@@ -4,18 +4,19 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import type { StatItem } from "@/lib/types";
-import { Users, Swords, Gamepad2, Activity, DollarSign, Eye } from "lucide-react";
+// Removed direct icon imports as they will be handled in StatsCard
+// import { Users, Swords, Gamepad2, Activity, DollarSign, Eye } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart, Tooltip as RechartsTooltip } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"; // Removed RechartsTooltip as it's not used
 
 // Placeholder admin stats
 const platformAnalytics: StatItem[] = [
-  { title: "Total Registered Users", value: "1,250", icon: Users },
-  { title: "Total Tournaments Hosted", value: 85, icon: Swords },
-  { title: "Total Matches Played", value: "3,420", icon: Gamepad2 },
-  { title: "Daily Active Users (Avg)", value: 230, icon: Eye },
-  // { title: "Total Revenue (Placeholder)", value: "$5,670", icon: DollarSign },
+  { title: "Total Registered Users", value: "1,250", icon: "Users" },
+  { title: "Total Tournaments Hosted", value: 85, icon: "Swords" },
+  { title: "Total Matches Played", value: "3,420", icon: "Gamepad2" },
+  { title: "Daily Active Users (Avg)", value: 230, icon: "Eye" },
+  // { title: "Total Revenue (Placeholder)", value: "$5,670", icon: "DollarSign" },
 ];
 
 // Placeholder data for charts

@@ -5,7 +5,8 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem } from "@/lib/types";
-import { BarChart3, Users, Trophy, Gamepad2 } from "lucide-react";
+// Removed direct icon imports as they will be handled in StatsCard
+// import { BarChart3, Users, Trophy, Gamepad2 } from "lucide-react"; 
 
 // Placeholder data - replace with actual data fetching
 const placeholderFeaturedTournament: Tournament = {
@@ -59,10 +60,10 @@ const placeholderLiveTournaments: Tournament[] = [
 ];
 
 const placeholderStats: StatItem[] = [
-  { title: "Active Tournaments", value: 2, icon: Trophy, change: "+1" },
-  { title: "Total Players", value: "1,234", icon: Users, change: "+52" },
-  { title: "Matches Played Today", value: 87, icon: Gamepad2, change: "+15" },
-  { title: "Your Rank (Overall)", value: "#42", icon: BarChart3, change: "-2" },
+  { title: "Active Tournaments", value: 2, icon: "Trophy", change: "+1" },
+  { title: "Total Players", value: "1,234", icon: "Users", change: "+52" },
+  { title: "Matches Played Today", value: 87, icon: "Gamepad2", change: "+15" },
+  { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3", change: "-2" },
 ];
 
 const placeholderGames: Game[] = [

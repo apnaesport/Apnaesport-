@@ -2,17 +2,17 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard"; // Reusing StatsCard
 import type { StatItem } from "@/lib/types";
-import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react";
+import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react"; // Kept for quickActions, not StatsCard
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 // Placeholder admin stats - replace with actual data
 const adminStats: StatItem[] = [
-  { title: "Total Users", value: "1,250", icon: Users, change: "+20 this week" },
-  { title: "Active Tournaments", value: 15, icon: Swords, change: "+3" },
-  { title: "Supported Games", value: 8, icon: Gamepad2 },
-  { title: "Pending Approvals", value: 3, icon: Bell, change: "Action needed" },
+  { title: "Total Users", value: "1,250", icon: "Users", change: "+20 this week" },
+  { title: "Active Tournaments", value: 15, icon: "Swords", change: "+3" },
+  { title: "Supported Games", value: 8, icon: "Gamepad2" },
+  { title: "Pending Approvals", value: 3, icon: "Bell", change: "Action needed" },
 ];
 
 const quickActions = [

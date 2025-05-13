@@ -5,20 +5,20 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard"; // Reusing StatsCard
 import type { StatItem } from "@/lib/types";
-import { BarChart3, Trophy, Percent, Zap, Activity, Swords } from "lucide-react";
+import { Activity } from "lucide-react"; // For CardTitle icon
+// Removed direct icon imports for StatItem as they will be handled in StatsCard
+// import { BarChart3, Trophy, Percent, Zap, Swords } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-// Charting libraries would be imported here if used
-// import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip as RechartsTooltip } from "recharts"
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts" // Removed RechartsTooltip
 
 
 // Placeholder user stats - replace with actual data
 const userOverallStats: StatItem[] = [
-  { title: "Total Matches Played", value: 152, icon: Swords },
-  { title: "Tournaments Won", value: 7, icon: Trophy },
-  { title: "Win Rate", value: "63%", icon: Percent },
-  { title: "Average K/D Ratio", value: "1.85", icon: Zap },
+  { title: "Total Matches Played", value: 152, icon: "Swords" },
+  { title: "Tournaments Won", value: 7, icon: "Trophy" },
+  { title: "Win Rate", value: "63%", icon: "Percent" },
+  { title: "Average K/D Ratio", value: "1.85", icon: "Zap" },
 ];
 
 // Placeholder data for a chart

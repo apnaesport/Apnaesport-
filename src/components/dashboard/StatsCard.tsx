@@ -2,16 +2,26 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { StatItem } from "@/lib/types";
+import type { StatItem, LucideIconName } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { icons, type LucideProps } from "lucide-react";
+import type React from "react";
 
 interface StatsCardProps {
   item: StatItem;
   className?: string;
 }
 
+// Helper to get Lucide icon component by name
+const getIconComponent = (iconName?: LucideIconName): React.ComponentType<LucideProps> | null => {
+  if (!iconName) return null;
+  const IconComponent = icons[iconName];
+  return IconComponent || null;
+};
+
+
 export function StatsCard({ item, className }: StatsCardProps) {
-  const IconComponent = item.icon;
+  const IconComponent = getIconComponent(item.icon);
   return (
     <Card className={cn("shadow-md hover:shadow-lg transition-shadow duration-200", className)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -27,7 +37,7 @@ export function StatsCard({ item, className }: StatsCardProps) {
             "text-xs text-muted-foreground mt-1",
             item.change.startsWith('+') ? 'text-green-500' : item.change.startsWith('-') ? 'text-red-500' : ''
           )}>
-            {item.change} from last month
+            {item.change}
           </p>
         )}
       </CardContent>

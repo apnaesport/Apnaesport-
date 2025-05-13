@@ -1,4 +1,7 @@
 import type { User as FirebaseUser } from "firebase/auth";
+import type { icons } from "lucide-react";
+
+export type LucideIconName = keyof typeof icons;
 
 export interface UserProfile extends FirebaseUser {
   displayName: string | null;
@@ -58,6 +61,6 @@ export type Tournament = {
 export type StatItem = {
   title: string;
   value: string | number;
-  icon?: React.ElementType;
+  icon?: LucideIconName; // Changed from React.ElementType to string
   change?: string; // e.g., "+5%"
 };
