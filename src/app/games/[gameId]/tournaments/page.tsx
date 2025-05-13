@@ -1,0 +1,155 @@
+
+import { PageTitle } from "@/components/shared/PageTitle";
+import { TournamentCard } from "@/components/tournaments/TournamentCard";
+import type { Game, Tournament } from "@/lib/types";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import Image from "next/image";
+import { PlusCircle } from "lucide-react";
+
+// Placeholder data - replace with actual data fetching based on gameId
+const getGameDetails = (gameId: string): Game | undefined => {
+  const games: Game[] = [
+    { id: "game-lol", name: "League of Legends", iconUrl: "https://picsum.photos/seed/lol-icon/80/80", bannerUrl: "https://picsum.photos/seed/lol-page-banner/1200/300" },
+    { id: "game-valo", name: "Valorant", iconUrl: "https://picsum.photos/seed/valo-icon/80/80", bannerUrl: "https://picsum.photos/seed/valo-page-banner/1200/300" },
+  ];
+  return games.find(g => g.id === gameId);
+};
+
+const getTournamentsForGame = (gameId: string): Tournament[] => {
+  // Simulating different tournaments for different games
+  const baseTournaments: Omit<Tournament, 'id' | 'gameId' | 'gameName' | 'gameIconUrl'>[] = [
+    {
+      name: "Weekly Skirmish",
+      bannerImageUrl: "https://picsum.photos/seed/tourney-banner1/400/200",
+      description: "Join our weekly skirmish for fun and prizes!",
+      status: "Upcoming",
+      startDate: new Date(new Date().setDate(new Date().getDate() + 3)),
+      participants: [],
+      maxParticipants: 32,
+      prizePool: "$100",
+      bracketType: "Single Elimination",
+    },
+    {
+      name: "Champions Cup",
+      bannerImageUrl: "https://picsum.photos/seed/tourney-banner2/400/200",
+      description: "The ultimate test of skill. Compete against the best!",
+      status: "Live",
+      startDate: new Date(new Date().setDate(new Date().getDate() - 1)),
+      participants: Array(10).fill({ id: '', name: ''}),
+      maxParticipants: 16,
+      prizePool: "$1,000",
+      bracketType: "Double Elimination",
+    },
+    {
+      name: "Community Showdown",
+      bannerImageUrl: "https://picsum.photos/seed/tourney-banner3/400/200",
+      description: "A friendly tournament for all skill levels.",
+      status: "Completed",
+      startDate: new Date(new Date().setDate(new Date().getDate() - 10)),
+      endDate: new Date(new Date().setDate(new Date().getDate() - 8)),
+      participants: Array(16).fill({ id: '', name: ''}),
+      maxParticipants: 16,
+      prizePool: "Bragging Rights",
+      bracketType: "Round Robin",
+    },
+  ];
+  
+  const game = getGameDetails(gameId);
+  if (!game) return [];
+
+  return baseTournaments.map((t, index) => ({
+    ...t,
+    id: `${gameId}-tourney-${index + 1}`,
+    gameId: game.id,
+    gameName: game.name,
+    gameIconUrl: game.iconUrl,
+  }));
+};
+
+interface GameTournamentsPageProps {
+  params: { gameId: string };
+}
+
+export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
+  const { gameId } = params;
+  const game = getGameDetails(gameId); // Fetch actual game details
+  const tournaments = getTournamentsForGame(gameId); // Fetch tournaments for this game
+
+  if (!game) {
+    return (
+      <div className="text-center py-10">
+        <PageTitle title="Game Not Found" />
+        <p className="text-muted-foreground">The game you are looking for does not exist.</p>
+        <Button asChild className="mt-4">
+          <Link href="/games">Back to Games</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  const upcomingTournaments = tournaments.filter(t => t.status === "Upcoming");
+  const liveTournaments = tournaments.filter(t => t.status === "Live" || t.status === "Ongoing");
+  const completedTournaments = tournaments.filter(t => t.status === "Completed");
+
+  return (
+    <div className="space-y-8">
+      <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-lg">
+        <Image 
+          src={game.bannerUrl || `https://picsum.photos/seed/${game.id}-banner/1200/300`} 
+          alt={`${game.name} banner`} 
+          layout="fill" 
+          objectFit="cover"
+          className="transition-transform duration-500 group-hover:scale-105"
+          data-ai-hint="game background art"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
+        <div className="absolute bottom-0 left-0 p-6 md:p-8">
+          <div className="flex items-center">
+            <Image src={game.iconUrl} alt={game.name} width={64} height={64} className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large" />
+            <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-end">
+        <Button asChild>
+          <Link href={`/tournaments/new?gameId=${game.id}`}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
+          </Link>
+        </Button>
+      </div>
+
+      <Tabs defaultValue="upcoming" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
+          <TabsTrigger value="upcoming">Upcoming ({upcomingTournaments.length})</TabsTrigger>
+          <TabsTrigger value="live">Live ({liveTournaments.length})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedTournaments.length})</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="upcoming" className="mt-6">
+          {upcomingTournaments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {upcomingTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
+            </div>
+          ) : <p className="text-muted-foreground py-4">No upcoming tournaments for {game.name} right now.</p>}
+        </TabsContent>
+        <TabsContent value="live" className="mt-6">
+          {liveTournaments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {liveTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
+            </div>
+          ) : <p className="text-muted-foreground py-4">No live tournaments for {game.name} at the moment.</p>}
+        </TabsContent>
+        <TabsContent value="completed" className="mt-6">
+          {completedTournaments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {completedTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
+            </div>
+          ) : <p className="text-muted-foreground py-4">No completed tournaments for {game.name} yet.</p>}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
