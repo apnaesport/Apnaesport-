@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Palette, ShieldLock } from "lucide-react";
+import { Bell, Palette, Shield } from "lucide-react"; // Changed ShieldLock to Shield
 
 export default function SettingsPage() {
   // Placeholder states for settings - in a real app, these would come from user preferences
@@ -34,14 +34,14 @@ export default function SettingsPage() {
                 <Label htmlFor="email-notifications" className="font-medium">Email Notifications</Label>
                 <p className="text-sm text-muted-foreground">Receive updates about tournaments, matches, and platform news via email.</p>
               </div>
-              <Switch id="email-notifications" checked={true} />
+              <Switch id="email-notifications" defaultChecked={true} />
             </div>
             <div className="flex items-center justify-between p-4 border rounded-md">
               <div>
                 <Label htmlFor="push-notifications" className="font-medium">Push Notifications</Label>
                 <p className="text-sm text-muted-foreground">Get real-time alerts on your device. (Requires browser permission)</p>
               </div>
-              <Switch id="push-notifications" checked={false} />
+              <Switch id="push-notifications" defaultChecked={false} />
             </div>
           </CardContent>
         </Card>
@@ -69,7 +69,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <ShieldLock className="mr-2 h-5 w-5 text-primary" /> Account & Security
+              <Shield className="mr-2 h-5 w-5 text-primary" /> Account & Security {/* Changed ShieldLock to Shield */}
             </CardTitle>
             <CardDescription>Manage your account security and data.</CardDescription>
           </CardHeader>
@@ -87,3 +87,4 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
+

@@ -1,7 +1,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Edit, Ban, ShieldCheck, ShieldAlert } from "lucide-react";
+import { UserPlus, Edit, Ban, ShieldCheck, ShieldAlert, Users } from "lucide-react"; // Added Users icon
 import Link from "next/link";
 import type { UserProfile } from "@/lib/types"; // Assuming UserProfile includes isAdmin
 import {
@@ -74,7 +74,7 @@ export default function AdminUsersPage() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} />
+                      <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} data-ai-hint="user avatar" />
                       <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                     </Avatar>
                     <span className="font-medium">{user.displayName || "N/A"}</span>
@@ -126,3 +126,4 @@ export default function AdminUsersPage() {
     </div>
   );
 }
+
