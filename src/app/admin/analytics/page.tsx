@@ -3,7 +3,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import type { StatItem, Tournament } from "@/lib/types";
+import type { StatItem } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts";
@@ -45,7 +45,15 @@ export default function AdminAnalyticsPage() {
     setIsLoading(true);
     try {
       const currentTournaments = await getTournamentsFromFirestore();
-      const totalMatchesPlayed = currentTournaments.reduce((acc, t) => acc + (t.matches?.length || 0), 0);
+      const totalMatchesPlayed = currentTournaments.reduce((acc, t) => {
+          const matchesCount = t.matches?.length || 0;
+          // For Round Robin, if each pair plays once, N*(N-1)/2 matches for N participants
+          // This is a simplified calculation for placeholder; real match counting can be complex.
+          if (t.bracketType === "Round Robin" && t.participants.length > 1 && matchesCount === 0) {
+              return acc + (t.participants.length * (t.participants.length - 1) / 2);
+          }
+          return acc + matchesCount;
+      }, 0);
       
       const placeholderTotalUsers = "1,250"; 
       const placeholderDailyActive = 230; 
@@ -53,7 +61,7 @@ export default function AdminAnalyticsPage() {
       setPlatformAnalytics([
         { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, 
         { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, 
-        { title: "Total Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" }, 
+        { title: "Total Matches Played (Est.)", value: totalMatchesPlayed, icon: "Gamepad2" }, 
         { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, 
       ]);
     } catch (error) {

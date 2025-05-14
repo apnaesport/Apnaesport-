@@ -9,7 +9,6 @@ import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
 import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import { useEffect, useState, useCallback } from "react"; 
-import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,8 +29,9 @@ export default function DashboardPage() {
         getGamesFromFirestore()
       ]);
 
-      const ft = allTournaments.find(t => t.featured && t.status === "Upcoming") || 
-                   allTournaments.find(t => t.status === "Upcoming") || 
+      const upcomingTournaments = allTournaments.filter(t => t.status === "Upcoming");
+      const ft = allTournaments.find(t => t.featured && upcomingTournaments.includes(t)) || 
+                   upcomingTournaments[0] || 
                    allTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0]; 
       setFeaturedTournament(ft);
 
@@ -78,9 +78,11 @@ export default function DashboardPage() {
           <FeaturedTournamentCard tournament={featuredTournament} />
         </section>
       ) : (
-        <div className="bg-card p-8 rounded-lg shadow-md text-center">
-          <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
-        </div>
+        !isLoading && ( // Only show "No featured" if not loading
+          <div className="bg-card p-8 rounded-lg shadow-md text-center">
+            <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
+          </div>
+        )
       )}
 
       <section>
@@ -92,7 +94,7 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
+           !isLoading && <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
         )}
       </section>
 

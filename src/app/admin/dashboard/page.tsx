@@ -3,7 +3,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import type { StatItem, Game, Tournament } from "@/lib/types";
+import type { StatItem } from "@/lib/types";
 import { Users, Swords, Gamepad2, Bell, PlusCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,7 +39,7 @@ export default function AdminDashboardPage() {
 
       setAdminStats([
         { title: "Total Users", value: placeholderTotalUsers, icon: "Users", change: "+0 this week" }, 
-        { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: "" }, 
+        { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: `${currentTournaments.filter(t => t.status === "Live").length} live` }, 
         { title: "Supported Games", value: currentGames.length, icon: "Gamepad2" }, 
         { title: "Pending Approvals", value: placeholderPendingApprovals, icon: "Bell", change: "Action needed" }, 
       ]);
@@ -98,7 +98,7 @@ export default function AdminDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Overview of recent user registrations, tournament creations, etc.</CardDescription>
+            <CardDescription>Overview of recent user registrations, tournament creations, etc. (Placeholder)</CardDescription>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground">Recent activity feed will be displayed here. (Placeholder)</p>
