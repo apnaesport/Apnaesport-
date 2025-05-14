@@ -12,11 +12,11 @@ import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTr
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useEffect, useCallback } // Added useCallback
+import { useState, useEffect, useCallback } 
 from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentByIdFromFirestore, addParticipantToTournament, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
+import { getTournamentByIdFromFirestore, addParticipantToTournament, deleteTournamentFromFirestore as deleteTournamentAction, updateTournamentInFirestore } from "@/lib/tournamentStore"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 
 interface TournamentPageProps {
@@ -101,12 +102,16 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         name: user.displayName || "Anonymous Player", 
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
       };
-      await addParticipantToTournament(tournament.id, newParticipant);
+      // Instead of addParticipantToTournament, we directly update the tournament
+      // to ensure Firestore upsert logic (if defined there) is used.
+      const updatedParticipants = [...tournament.participants, newParticipant];
+      await updateTournamentInFirestore(tournament.id, { participants: updatedParticipants });
+      
       toast({
         title: "Successfully Registered!",
         description: `You have joined ${tournament.name}.`,
       });
-      await fetchTournament(); // Re-fetch to update participant list and status
+      await fetchTournament(); 
     } catch (error: any) {
       console.error("Error joining tournament:", error);
       toast({ title: "Join Failed", description: error.message || "Could not join tournament.", variant: "destructive" });
@@ -173,7 +178,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
 
   return (
     <div className="space-y-8">
-      <div className="relative h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
+      <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
         <Image 
           src={tournament.bannerImageUrl} 
           alt={`${tournament.name} banner`} 
@@ -186,10 +191,10 @@ export default function TournamentPage({ params }: TournamentPageProps) {
           onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournament.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-        <div className="absolute bottom-0 left-0 p-6 md:p-8">
-          <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-sm px-3 py-1">{tournament.status}</Badge>
-          <PageTitle title={tournament.name} className="mb-0 text-shadow text-white" /> 
-          <div className="flex items-center mt-2 text-sm text-slate-200 drop-shadow-sm">
+        <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
+          <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
+          <PageTitle title={tournament.name} className="mb-0 text-shadow !text-xl sm:!text-2xl md:!text-3xl text-white" /> 
+          <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm text-slate-200 drop-shadow-sm">
             <Image 
               src={tournament.gameIconUrl} 
               alt={tournament.gameName} 
@@ -207,13 +212,16 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <Tabs defaultValue="bracket" className="w-full">
-            <TabsList>
-              <TabsTrigger value="bracket">Bracket</TabsTrigger>
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="participants">Participants ({tournament.participants.length})</TabsTrigger>
-              <TabsTrigger value="rules">Rules</TabsTrigger>
-              {tournament.registrationInstructions && <TabsTrigger value="howToJoin">How to Join</TabsTrigger>}
-            </TabsList>
+            <ScrollArea className="w-full whitespace-nowrap">
+              <TabsList className="inline-flex w-auto">
+                <TabsTrigger value="bracket">Bracket</TabsTrigger>
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="participants">Participants ({tournament.participants.length})</TabsTrigger>
+                <TabsTrigger value="rules">Rules</TabsTrigger>
+                {tournament.registrationInstructions && <TabsTrigger value="howToJoin">How to Join</TabsTrigger>}
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
 
             <TabsContent value="bracket" className="mt-6">
               <Card>
@@ -318,7 +326,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         <div className="lg:col-span-1 space-y-6">
           <Card className="bg-gradient-to-br from-primary/80 to-accent/80 text-primary-foreground shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl">
+              <CardTitle className="text-xl sm:text-2xl">
                 {tournament.status === "Upcoming" && "Ready to Join?"}
                 {tournament.status === "Live" && "Tournament is Live!"}
                 {tournament.status === "Completed" && "Tournament Ended"}
@@ -326,7 +334,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="mb-4">
+              <p className="mb-4 text-sm sm:text-base">
                 {tournament.status === "Upcoming" && "Registrations are open! Secure your spot now."}
                 {tournament.status === "Live" && "Tournament is live! Check registration details. You might still be able to join late if allowed by the organizer."}
                 {tournament.status === "Completed" && "This tournament has concluded. Check out the results!"}

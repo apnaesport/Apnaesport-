@@ -39,7 +39,7 @@ const gameSchema = z.object({
   bannerUrl: z.string().url("Must be a valid URL for the banner.").optional().or(z.literal('')),
   iconFile: z.custom<FileList>().optional(),
   bannerFile: z.custom<FileList>().optional(),
-  dataAiHint: z.string().max(30, "AI Hint too long").optional(), // Max length example
+  dataAiHint: z.string().max(30, "AI Hint too long (max 2 words recommended)").optional(),
 });
 type GameFormData = z.infer<typeof gameSchema>;
 
@@ -48,8 +48,8 @@ export default function AdminGamesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true); // For page load
-  const [isSubmitting, setIsSubmitting] = useState(false); // For form submission
+  const [isLoading, setIsLoading] = useState(true); 
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
@@ -90,8 +90,13 @@ export default function AdminGamesPage() {
       };
       reader.readAsDataURL(file);
     } else {
-       if (type === 'icon') setIconPreview(null);
-       else setBannerPreview(null);
+       if (type === 'icon') {
+        setIconPreview(editingGame?.iconUrl || null);
+        form.setValue('iconUrl', editingGame?.iconUrl || "");
+       } else {
+        setBannerPreview(editingGame?.bannerUrl || null);
+        form.setValue('bannerUrl', editingGame?.bannerUrl || "");
+       }
     }
   };
 
@@ -102,20 +107,18 @@ export default function AdminGamesPage() {
     let finalIconUrl = data.iconUrl;
     let finalBannerUrl = data.bannerUrl;
 
-    // Use uploaded file if present, otherwise use URL or placeholder
-    if (form.getValues('iconFile')?.[0] && iconPreview) {
-        finalIconUrl = iconPreview; 
-    } else if (!finalIconUrl && !editingGame?.iconUrl) { // Only apply placeholder if no URL and no existing icon
+    if (iconPreview && iconPreview.startsWith('data:image')) { // Prefer Data URI from preview if available
+        finalIconUrl = iconPreview;
+    } else if (!finalIconUrl && !editingGame?.iconUrl) {
          finalIconUrl = `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`;
     }
 
-    if (form.getValues('bannerFile')?.[0] && bannerPreview) {
+    if (bannerPreview && bannerPreview.startsWith('data:image')) { // Prefer Data URI from preview
         finalBannerUrl = bannerPreview;
-    } else if (!finalBannerUrl && !editingGame?.bannerUrl) { // Only apply placeholder if no URL and no existing banner
+    } else if (!finalBannerUrl && !editingGame?.bannerUrl) {
         finalBannerUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`;
     }
     
-    // Basic URL validation beyond Zod's, as Data URIs are also valid
     if (finalIconUrl && !finalIconUrl.startsWith('data:image') && !finalIconUrl.startsWith('https://placehold.co') && !finalIconUrl.startsWith('http')) {
       form.setError("iconUrl", { type: "manual", message: "Icon URL must be a valid URL or a Data URI." });
     }
@@ -131,8 +134,8 @@ export default function AdminGamesPage() {
     try {
       const gameDataToSave: Omit<Game, 'id' | 'createdAt' | 'updatedAt'> = {
         name: data.name,
-        iconUrl: finalIconUrl || "https://placehold.co/40x40.png", // Ensure fallback
-        bannerUrl: finalBannerUrl || "https://placehold.co/400x300.png", // Ensure fallback
+        iconUrl: finalIconUrl || `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`,
+        bannerUrl: finalBannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`,
         dataAiHint: data.dataAiHint || data.name.toLowerCase().split(" ").slice(0,2).join(" "),
       };
 
@@ -143,7 +146,7 @@ export default function AdminGamesPage() {
         await addGameToFirestore(gameDataToSave);
         toast({ title: "Game Added", description: `${data.name} has been added.` });
       }
-      await fetchGames(); // Re-fetch games to show the latest data
+      await fetchGames();
       form.reset();
       setIconPreview(null);
       setBannerPreview(null);
@@ -160,22 +163,23 @@ export default function AdminGamesPage() {
     setEditingGame(game);
     form.reset({ 
       name: game.name, 
-      iconUrl: game.iconUrl.startsWith('data:image') ? '' : game.iconUrl, // Clear URL if it's a data URI to encourage re-upload or re-paste
-      bannerUrl: game.bannerUrl?.startsWith('data:image') ? '' : game.bannerUrl || "",
+      iconUrl: game.iconUrl.startsWith('data:image') ? game.iconUrl : game.iconUrl,
+      bannerUrl: game.bannerUrl?.startsWith('data:image') ? game.bannerUrl : game.bannerUrl || "",
       dataAiHint: game.dataAiHint || ""
     });
-    setIconPreview(game.iconUrl.startsWith('data:image') ? game.iconUrl : null); // Show preview for data URI
-    setBannerPreview(game.bannerUrl?.startsWith('data:image') ? game.bannerUrl : null);
+    // Set previews regardless of whether it's data URI or URL for consistency in display
+    setIconPreview(game.iconUrl);
+    setBannerPreview(game.bannerUrl || null);
     setIsDialogOpen(true);
   };
   
   const handleDelete = async (gameId: string, gameName: string) => {
     if (confirm(`Are you sure you want to delete the game: "${gameName}"? This action cannot be undone.`)) {
-      setIsSubmitting(true); // Use isSubmitting to disable buttons during delete
+      setIsSubmitting(true); 
       try {
         await deleteGameFromFirestore(gameId);
         toast({ title: "Game Deleted", description: `"${gameName}" has been removed.`, variant: "destructive" });
-        await fetchGames(); // Re-fetch
+        await fetchGames(); 
       } catch (error) {
         console.error("Error deleting game:", error);
         toast({ title: "Error", description: `Could not delete "${gameName}".`, variant: "destructive" });
@@ -194,9 +198,9 @@ export default function AdminGamesPage() {
   
   if (isLoading && games.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="ml-4 text-lg">Loading games...</p>
+        <p className="mt-4 text-lg text-muted-foreground">Loading games...</p>
       </div>
     );
   }
@@ -214,7 +218,7 @@ export default function AdminGamesPage() {
       />
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => {
-        if (isSubmitting) return; // Prevent closing while submitting
+        if (isSubmitting) return; 
         setIsDialogOpen(open);
         if (!open) {
           form.reset();
@@ -223,7 +227,7 @@ export default function AdminGamesPage() {
           setEditingGame(null);
         }
       }}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle>{editingGame ? "Edit Game" : "Add New Game"}</DialogTitle>
             <DialogDescription>
@@ -241,7 +245,7 @@ export default function AdminGamesPage() {
               <Label htmlFor="iconFile" className="text-right">Icon</Label>
               <Input id="iconFile" type="file" {...form.register("iconFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')} disabled={isSubmitting}/>
             </div>
-            {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="col-start-2 col-span-3 rounded-md border" data-ai-hint='game icon preview'/>}
+            {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="col-start-2 col-span-3 rounded-md border object-cover" data-ai-hint='game icon preview' unoptimized={iconPreview.startsWith('data:image')}/>}
             <div className="grid grid-cols-4 items-center gap-4">
                  <Label htmlFor="iconUrl" className="text-right">Or Icon URL</Label>
                  <Input id="iconUrl" {...form.register("iconUrl")} className="col-span-3" placeholder="https://placehold.co/40x40.png" disabled={isSubmitting}/>
@@ -252,7 +256,7 @@ export default function AdminGamesPage() {
               <Label htmlFor="bannerFile" className="text-right">Banner</Label>
               <Input id="bannerFile" type="file" {...form.register("bannerFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isSubmitting}/>
             </div>
-            {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={150} className="col-start-2 col-span-3 rounded-md border" data-ai-hint='game banner preview'/>}
+            {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={150} className="col-start-2 col-span-3 rounded-md border object-cover" data-ai-hint='game banner preview' unoptimized={bannerPreview.startsWith('data:image')}/>}
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="bannerUrl" className="text-right">Or Banner URL</Label>
                 <Input id="bannerUrl" {...form.register("bannerUrl")} className="col-span-3" placeholder="https://placehold.co/400x300.png" disabled={isSubmitting}/>
@@ -283,10 +287,10 @@ export default function AdminGamesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Icon</TableHead>
+              <TableHead className="w-[60px]">Icon</TableHead>
               <TableHead>Name</TableHead>
-              <TableHead>AI Hint</TableHead>
-              <TableHead>Actions</TableHead>
+              <TableHead className="hidden sm:table-cell">AI Hint</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,19 +302,21 @@ export default function AdminGamesPage() {
                     alt={game.name} 
                     width={40} 
                     height={40} 
-                    className="rounded-md" 
+                    className="rounded-md object-cover" 
                     data-ai-hint={game.dataAiHint || "game logo"}
-                    unoptimized={game.iconUrl.startsWith('data:image')} // Important for Data URLs
+                    unoptimized={game.iconUrl.startsWith('data:image')} 
                     onError={(e) => (e.currentTarget.src = `https://placehold.co/40x40.png?text=${game.name.substring(0,2)}`)} />
                 </TableCell>
                 <TableCell className="font-medium">{game.name}</TableCell>
-                <TableCell className="text-xs text-muted-foreground">{game.dataAiHint}</TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
+                <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{game.dataAiHint}</TableCell>
+                <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap text-right">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(game)} disabled={isSubmitting}>
-                    <Edit className="h-4 w-4" />
+                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
                   </Button>
                   <Button variant="destructive" size="sm" onClick={() => handleDelete(game.id, game.name)} disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    {isDeleting === game.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                     <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
                   </Button>
                 </TableCell>
               </TableRow>
