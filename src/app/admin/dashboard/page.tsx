@@ -60,7 +60,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <PageTitle title="Admin Dashboard" subtitle="Oversee and manage TournamentHub." />
+      <PageTitle title="Admin Dashboard" subtitle="Oversee and manage Apna Esport." />
 
       <section>
         <h2 className="text-xl font-semibold mb-4 text-foreground">Platform Overview</h2>

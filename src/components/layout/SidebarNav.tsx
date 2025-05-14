@@ -2,14 +2,14 @@
 "use client";
 
 import {
-  Home,
   LayoutDashboard,
   Swords,
   Gamepad2,
   Settings,
   LogOut,
   ShieldCheck,
-  BarChart3
+  BarChart3,
+  Loader2
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -20,6 +20,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -35,11 +36,25 @@ const secondaryNavItems = [
 export function SidebarNav() {
   const pathname = usePathname();
   const { logout, isAdmin } = useAuth();
+  const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === href;
-    return pathname.startsWith(href);
+    if (href === "/dashboard") return pathname === href; // Exact match for dashboard
+    if (href === "/admin/dashboard" && pathname.startsWith("/admin")) return true; // Special case for admin root
+    return pathname.startsWith(href) && href !== "/admin/dashboard"; // StartsWith for others, but not admin root itself unless on it
   };
+  
+  useEffect(() => {
+    // Clear navigation indicator when pathname changes
+    setNavigatingTo(null);
+  }, [pathname]);
+
+  const handleNavigate = (href: string) => {
+    if (pathname !== href) { // Only set if navigating to a different page
+      setNavigatingTo(href);
+    }
+  };
+
 
   return (
     <>
@@ -48,17 +63,16 @@ export function SidebarNav() {
           <SidebarMenuItem key={item.href}>
             <Link href={item.href} passHref legacyBehavior>
               <SidebarMenuButton
-                asChild
+                as="a" // Use 'a' for proper Link behavior
                 isActive={isActive(item.href)}
                 tooltip={item.label}
+                onClick={() => handleNavigate(item.href)}
                 className={cn(
                   isActive(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground"
                 )}
               >
-                <a>
-                  <item.icon />
-                  <span>{item.label}</span>
-                </a>
+                {navigatingTo === item.href ? <Loader2 className="animate-spin" /> : <item.icon />}
+                <span>{item.label}</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
@@ -71,17 +85,16 @@ export function SidebarNav() {
              <SidebarMenuItem>
                <Link href="/admin/dashboard" passHref legacyBehavior>
                  <SidebarMenuButton
-                    asChild
+                    as="a"
                     isActive={isActive("/admin/dashboard")}
                     tooltip="Admin Panel"
+                    onClick={() => handleNavigate("/admin/dashboard")}
                     className={cn(
                       isActive("/admin/dashboard") && "bg-sidebar-accent text-sidebar-accent-foreground"
                     )}
                  >
-                    <a>
-                      <ShieldCheck />
-                      <span>Admin Panel</span>
-                    </a>
+                    {navigatingTo === "/admin/dashboard" ? <Loader2 className="animate-spin" /> : <ShieldCheck />}
+                    <span>Admin Panel</span>
                  </SidebarMenuButton>
                </Link>
              </SidebarMenuItem>
@@ -90,23 +103,29 @@ export function SidebarNav() {
             <SidebarMenuItem key={item.href}>
               <Link href={item.href} passHref legacyBehavior>
                 <SidebarMenuButton
-                  asChild
+                  as="a"
                   isActive={isActive(item.href)}
                   tooltip={item.label}
+                  onClick={() => handleNavigate(item.href)}
                   className={cn(
                     isActive(item.href) && "bg-sidebar-accent text-sidebar-accent-foreground"
                   )}
                 >
-                  <a>
-                    <item.icon />
-                    <span>{item.label}</span>
-                  </a>
+                  {navigatingTo === item.href ? <Loader2 className="animate-spin" /> : <item.icon />}
+                  <span>{item.label}</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
           ))}
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={logout} tooltip="Logout" className="text-destructive hover:bg-destructive/20 hover:text-destructive-foreground/80 focus:bg-destructive/30 focus:text-destructive-foreground">
+            <SidebarMenuButton 
+              onClick={() => {
+                // Optionally, set navigatingTo state here if logout involves a route change that isn't immediate
+                logout();
+              }} 
+              tooltip="Logout" 
+              className="text-destructive hover:bg-destructive/20 hover:text-destructive-foreground/80 focus:bg-destructive/30 focus:text-destructive-foreground"
+            >
               <LogOut />
               <span>Logout</span>
             </SidebarMenuButton>

@@ -3,7 +3,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Upload } from "lucide-react";
+import { PlusCircle, Edit, Trash2 } from "lucide-react";
 import type { Game } from "@/lib/types";
 import {
   Table,
@@ -36,10 +36,11 @@ import { getGames, addGame, updateGameInStore, deleteGameFromStore, subscribe } 
 const gameSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(2, "Game name must be at least 2 characters."),
-  iconUrl: z.string().url("Must be a valid URL for the icon.").or(z.literal('')).optional(), // Optional if file is provided
+  iconUrl: z.string().url("Must be a valid URL for the icon.").or(z.literal('')).optional(),
   bannerUrl: z.string().url("Must be a valid URL for the banner.").optional().or(z.literal('')),
   iconFile: z.custom<FileList>().optional(),
   bannerFile: z.custom<FileList>().optional(),
+  dataAiHint: z.string().optional(),
 });
 type GameFormData = z.infer<typeof gameSchema>;
 
@@ -64,7 +65,7 @@ export default function AdminGamesPage() {
 
   const form = useForm<GameFormData>({
     resolver: zodResolver(gameSchema),
-    defaultValues: { name: "", iconUrl: "", bannerUrl: "" },
+    defaultValues: { name: "", iconUrl: "", bannerUrl: "", dataAiHint: "" },
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
@@ -74,10 +75,10 @@ export default function AdminGamesPage() {
       reader.onloadend = () => {
         if (type === 'icon') {
           setIconPreview(reader.result as string);
-          form.setValue('iconUrl', reader.result as string); // Store as data URL
+          form.setValue('iconUrl', reader.result as string); 
         } else {
           setBannerPreview(reader.result as string);
-          form.setValue('bannerUrl', reader.result as string); // Store as data URL
+          form.setValue('bannerUrl', reader.result as string); 
         }
       };
       reader.readAsDataURL(file);
@@ -95,7 +96,7 @@ export default function AdminGamesPage() {
     let finalBannerUrl = data.bannerUrl;
 
     if (form.getValues('iconFile')?.[0] && iconPreview) {
-        finalIconUrl = iconPreview; // Use data URL from preview
+        finalIconUrl = iconPreview; 
     } else if (!finalIconUrl && !editingGame?.iconUrl) {
          finalIconUrl = `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`;
     }
@@ -107,7 +108,6 @@ export default function AdminGamesPage() {
         finalBannerUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`;
     }
     
-    // Validate URLs if they are not data URLs
     if (finalIconUrl && !finalIconUrl.startsWith('data:image') && !finalIconUrl.startsWith('https://placehold.co') && !finalIconUrl.startsWith('http')) {
       form.setError("iconUrl", { type: "manual", message: "Icon URL must be a valid URL or a placehold.co URL." });
     }
@@ -117,13 +117,14 @@ export default function AdminGamesPage() {
 
     if (form.formState.errors.name || form.formState.errors.iconUrl || form.formState.errors.bannerUrl) return;
 
-    setIsLoading(true);
+    setIsLoading(true); // For form submission UX
     try {
       const gameDataToSave: Game = {
         id: editingGame ? editingGame.id : `game-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         name: data.name,
-        iconUrl: finalIconUrl || "https://placehold.co/40x40.png", // Fallback
-        bannerUrl: finalBannerUrl || "https://placehold.co/400x300.png", // Fallback
+        iconUrl: finalIconUrl || "https://placehold.co/40x40.png",
+        bannerUrl: finalBannerUrl || "https://placehold.co/400x300.png",
+        dataAiHint: data.dataAiHint || data.name.toLowerCase().split(" ").slice(0,2).join(" "),
       };
 
       if (editingGame) {
@@ -147,21 +148,21 @@ export default function AdminGamesPage() {
 
   const handleEdit = (game: Game) => {
     setEditingGame(game);
-    form.reset({ name: game.name, iconUrl: game.iconUrl, bannerUrl: game.bannerUrl || "" });
+    form.reset({ name: game.name, iconUrl: game.iconUrl, bannerUrl: game.bannerUrl || "", dataAiHint: game.dataAiHint || ""});
     setIconPreview(game.iconUrl);
     setBannerPreview(game.bannerUrl || null);
     setIsDialogOpen(true);
   };
   
-  const handleDelete = async (gameId: string) => {
-    if (confirm("Are you sure you want to delete this game? This action cannot be undone.")) {
+  const handleDelete = async (gameId: string, gameName: string) => {
+    if (confirm(`Are you sure you want to delete the game: "${gameName}"? This action cannot be undone.`)) {
       setIsLoading(true);
       try {
         deleteGameFromStore(gameId);
-        toast({ title: "Game Deleted", description: "The game has been removed.", variant: "destructive" });
+        toast({ title: "Game Deleted", description: `"${gameName}" has been removed.`, variant: "destructive" });
       } catch (error) {
         console.error("Error deleting game:", error);
-        toast({ title: "Error", description: "Could not delete game.", variant: "destructive" });
+        toast({ title: "Error", description: `Could not delete "${gameName}".`, variant: "destructive" });
       }
       setIsLoading(false);
     }
@@ -169,7 +170,7 @@ export default function AdminGamesPage() {
 
   const openNewGameDialog = () => {
     setEditingGame(null);
-    form.reset({ name: "", iconUrl: "", bannerUrl: "" });
+    form.reset({ name: "", iconUrl: "", bannerUrl: "", dataAiHint:"" });
     setIconPreview(null);
     setBannerPreview(null);
     setIsDialogOpen(true);
@@ -195,9 +196,10 @@ export default function AdminGamesPage() {
           form.reset();
           setIconPreview(null);
           setBannerPreview(null);
+          setEditingGame(null);
         }
       }}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingGame ? "Edit Game" : "Add New Game"}</DialogTitle>
             <DialogDescription>
@@ -216,7 +218,7 @@ export default function AdminGamesPage() {
               <Label htmlFor="iconFile" className="text-right">Icon</Label>
               <Input id="iconFile" type="file" {...form.register("iconFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')}/>
             </div>
-            {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="col-start-2 col-span-3 rounded-md border data-ai-hint='game icon preview'"/>}
+            {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="col-start-2 col-span-3 rounded-md border" data-ai-hint='game icon preview'/>}
             <div className="grid grid-cols-4 items-center gap-4">
                  <Label htmlFor="iconUrl" className="text-right">Or Icon URL</Label>
                  <Input id="iconUrl" {...form.register("iconUrl")} className="col-span-3" placeholder="https://placehold.co/40x40.png"/>
@@ -229,12 +231,19 @@ export default function AdminGamesPage() {
               <Label htmlFor="bannerFile" className="text-right">Banner</Label>
               <Input id="bannerFile" type="file" {...form.register("bannerFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} />
             </div>
-            {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={150} className="col-start-2 col-span-3 rounded-md border data-ai-hint='game banner preview'"/>}
+            {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={150} className="col-start-2 col-span-3 rounded-md border" data-ai-hint='game banner preview'/>}
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="bannerUrl" className="text-right">Or Banner URL</Label>
                 <Input id="bannerUrl" {...form.register("bannerUrl")} className="col-span-3" placeholder="https://placehold.co/400x300.png"/>
                 {form.formState.errors.bannerUrl && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.bannerUrl.message}</p>}
             </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="dataAiHint" className="text-right">AI Hint</Label>
+              <Input id="dataAiHint" {...form.register("dataAiHint")} className="col-span-3" placeholder="e.g. esports game, fps shooter" />
+              <p className="col-start-2 col-span-3 text-xs text-muted-foreground">Keywords for AI image search (max 2 words).</p>
+            </div>
+
 
             <DialogFooter>
               <DialogClose asChild>
@@ -254,6 +263,7 @@ export default function AdminGamesPage() {
             <TableRow>
               <TableHead>Icon</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>AI Hint</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -267,22 +277,23 @@ export default function AdminGamesPage() {
                     width={40} 
                     height={40} 
                     className="rounded-md" 
-                    data-ai-hint="game logo"
+                    data-ai-hint={game.dataAiHint || "game logo"}
                     onError={(e) => (e.currentTarget.src = `https://placehold.co/40x40.png?text=${game.name.substring(0,2)}`)} />
                 </TableCell>
                 <TableCell className="font-medium">{game.name}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">{game.dataAiHint}</TableCell>
                 <TableCell className="space-x-2 whitespace-nowrap">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(game)} disabled={form.formState.isSubmitting || isLoading}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(game.id)} disabled={form.formState.isSubmitting || isLoading}>
+                  <Button variant="destructive" size="sm" onClick={() => handleDelete(game.id, game.name)} disabled={form.formState.isSubmitting || isLoading}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>
               </TableRow>
             )) : (
               <TableRow>
-                <TableCell colSpan={3} className="text-center h-24">
+                <TableCell colSpan={4} className="text-center h-24">
                   No games added yet.
                 </TableCell>
               </TableRow>

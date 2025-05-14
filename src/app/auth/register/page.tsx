@@ -33,14 +33,14 @@ export default function RegisterPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Create an Account</CardTitle>
-          <CardDescription>Join TournamentHub and start competing!</CardDescription>
+          <CardDescription>Join Apna Esport and start competing!</CardDescription>
         </CardHeader>
         <CardContent>
           <RegisterForm />
         </CardContent>
       </Card>
        <p className="mt-8 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} TournamentHub. All rights reserved.
+        &copy; {new Date().getFullYear()} Apna Esport. All rights reserved.
       </p>
     </div>
   );

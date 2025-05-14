@@ -11,7 +11,6 @@ import { Separator } from "@/components/ui/separator";
 import { Bell, Palette, Shield, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 
@@ -73,7 +72,7 @@ export default function SettingsPage() {
             <CardTitle className="flex items-center">
               <Bell className="mr-2 h-5 w-5 text-primary" /> Notification Settings
             </CardTitle>
-            <CardDescription>Control how you receive notifications from TournamentHub.</CardDescription>
+            <CardDescription>Control how you receive notifications from Apna Esport.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between p-4 border rounded-md">
@@ -98,7 +97,7 @@ export default function SettingsPage() {
             <CardTitle className="flex items-center">
               <Palette className="mr-2 h-5 w-5 text-primary" /> Appearance
             </CardTitle>
-            <CardDescription>Customize the look and feel of TournamentHub.</CardDescription>
+            <CardDescription>Customize the look and feel of Apna Esport.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="flex items-center justify-between p-4 border rounded-md">

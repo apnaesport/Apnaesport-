@@ -12,7 +12,6 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const placeholderUserOverallStats: StatItem[] = [
@@ -78,7 +77,7 @@ export default function StatsPage() {
 
   return (
     <MainLayout>
-      <PageTitle title="My Statistics" subtitle="Track your performance and achievements on TournamentHub." />
+      <PageTitle title="My Statistics" subtitle="Track your performance and achievements on Apna Esport." />
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4 text-foreground">Overall Performance</h2>

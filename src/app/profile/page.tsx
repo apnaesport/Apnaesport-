@@ -13,13 +13,12 @@ import { Separator } from "@/components/ui/separator";
 import { Shield, Edit3, LogIn } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
 
   const getInitials = (name: string | null | undefined) => {
-    if (!name) return "TH";
+    if (!name) return "AE"; // Apna Esport
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 

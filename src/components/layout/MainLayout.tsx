@@ -2,13 +2,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-// useRouter and useEffect are removed as auth redirection is handled by individual pages now.
-// import { useRouter } from "next/navigation";
-// import { useEffect } from "react";
-// import { useAuth } from "@/contexts/AuthContext"; // useAuth might still be needed for other parts of MainLayout potentially
 import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
-// import { LoadingSpinner } from "@/components/shared/LoadingSpinner"; // Loading for auth is handled by pages
 import { Logo } from "@/components/shared/Logo";
 import {
   SidebarProvider,
@@ -25,21 +20,6 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  // const { user, loading } = useAuth(); // Not needed for redirection anymore
-  // const router = useRouter();
-
-  // useEffect(() => {
-  //   // This redirection logic is now removed from MainLayout.
-  //   // Individual pages will handle their own authentication checks.
-  //   if (!loading && !user) {
-  //     router.push("/auth/login");
-  //   }
-  // }, [user, loading, router]);
-
-  // if (loading || !user) { // This loading state is also removed.
-  //   return <LoadingSpinner fullPage text="Authenticating..." />;
-  // }
-
   return (
     <SidebarProvider defaultOpen={true}>
       <Sidebar variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
@@ -50,7 +30,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <SidebarNav />
         </SidebarContent>
         <SidebarFooter className="p-2 text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} TournamentHub
+          &copy; {new Date().getFullYear()} Apna Esport
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

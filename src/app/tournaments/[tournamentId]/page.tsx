@@ -8,16 +8,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle } from "lucide-react"; 
-import { format } from "date-fns";
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info } from "lucide-react"; 
+import { format, formatDistanceToNowStrict } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentDetails as fetchTournamentDetails, subscribe, addTournament as upsertTournamentInStore } from "@/lib/tournamentStore"; 
+import { getTournamentDetails as fetchTournamentDetails, subscribe, addTournament as upsertTournamentInStore, deleteTournamentFromStore } from "@/lib/tournamentStore"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 interface TournamentPageProps {
@@ -27,19 +38,23 @@ interface TournamentPageProps {
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
   const [tournament, setTournament] = useState<Tournament | undefined>(undefined);
-  const { user } = useAuth(); 
+  const { user, isAdmin } = useAuth(); 
   const router = useRouter(); 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [formattedStartDate, setFormattedStartDate] = useState<string | null>(null);
 
   useEffect(() => {
     const loadTournament = () => {
       setIsLoading(true);
       const fetchedTournament = fetchTournamentDetails(tournamentId);
       setTournament(fetchedTournament);
-      if (fetchedTournament && user) {
-        setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
+      if (fetchedTournament) {
+        setFormattedStartDate(format(new Date(fetchedTournament.startDate), "PPPPp"))
+        if (user) {
+          setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
+        }
       }
       setIsLoading(false);
     };
@@ -54,7 +69,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       router.push(`/auth/login?redirect=/tournaments/${tournamentId}`);
       return;
     }
-    if (tournament && !isRegistered && tournament.participants.length < tournament.maxParticipants) {
+    if (tournament && !isRegistered && tournament.participants.length < tournament.maxParticipants && (tournament.status === "Upcoming" || tournament.status === "Live")) {
       const newParticipant: Participant = { 
         id: user.uid, 
         name: user.displayName || "Anonymous Player", 
@@ -63,11 +78,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       const updatedParticipants = [...tournament.participants, newParticipant];
       const updatedTournament: Tournament = { ...tournament, participants: updatedParticipants };
       
-      upsertTournamentInStore(updatedTournament); // This will update the tournament in the store
-
-      // Optimistic UI updates are handled by the subscription useEffect
-      // setTournament(updatedTournament); 
-      // setIsRegistered(true);
+      upsertTournamentInStore(updatedTournament); 
 
       toast({
         title: "Successfully Registered!",
@@ -79,7 +90,24 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         description: "This tournament has reached its maximum number of participants.",
         variant: "destructive",
       });
+    } else if (tournament && (tournament.status !== "Upcoming" && tournament.status !== "Live")) {
+        toast({
+            title: "Registration Closed",
+            description: "This tournament is not currently open for registration.",
+            variant: "destructive",
+        });
     }
+  };
+
+  const handleDeleteTournament = () => {
+    if (!tournament) return;
+    deleteTournamentFromStore(tournament.id);
+    toast({
+      title: "Tournament Deleted",
+      description: `"${tournament.name}" has been removed.`,
+      variant: "destructive",
+    });
+    router.push("/tournaments");
   };
 
 
@@ -117,6 +145,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
   }
 
   const canJoinOrRegister = user && (tournament.status === "Upcoming" || tournament.status === "Live");
+  const isTournamentCreator = user && tournament.organizerId === user.uid;
 
 
   return (
@@ -136,7 +165,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
           <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-sm px-3 py-1">{tournament.status}</Badge>
-          <PageTitle title={tournament.name} className="mb-0 text-shadow text-white" /> {/* Ensure text is visible on banner */}
+          <PageTitle title={tournament.name} className="mb-0 text-shadow text-white" /> 
           <div className="flex items-center mt-2 text-sm text-slate-200 drop-shadow-sm">
             <Image 
               src={tournament.gameIconUrl} 
@@ -159,6 +188,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="participants">Participants ({tournament.participants.length})</TabsTrigger>
               <TabsTrigger value="rules">Rules</TabsTrigger>
+              {tournament.registrationInstructions && <TabsTrigger value="howToJoin">How to Join</TabsTrigger>}
             </TabsList>
 
             <TabsContent value="bracket" className="mt-6">
@@ -185,7 +215,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                         <CalendarDays className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <p className="font-medium">Date & Time</p>
-                            <p className="text-muted-foreground">{format(new Date(tournament.startDate), "PPPPp")}</p>
+                            <p className="text-muted-foreground">{formattedStartDate || "Loading date..."}</p>
                         </div>
                     </div>
                     <div className="flex items-start space-x-3">
@@ -248,6 +278,15 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                 <CardContent><p className="text-muted-foreground whitespace-pre-line">{tournament.rules || "No specific rules provided for this tournament."}</p></CardContent>
               </Card>
             </TabsContent>
+
+            {tournament.registrationInstructions && (
+                <TabsContent value="howToJoin" className="mt-6">
+                <Card>
+                    <CardHeader><CardTitle className="flex items-center"><Info className="mr-2 h-5 w-5 text-primary" /> How to Join / Registration</CardTitle></CardHeader>
+                    <CardContent><p className="text-muted-foreground whitespace-pre-line">{tournament.registrationInstructions}</p></CardContent>
+                </Card>
+                </TabsContent>
+            )}
           </Tabs>
         </div>
 
@@ -264,25 +303,30 @@ export default function TournamentPage({ params }: TournamentPageProps) {
             <CardContent>
               <p className="mb-4">
                 {tournament.status === "Upcoming" && "Registrations are open! Secure your spot now."}
-                {tournament.status === "Live" && "Tournament is live! You might still be able to join late if allowed, or watch the matches."}
+                {tournament.status === "Live" && "Tournament is live! Check registration details. You might still be able to join late if allowed by the organizer."}
                 {tournament.status === "Completed" && "This tournament has concluded. Check out the results!"}
                 {tournament.status === "Cancelled" && "This tournament has been cancelled."}
               </p>
-              {(tournament.status === "Upcoming" || (tournament.status === "Live" /* && allowLateJoins */)) && (
+              {(tournament.status === "Upcoming" || tournament.status === "Live") && (
                  <Button 
                    size="lg" 
                    className="w-full bg-background text-foreground hover:bg-background/90"
                    onClick={handleJoinTournament}
-                   disabled={!canJoinOrRegister || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming")}
+                   disabled={!user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
                  >
                    {isRegistered ? "You are Registered" : 
                     (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
-                    tournament.status === "Upcoming" ? "Register Now" : "Check In / Join Late"}
+                    tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
                  </Button>
               )}
                {tournament.status === "Completed" && (
                  <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
               )}
+               {(!user && (tournament.status === "Upcoming" || tournament.status === "Live")) && (
+                  <Button size="lg" className="w-full" asChild>
+                    <Link href={`/auth/login?redirect=/tournaments/${tournamentId}`}>Login to Register</Link>
+                  </Button>
+               )}
             </CardContent>
           </Card>
 
@@ -300,10 +344,37 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                   data-ai-hint="company logo"
                   onError={(e) => (e.currentTarget.src = "https://placehold.co/50x50.png?text=OG")}
                 />
-                <p className="font-medium">{tournament.organizer || "TournamentHub Community"}</p>
+                <p className="font-medium">{tournament.organizer || "Apna Esport Community"}</p>
               </div>
             </CardContent>
           </Card>
+
+          {(isAdmin || isTournamentCreator) && tournament.status !== "Completed" && (
+            <Card>
+                <CardHeader><CardTitle>Admin Actions</CardTitle></CardHeader>
+                <CardContent className="space-y-2">
+                    {/* <Button variant="outline" className="w-full" disabled>Edit Tournament (Coming Soon)</Button> */}
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" className="w-full">Delete Tournament</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the tournament
+                                "{tournament.name}" and all of its associated data.
+                            </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteTournament}>Delete</AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

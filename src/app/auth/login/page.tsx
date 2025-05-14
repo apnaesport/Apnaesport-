@@ -33,14 +33,14 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome Back!</CardTitle>
-          <CardDescription>Sign in to access your TournamentHub dashboard.</CardDescription>
+          <CardDescription>Sign in to access your Apna Esport dashboard.</CardDescription>
         </CardHeader>
         <CardContent>
           <LoginForm />
         </CardContent>
       </Card>
        <p className="mt-8 text-center text-sm text-muted-foreground">
-        &copy; {new Date().getFullYear()} TournamentHub. All rights reserved.
+        &copy; {new Date().getFullYear()} Apna Esport. All rights reserved.
       </p>
     </div>
   );

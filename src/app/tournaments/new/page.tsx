@@ -18,10 +18,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
 import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Upload } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { addTournament, getGames as fetchGamesFromStore } from "@/lib/tournamentStore"; // Updated import
+import { addTournament, getGames as fetchGamesFromStore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 
 
@@ -34,8 +34,9 @@ const tournamentSchema = z.object({
   prizePool: z.string().optional(),
   bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
   rules: z.string().optional(),
-  bannerImageFile: z.custom<FileList>().optional(), // For the file input
-  bannerImageDataUri: z.string().optional(), // To store the Data URL
+  registrationInstructions: z.string().optional(), // New field
+  bannerImageFile: z.custom<FileList>().optional(), 
+  bannerImageDataUri: z.string().optional(), 
 });
 
 
@@ -59,6 +60,7 @@ export default function CreateTournamentPage() {
       prizePool: "",
       bracketType: "Single Elimination",
       rules: "",
+      registrationInstructions: "",
       bannerImageDataUri: "",
     },
   });
@@ -116,18 +118,19 @@ export default function CreateTournamentPage() {
       prizePool: data.prizePool,
       bracketType: data.bracketType,
       rules: data.rules,
+      registrationInstructions: data.registrationInstructions,
       bannerImageUrl: data.bannerImageDataUri || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       organizerId: user.uid,
       organizer: user.displayName || user.email || "Unknown Organizer",
-      participants: [], // Initially no participants
+      participants: [], 
       status: "Upcoming" as TournamentStatus,
-      matches: [], // Initially no matches
+      matches: [], 
     };
     
     console.log("Submitting new tournament:", newTournament);
 
     try {
-      addTournament(newTournament); // Add to the client-side store
+      addTournament(newTournament); 
       toast({
         title: "Tournament Created!",
         description: `"${data.name}" has been successfully created.`,
@@ -251,7 +254,7 @@ export default function CreateTournamentPage() {
                                 field.onChange(date);
                             }}
                             initialFocus
-                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} // Disable past dates
+                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} 
                         />
                         <div className="p-3 border-t border-border">
                             <Label>Time (HH:MM)</Label>
@@ -263,7 +266,7 @@ export default function CreateTournamentPage() {
                                     const newDate = field.value ? new Date(field.value) : new Date();
                                     newDate.setHours(hours);
                                     newDate.setMinutes(minutes);
-                                    if (newDate < new Date()) { // Basic past time check for today
+                                    if (newDate < new Date()) { 
                                       if (new Date(newDate).setHours(0,0,0,0) === new Date().setHours(0,0,0,0) && (hours < new Date().getHours() || (hours === new Date().getHours() && minutes < new Date().getMinutes()))) {
                                         toast({ title: "Invalid Time", description: "Cannot select a past time for today.", variant: "destructive" });
                                         return;
@@ -318,6 +321,12 @@ export default function CreateTournamentPage() {
               <Textarea id="rules" {...form.register("rules")} rows={3} placeholder="Specify any custom rules for your tournament." />
             </div>
 
+            <div>
+              <Label htmlFor="registrationInstructions">Registration Instructions (Optional)</Label>
+              <Textarea id="registrationInstructions" {...form.register("registrationInstructions")} rows={3} placeholder="e.g., How to join, in-game ID requirements, Discord server link..." />
+              {form.formState.errors.registrationInstructions && <p className="text-destructive text-xs mt-1">{form.formState.errors.registrationInstructions.message}</p>}
+            </div>
+
             <Button type="submit" size="lg" disabled={form.formState.isSubmitting || isLoadingGames} className="w-full md:w-auto">
               {form.formState.isSubmitting || isLoadingGames ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -332,4 +341,3 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
-

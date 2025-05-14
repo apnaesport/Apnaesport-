@@ -14,5 +14,5 @@ export default function HomePage() {
   }, [router]);
 
   // Show a brief loading spinner during the redirection process
-  return <LoadingSpinner fullPage showLogo showProgressBar text="Initializing TournamentHub..." />;
+  return <LoadingSpinner fullPage showLogo showProgressBar text="Initializing Apna Esport..." />;
 }

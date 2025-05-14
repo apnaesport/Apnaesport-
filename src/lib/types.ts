@@ -18,6 +18,7 @@ export type Game = {
   name: string;
   iconUrl: string; // URL to game icon/logo
   bannerUrl?: string; // Optional banner for game page
+  dataAiHint?: string; // For AI image generation hints
 };
 
 export type TournamentStatus = "Upcoming" | "Live" | "Ongoing" | "Completed" | "Cancelled";
@@ -53,6 +54,7 @@ export type Tournament = {
   maxParticipants: number;
   prizePool?: string;
   rules?: string;
+  registrationInstructions?: string; // New field
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   matches?: Match[]; // Embedded or fetched separately
   featured?: boolean;
@@ -70,6 +72,7 @@ export type TournamentFormDataUI = {
   prizePool?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   rules?: string;
+  registrationInstructions?: string; // New field
   bannerImageFile?: FileList; // For handling the file input
   bannerImageDataUri?: string; // For storing the Data URL of the image
 };

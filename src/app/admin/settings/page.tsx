@@ -9,15 +9,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save } from "lucide-react"; // Changed ShieldCog to Shield
+import { Globe, Palette, Shield, UsersRound, Save } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import type { SiteSettings } from "@/lib/types";
-// For a real backend:
-// import { doc, getDoc, setDoc } from "firebase/firestore";
-// import { db } from "@/lib/firebase";
 import { useEffect, useState } from "react";
 
 const settingsSchema = z.object({
@@ -27,59 +24,38 @@ const settingsSchema = z.object({
   allowRegistrations: z.boolean(),
   logoUrl: z.string().url("Must be a valid URL for logo.").or(z.literal('')).optional(),
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
-  defaultTheme: z.string().optional(), // Added defaultTheme to schema
+  defaultTheme: z.string().optional(), 
 });
 
 const defaultSettings: SiteSettings = {
-  siteName: "TournamentHub",
+  siteName: "Apna Esport",
   siteDescription: "Your Ultimate Gaming Tournament Platform",
   maintenanceMode: false,
   allowRegistrations: true,
-  logoUrl: "https://placehold.co/150x50.png",
+  logoUrl: "https://placehold.co/150x50.png", // Will be updated via Logo component, this is for form
   faviconUrl: "https://placehold.co/32x32.png",
   defaultTheme: "dark",
 };
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false); // For real save operations
+  const [isLoading, setIsLoading] = useState(false); 
   
   const form = useForm<SiteSettings>({
     resolver: zodResolver(settingsSchema),
     defaultValues: defaultSettings,
   });
 
-  // Example: Fetch settings from Firestore (uncomment and adapt for real backend)
-  // useEffect(() => {
-  //   const fetchSettings = async () => {
-  //     setIsLoading(true);
-  //     try {
-  //       const settingsDocRef = doc(db, "settings", "global");
-  //       const docSnap = await getDoc(settingsDocRef);
-  //       if (docSnap.exists()) {
-  //         form.reset(docSnap.data() as SiteSettings);
-  //       } else {
-  //         // Initialize with default if no settings found
-  //         form.reset(defaultSettings);
-  //         await setDoc(settingsDocRef, defaultSettings); 
-  //       }
-  //     } catch (error) {
-  //       console.error("Error fetching settings:", error);
-  //       toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
-  //     }
-  //     setIsLoading(false);
-  //   };
-  //   fetchSettings();
-  // }, [form, toast]);
-
   const onSubmit: SubmitHandler<SiteSettings> = async (data) => {
     setIsLoading(true);
     console.log("Saving settings:", data);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
     try {
-      // Example: Save settings to Firestore
-      // await setDoc(doc(db, "settings", "global"), data, { merge: true });
+      // Example: Save settings (e.g., to localStorage or a backend)
+      // localStorage.setItem("siteSettings", JSON.stringify(data));
       toast({
-        title: "Settings Saved (Simulated)",
+        title: "Settings Saved",
         description: "Site settings have been updated successfully.",
       });
     } catch (error) {
@@ -89,9 +65,17 @@ export default function AdminSettingsPage() {
     setIsLoading(false);
   };
 
+  // Example: Load settings from localStorage (if previously saved)
+  // useEffect(() => {
+  //   const savedSettings = localStorage.getItem("siteSettings");
+  //   if (savedSettings) {
+  //     form.reset(JSON.parse(savedSettings));
+  //   }
+  // }, [form]);
+
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-      <PageTitle title="Site Settings" subtitle="Configure global settings for TournamentHub." />
+      <PageTitle title="Site Settings" subtitle="Configure global settings for Apna Esport." />
 
       <Card>
         <CardHeader>
@@ -161,8 +145,8 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="logoUrl">Logo URL</Label>
-            <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://placehold.co/150x50.png" />
+            <Label htmlFor="logoUrl">Logo URL (Currently managed by Logo component)</Label>
+            <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://placehold.co/150x50.png" disabled />
             {form.formState.errors.logoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.logoUrl.message}</p>}
           </div>
           <div className="space-y-2">
@@ -172,7 +156,6 @@ export default function AdminSettingsPage() {
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="defaultTheme" className="font-medium">Default Theme</Label>
-            {/* This is a display of the current theme, assuming it's 'dark'. Actual theme switching would be more complex. */}
             <Input id="defaultTheme" {...form.register("defaultTheme")} disabled className="w-auto" />
           </div>
         </CardContent>

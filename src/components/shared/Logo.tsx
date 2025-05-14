@@ -1,6 +1,6 @@
 
 import Link from "next/link";
-import { Swords } from "lucide-react"; // Using Swords icon for gaming theme
+import { Gamepad2 } from "lucide-react"; // Changed to Gamepad2 for a more generic esport feel
 
 export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const sizeClasses = {
@@ -11,8 +11,8 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
 
   return (
     <Link href="/" className={`flex items-center gap-2 font-bold text-primary hover:text-accent transition-colors ${sizeClasses[size]} ${className}`}>
-      <Swords className={`h-auto ${size === 'sm' ? 'w-5' : size === 'md' ? 'w-6' : 'w-7'}`} />
-      <span>TournamentHub</span>
+      <Gamepad2 className={`h-auto ${size === 'sm' ? 'w-5' : size === 'md' ? 'w-6' : 'w-7'}`} />
+      <span>Apna Esport</span>
     </Link>
   );
 }

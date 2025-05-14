@@ -1,3 +1,4 @@
+
 import type { Metadata } from "next";
 import { Inter } from "next/font/google"; // Using Inter font for a modern look
 import "./globals.css";
@@ -10,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "TournamentHub - Your Ultimate Gaming Platform",
-  description: "Organize and participate in online gaming tournaments.",
+  title: "Apna Esport - Your Ultimate Gaming Platform",
+  description: "Organize and participate in online gaming tournaments on Apna Esport.",
 };
 
 export default function RootLayout({
