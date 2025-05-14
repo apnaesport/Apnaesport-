@@ -19,12 +19,13 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
     <Card className="overflow-hidden shadow-xl hover:shadow-primary/30 transition-shadow duration-300 group bg-card/80 backdrop-blur-sm">
       <CardHeader className="relative p-0 h-64 md:h-80">
         <Image
-          src={tournament.bannerImageUrl || `https://picsum.photos/seed/${tournament.id}/800/400`}
+          src={tournament.bannerImageUrl || `https://placehold.co/800x400.png`}
           alt={tournament.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports tournament banner"
+          onError={(e) => e.currentTarget.src = "https://placehold.co/800x400.png"}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
@@ -48,7 +49,13 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
             <span>{tournament.participants.length} / {tournament.maxParticipants} Players</span>
           </div>
           <div className="flex items-center gap-2">
-            <Image src={tournament.gameIconUrl || `https://picsum.photos/seed/${tournament.gameId}/40/40`} alt={tournament.gameName} width={20} height={20} className="rounded" data-ai-hint="game icon" />
+            <Image 
+              src={tournament.gameIconUrl || `https://placehold.co/40x40.png`} 
+              alt={tournament.gameName} 
+              width={20} height={20} 
+              className="rounded" data-ai-hint="game icon"
+              onError={(e) => e.currentTarget.src = "https://placehold.co/40x40.png"}
+            />
             <span>{tournament.gameName}</span>
           </div>
           {tournament.prizePool && (

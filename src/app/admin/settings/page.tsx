@@ -9,18 +9,87 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, ShieldCog, UsersRound } from "lucide-react";
+import { Globe, Palette, ShieldCog, UsersRound, Save } from "lucide-react";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+import type { SiteSettings } from "@/lib/types";
+// For a real backend:
+// import { doc, getDoc, setDoc } from "firebase/firestore";
+// import { db } from "@/lib/firebase";
+import { useEffect, useState } from "react";
+
+const settingsSchema = z.object({
+  siteName: z.string().min(3, "Site name must be at least 3 characters."),
+  siteDescription: z.string().min(10, "Site description must be at least 10 characters."),
+  maintenanceMode: z.boolean(),
+  allowRegistrations: z.boolean(),
+  logoUrl: z.string().url("Must be a valid URL for logo.").or(z.literal('')).optional(),
+  faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
+});
+
+const defaultSettings: SiteSettings = {
+  siteName: "TournamentHub",
+  siteDescription: "Your Ultimate Gaming Tournament Platform",
+  maintenanceMode: false,
+  allowRegistrations: true,
+  logoUrl: "https://placehold.co/150x50.png",
+  faviconUrl: "https://placehold.co/32x32.png",
+  defaultTheme: "dark",
+};
 
 export default function AdminSettingsPage() {
-  // Placeholder states for settings
-  // In a real app, these would be fetched and updated via API/database
-  // const [siteName, setSiteName] = useState("TournamentHub");
-  // const [maintenanceMode, setMaintenanceMode] = useState(false);
-  // const [allowRegistrations, setAllowRegistrations] = useState(true);
-  // const [defaultTheme, setDefaultTheme] = useState("dark");
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false); // For real save operations
+  
+  const form = useForm<SiteSettings>({
+    resolver: zodResolver(settingsSchema),
+    defaultValues: defaultSettings,
+  });
+
+  // Example: Fetch settings from Firestore (uncomment and adapt for real backend)
+  // useEffect(() => {
+  //   const fetchSettings = async () => {
+  //     setIsLoading(true);
+  //     try {
+  //       const settingsDocRef = doc(db, "settings", "global");
+  //       const docSnap = await getDoc(settingsDocRef);
+  //       if (docSnap.exists()) {
+  //         form.reset(docSnap.data() as SiteSettings);
+  //       } else {
+  //         // Initialize with default if no settings found
+  //         form.reset(defaultSettings);
+  //         await setDoc(settingsDocRef, defaultSettings); 
+  //       }
+  //     } catch (error) {
+  //       console.error("Error fetching settings:", error);
+  //       toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
+  //     }
+  //     setIsLoading(false);
+  //   };
+  //   fetchSettings();
+  // }, [form, toast]);
+
+  const onSubmit: SubmitHandler<SiteSettings> = async (data) => {
+    setIsLoading(true);
+    console.log("Saving settings:", data);
+    try {
+      // Example: Save settings to Firestore
+      // await setDoc(doc(db, "settings", "global"), data, { merge: true });
+      toast({
+        title: "Settings Saved (Simulated)",
+        description: "Site settings have been updated successfully.",
+      });
+    } catch (error) {
+      console.error("Error saving settings:", error);
+      toast({ title: "Save Failed", description: "Could not save settings.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  };
 
   return (
-    <div className="space-y-8">
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
       <PageTitle title="Site Settings" subtitle="Configure global settings for TournamentHub." />
 
       <Card>
@@ -33,20 +102,28 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="siteName">Site Name</Label>
-            <Input id="siteName" defaultValue="TournamentHub" />
+            <Input id="siteName" {...form.register("siteName")} />
+            {form.formState.errors.siteName && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteName.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="siteDescription">Site Description / Motto</Label>
-            <Textarea id="siteDescription" defaultValue="Your Ultimate Gaming Tournament Platform" />
+            <Textarea id="siteDescription" {...form.register("siteDescription")} />
+            {form.formState.errors.siteDescription && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteDescription.message}</p>}
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="maintenanceMode" className="font-medium">Maintenance Mode</Label>
-              <p className="text-sm text-muted-foreground">Temporarily disable access to the site for users.</p>
-            </div>
-            <Switch id="maintenanceMode" />
-          </div>
+          <Controller
+            name="maintenanceMode"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="maintenanceMode" className="font-medium">Maintenance Mode</Label>
+                  <p className="text-sm text-muted-foreground">Temporarily disable access to the site for users.</p>
+                </div>
+                <Switch id="maintenanceMode" checked={field.value} onCheckedChange={field.onChange} />
+              </div>
+            )}
+          />
         </CardContent>
       </Card>
 
@@ -58,14 +135,19 @@ export default function AdminSettingsPage() {
           <CardDescription>Manage user registration and default roles.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="allowRegistrations" className="font-medium">Allow New Registrations</Label>
-              <p className="text-sm text-muted-foreground">Enable or disable new users from signing up.</p>
-            </div>
-            <Switch id="allowRegistrations" checked={true} />
-          </div>
-          {/* Add settings for default user role, email verification requirements, etc. */}
+          <Controller
+            name="allowRegistrations"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="allowRegistrations" className="font-medium">Allow New Registrations</Label>
+                  <p className="text-sm text-muted-foreground">Enable or disable new users from signing up.</p>
+                </div>
+                <Switch id="allowRegistrations" checked={field.value} onCheckedChange={field.onChange} />
+              </div>
+            )}
+          />
         </CardContent>
       </Card>
       
@@ -79,16 +161,17 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="logoUrl">Logo URL</Label>
-            <Input id="logoUrl" placeholder="https://example.com/logo.png" />
+            <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://placehold.co/150x50.png" />
+            {form.formState.errors.logoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.logoUrl.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="faviconUrl">Favicon URL</Label>
-            <Input id="faviconUrl" placeholder="https://example.com/favicon.ico" />
+            <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://placehold.co/32x32.png" />
+            {form.formState.errors.faviconUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.faviconUrl.message}</p>}
           </div>
-          {/* This is currently hardcoded to dark. Could be a select for default theme later. */}
           <div className="flex items-center justify-between">
-            <Label htmlFor="defaultTheme" className="font-medium">Default Theme</Label>
-            <Input id="defaultTheme" value="Dark (Current)" disabled className="w-auto" />
+            <Label className="font-medium">Default Theme</Label>
+            <Input value="Dark (Current)" disabled className="w-auto" />
           </div>
         </CardContent>
       </Card>
@@ -101,15 +184,15 @@ export default function AdminSettingsPage() {
           <CardDescription>Manage API keys and security configurations.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Placeholder for API keys (e.g., for game data providers, email services) */}
-          <p className="text-muted-foreground">API key management and advanced security settings will appear here.</p>
+          <p className="text-muted-foreground">API key management and advanced security settings will appear here. (Placeholder)</p>
         </CardContent>
       </Card>
 
       <div className="flex justify-end">
-        <Button size="lg">Save All Settings</Button>
+        <Button type="submit" size="lg" disabled={isLoading || form.formState.isSubmitting}>
+          <Save className="mr-2 h-4 w-4" /> {isLoading || form.formState.isSubmitting ? "Saving..." : "Save All Settings"}
+        </Button>
       </div>
-    </div>
+    </form>
   );
 }
-

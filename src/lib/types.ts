@@ -56,11 +56,22 @@ export type Tournament = {
   matches?: Match[]; // Embedded or fetched separately
   featured?: boolean;
   organizer?: string; // User ID or name
+  organizerId?: string; // UID of the user who created it
 };
 
 export type StatItem = {
   title: string;
   value: string | number;
-  icon?: LucideIconName; // Changed from React.ElementType to string
+  icon?: LucideIconName; 
   change?: string; // e.g., "+5%"
 };
+
+export interface SiteSettings {
+  siteName: string;
+  siteDescription: string;
+  maintenanceMode: boolean;
+  allowRegistrations: boolean;
+  logoUrl?: string;
+  faviconUrl?: string;
+  defaultTheme?: string; // Example: "dark" or "light"
+}

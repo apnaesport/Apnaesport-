@@ -17,24 +17,26 @@ export function GameCard({ game }: GameCardProps) {
     <Card className="overflow-hidden shadow-lg hover:shadow-primary/20 transition-all duration-300 group flex flex-col h-full">
       <CardHeader className="relative p-0 h-60">
         <Image
-          src={game.bannerUrl || game.iconUrl || `https://picsum.photos/seed/${game.id}/400/300`}
+          src={game.bannerUrl || game.iconUrl || `https://placehold.co/400x300.png`}
           alt={game.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="game wallpaper"
+          onError={(e) => e.currentTarget.src = `https://placehold.co/400x300.png`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
       </CardHeader>
       <CardContent className="p-6 flex-grow flex flex-col">
          <div className="flex items-center mb-2">
           <Image
-            src={game.iconUrl || `https://picsum.photos/seed/${game.id}-icon/40/40`}
+            src={game.iconUrl || `https://placehold.co/40x40.png`}
             alt={`${game.name} icon`}
             width={40}
             height={40}
             className="rounded-md mr-3 border-2 border-card"
             data-ai-hint="game icon small"
+            onError={(e) => e.currentTarget.src = `https://placehold.co/40x40.png`}
           />
           <CardTitle className="text-2xl font-bold group-hover:text-primary transition-colors">
             {game.name}

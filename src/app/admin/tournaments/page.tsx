@@ -1,4 +1,6 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, Edit, Trash2, Eye } from "lucide-react";
@@ -14,29 +16,78 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { useState, useEffect } from "react"; // Added useState and useEffect
+import { useToast } from "@/hooks/use-toast"; // Added useToast
 
-// Placeholder data
-const placeholderTournaments: Tournament[] = [
+// Placeholder data - replace with actual data fetching
+const initialTournaments: Tournament[] = [
   {
-    id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://picsum.photos/seed/lol-icon/40/40",
-    bannerImageUrl: "", description: "", status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 5)), 
-    participants: Array(5).fill({id:'', name:''}), maxParticipants: 16, prizePool: "$200", bracketType: "Single Elimination"
+    id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://placehold.co/40x40.png",
+    bannerImageUrl: "https://placehold.co/800x400.png", description: "Weekly LoL tournament", status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 5)), 
+    participants: Array(5).fill({id:'', name:''}), maxParticipants: 16, prizePool: "$200", bracketType: "Single Elimination", organizerId: "admin-user"
   },
   {
-    id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://picsum.photos/seed/valo-icon/40/40",
-    bannerImageUrl: "", description: "", status: "Live", startDate: new Date(new Date().setDate(new Date().getDate() - 2)), 
-    participants: Array(20).fill({id:'', name:''}), maxParticipants: 32, prizePool: "$5,000", bracketType: "Double Elimination"
+    id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://placehold.co/40x40.png",
+    bannerImageUrl: "https://placehold.co/800x400.png", description: "Valorant regional qualifier", status: "Live", startDate: new Date(new Date().setDate(new Date().getDate() - 2)), 
+    participants: Array(20).fill({id:'', name:''}), maxParticipants: 32, prizePool: "$5,000", bracketType: "Double Elimination", organizerId: "admin-user"
   },
   {
-    id: "t3-cs", name: "CS:2 Open League", gameId: "game-cs", gameName: "Counter-Strike 2", gameIconUrl: "https://picsum.photos/seed/cs-icon/40/40",
-    bannerImageUrl: "", description: "", status: "Completed", startDate: new Date(new Date().setDate(new Date().getDate() - 20)), 
-    participants: Array(50).fill({id:'', name:''}), maxParticipants: 64, prizePool: "$1,000", bracketType: "Round Robin"
+    id: "t3-cs", name: "CS:2 Open League", gameId: "game-cs", gameName: "Counter-Strike 2", gameIconUrl: "https://placehold.co/40x40.png",
+    bannerImageUrl: "https://placehold.co/800x400.png", description: "Open CS2 league", status: "Completed", startDate: new Date(new Date().setDate(new Date().getDate() - 20)), 
+    participants: Array(50).fill({id:'', name:''}), maxParticipants: 64, prizePool: "$1,000", bracketType: "Round Robin", organizerId: "admin-user"
   },
 ];
 
 
 export default function AdminTournamentsPage() {
-  const tournaments = placeholderTournaments; // Replace with actual data fetching
+  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
+  const { toast } = useToast();
+  // const [isLoading, setIsLoading] = useState(true); // For real data fetching
+
+  // Example: Fetch tournaments from Firestore (uncomment and adapt for real backend)
+  // useEffect(() => {
+  //   const fetchTournaments = async () => {
+  //     setIsLoading(true);
+  //     try {
+  //       // const q = query(collection(db, "tournaments"));
+  //       // const querySnapshot = await getDocs(q);
+  //       // const fetchedTournaments: Tournament[] = querySnapshot.docs.map(doc => {
+  //       //   const data = doc.data();
+  //       //   return { 
+  //       //     id: doc.id, 
+  //       //     ...data, 
+  //       //     startDate: data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate), // Firestore timestamp conversion
+  //       //     endDate: data.endDate?.toDate ? data.endDate.toDate() : data.endDate ? new Date(data.endDate) : undefined,
+  //       //   } as Tournament;
+  //       // });
+  //       // setTournaments(fetchedTournaments);
+  //       setTournaments(initialTournaments); // Using placeholder for now
+  //     } catch (error) {
+  //       console.error("Error fetching tournaments:", error);
+  //       toast({ title: "Error", description: "Could not fetch tournaments.", variant: "destructive" });
+  //     }
+  //     setIsLoading(false);
+  //   };
+  //   fetchTournaments();
+  // }, [toast]);
+
+  const handleDeleteTournament = async (tournamentId: string, tournamentName: string) => {
+    if (confirm(`Are you sure you want to delete the tournament: "${tournamentName}"? This action cannot be undone.`)) {
+      // setIsLoading(true);
+      try {
+        // Example: Delete tournament from Firestore
+        // await deleteDoc(doc(db, "tournaments", tournamentId));
+        setTournaments(prevTournaments => prevTournaments.filter(t => t.id !== tournamentId));
+        toast({ title: "Tournament Deleted", description: `"${tournamentName}" has been removed.`, variant: "destructive" });
+      } catch (error) {
+        console.error("Error deleting tournament:", error);
+        toast({ title: "Error", description: `Could not delete "${tournamentName}".`, variant: "destructive" });
+      }
+      // setIsLoading(false);
+    }
+  };
+
+  // if (isLoading) return <p>Loading tournaments...</p>;
 
   return (
     <div className="space-y-8">
@@ -45,14 +96,12 @@ export default function AdminTournamentsPage() {
         subtitle="Create, edit, and oversee all platform tournaments."
         actions={
           <Button asChild>
-            <Link href="/admin/tournaments/new">
+            <Link href="/tournaments/new"> {/* Changed from /admin/tournaments/new */}
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
             </Link>
           </Button>
         }
       />
-
-      {/* TODO: Add filtering and search capabilities */}
 
       <div className="overflow-x-auto">
         <Table>
@@ -84,12 +133,12 @@ export default function AdminTournamentsPage() {
                       <Eye className="h-4 w-4" />
                     </Link>
                   </Button>
-                  <Button variant="outline" size="sm" asChild>
+                  {/* <Button variant="outline" size="sm" asChild>
                     <Link href={`/admin/tournaments/${tournament.id}/edit`} title="Edit Tournament">
                        <Edit className="h-4 w-4" />
                     </Link>
-                  </Button>
-                  <Button variant="destructive" size="sm" title="Delete Tournament" onClick={() => alert(`Confirm delete tournament: ${tournament.name}`)}>
+                  </Button> */}
+                  <Button variant="destructive" size="sm" title="Delete Tournament" onClick={() => handleDeleteTournament(tournament.id, tournament.name)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>

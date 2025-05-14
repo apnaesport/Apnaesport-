@@ -1,7 +1,9 @@
 
+"use client"; // Added "use client" for potential future interactions and hooks
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
-import type { Tournament, Game } from "@/lib/types";
+import type { Tournament, Game, Participant } from "@/lib/types"; // Added Participant
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -10,35 +12,48 @@ import { CalendarDays, Users, Trophy, Gamepad2, Info, ListChecks, ChevronLeft } 
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
+import { useState, useEffect } from "react"; // Added useState, useEffect
+import { useAuth } from "@/contexts/AuthContext"; // Added useAuth
+import { useRouter } from "next/navigation"; // Added useRouter
 
 // Placeholder data - replace with actual data fetching based on tournamentId
 const getTournamentDetails = (tournamentId: string): Tournament | undefined => {
+  const sampleParticipants: Participant[] = Array.from({ length: 12 }, (_, i) => ({ 
+    id: `p${i}`, name: `Team Player ${i + 1}`, avatarUrl: `https://placehold.co/40x40.png` 
+  }));
+  const sampleValoParticipants: Participant[] = Array.from({ length: 28 }, (_, i) => ({ 
+    id: `vp${i}`, name: `ValoPro ${i + 1}`, avatarUrl: `https://placehold.co/40x40.png` 
+  }));
+
   const sampleTournaments: Tournament[] = [
     {
-      id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://picsum.photos/seed/lol-icon/80/80",
-      bannerImageUrl: "https://picsum.photos/seed/t1-banner-large/1200/400", 
+      id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://placehold.co/80x80.png",
+      bannerImageUrl: "https://placehold.co/1200x400.png", 
       description: "The LoL Summer Skirmish is a weekly online tournament designed for amateur and semi-pro teams looking to test their skills and climb the ranks. Featuring a prize pool and broadcasted final matches.",
       status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 5)), 
-      participants: Array.from({ length: 12 }, (_, i) => ({ id: `p${i}`, name: `Team Player ${i + 1}` })), 
+      participants: sampleParticipants, 
       maxParticipants: 16, prizePool: "$200 + Merchandise", bracketType: "Single Elimination",
       rules: "Standard 5v5 Summoner's Rift tournament rules. All matches Best of 1, Finals Best of 3. Check-in 30 minutes before start time. Full rules on Discord.",
-      matches: [ // Sample matches for bracket
-        { id: 'm1', round: 1, participants: [{id: 'p1', name: 'Team Alpha'}, {id: 'p2', name: 'Team Beta'}], status: 'Pending' },
-        { id: 'm2', round: 1, participants: [{id: 'p3', name: 'Team Gamma'}, {id: 'p4', name: 'Team Delta'}], status: 'Pending' },
+      organizer: "TournamentHub Staff",
+      organizerId: "admin-user",
+      matches: [ 
+        { id: 'm1', round: 1, participants: [sampleParticipants[0], sampleParticipants[1]], status: 'Pending' },
+        { id: 'm2', round: 1, participants: [sampleParticipants[2], sampleParticipants[3]], status: 'Pending' },
       ]
     },
      {
-      id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://picsum.photos/seed/valo-icon/80/80",
-      bannerImageUrl: "https://picsum.photos/seed/t2-banner-large/1200/400", 
+      id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://placehold.co/80x80.png",
+      bannerImageUrl: "https://placehold.co/1200x400.png", 
       description: "The official Valorant regional qualifier where teams battle for a spot in the global championship. High stakes, intense action, and top-tier talent.",
       status: "Live", startDate: new Date(new Date().setDate(new Date().getDate() - 2)), 
-      participants: Array.from({ length: 28 }, (_, i) => ({ id: `vp${i}`, name: `ValoPro ${i + 1}` })), 
+      participants: sampleValoParticipants, 
       maxParticipants: 32, prizePool: "$5,000 + VCT Points", bracketType: "Double Elimination",
       rules: "Official VCT rulebook applies. All server settings and map vetos as per VCT guidelines. Strict anti-cheat measures in place.",
+      organizer: "Pro Gamers League",
+      organizerId: "pgl-user",
       matches: [
-        { id: 'vm1', round: 1, participants: [{id: 'vp1', name: 'Sentinels'}, {id: 'vp2', name: 'Cloud9'}], status: 'Live', score: '1-0' },
-        { id: 'vm2', round: 1, participants: [{id: 'vp3', name: 'NRG'}, {id: 'vp4', name: '100 Thieves'}], status: 'Pending' },
+        { id: 'vm1', round: 1, participants: [sampleValoParticipants[0], sampleValoParticipants[1]], status: 'Live', score: '1-0' },
+        { id: 'vm2', round: 1, participants: [sampleValoParticipants[2], sampleValoParticipants[3]], status: 'Pending' },
       ]
     },
   ];
@@ -51,7 +66,21 @@ interface TournamentPageProps {
 
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
-  const tournament = getTournamentDetails(tournamentId);
+  const [tournament, setTournament] = useState<Tournament | undefined>(undefined);
+  const { user } = useAuth(); // To manage Join/Register button states
+  const router = useRouter(); // For navigation
+  // const [isLoading, setIsLoading] = useState(true); // For real data fetching
+
+  useEffect(() => {
+    // Simulating data fetching. Replace with actual fetch logic.
+    // setIsLoading(true);
+    const fetchedTournament = getTournamentDetails(tournamentId);
+    setTournament(fetchedTournament);
+    // setIsLoading(false);
+  }, [tournamentId]);
+
+
+  // if (isLoading) return <p>Loading tournament details...</p>; // Or a spinner component
 
   if (!tournament) {
     return (
@@ -67,6 +96,19 @@ export default function TournamentPage({ params }: TournamentPageProps) {
     );
   }
 
+  const canJoinOrRegister = user && (tournament.status === "Upcoming" || tournament.status === "Live");
+  const isRegistered = user && tournament.participants.some(p => p.id === user.uid); // Simplified check
+
+  const handleJoinTournament = () => {
+    if (!user) {
+      router.push(`/auth/login?redirect=/tournaments/${tournament.id}`);
+      return;
+    }
+    // TODO: Implement join logic (e.g., add user to participants list, update Firestore)
+    alert(`Simulating join for ${user.displayName} in ${tournament.name}`);
+  };
+
+
   return (
     <div className="space-y-8">
       <div className="relative h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
@@ -77,13 +119,21 @@ export default function TournamentPage({ params }: TournamentPageProps) {
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports event stage"
+          onError={(e) => e.currentTarget.src = "https://placehold.co/1200x400.png"}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
           <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-sm px-3 py-1">{tournament.status}</Badge>
           <PageTitle title={tournament.name} className="mb-0 text-shadow" />
           <div className="flex items-center mt-2 text-sm text-slate-200 drop-shadow-sm">
-            <Image src={tournament.gameIconUrl} alt={tournament.gameName} width={24} height={24} className="rounded-sm mr-2" data-ai-hint="game icon mini" />
+            <Image 
+              src={tournament.gameIconUrl} 
+              alt={tournament.gameName} 
+              width={24} height={24} 
+              className="rounded-sm mr-2" 
+              data-ai-hint="game icon mini"
+              onError={(e) => e.currentTarget.src = "https://placehold.co/24x24.png"}
+            />
             <span>{tournament.gameName}</span>
           </div>
         </div>
@@ -158,10 +208,17 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                 </CardHeader>
                 <CardContent>
                 {tournament.participants.length > 0 ? (
-                    <ul className="space-y-2">
+                    <ul className="space-y-2 max-h-96 overflow-y-auto">
                         {tournament.participants.map(p => (
                             <li key={p.id} className="flex items-center space-x-3 p-2 border rounded-md bg-secondary/30">
-                                <Image src={p.avatarUrl || `https://picsum.photos/seed/${p.id}/40/40`} alt={p.name} width={32} height={32} className="rounded-full" data-ai-hint="player avatar"/>
+                                <Image 
+                                  src={p.avatarUrl || `https://placehold.co/40x40.png`} 
+                                  alt={p.name} 
+                                  width={32} height={32} 
+                                  className="rounded-full" 
+                                  data-ai-hint="player avatar"
+                                  onError={(e) => e.currentTarget.src = `https://placehold.co/40x40.png`}
+                                />
                                 <span>{p.name}</span>
                             </li>
                         ))}
@@ -185,35 +242,52 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         <div className="lg:col-span-1 space-y-6">
           <Card className="bg-gradient-to-br from-primary/80 to-accent/80 text-primary-foreground shadow-lg">
             <CardHeader>
-              <CardTitle className="text-2xl">Ready to Join?</CardTitle>
+              <CardTitle className="text-2xl">
+                {tournament.status === "Upcoming" && "Ready to Join?"}
+                {tournament.status === "Live" && "Tournament is Live!"}
+                {tournament.status === "Completed" && "Tournament Ended"}
+                {tournament.status === "Cancelled" && "Tournament Cancelled"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="mb-4">
-                {tournament.status === "Upcoming" 
-                  ? "Registrations are open! Secure your spot now."
-                  : tournament.status === "Live" 
-                  ? "Tournament is live! You might still be able to join late if allowed."
-                  : "This tournament has ended."
-                }
+                {tournament.status === "Upcoming" && "Registrations are open! Secure your spot now."}
+                {tournament.status === "Live" && "Tournament is live! You might still be able to join late if allowed, or watch the matches."}
+                {tournament.status === "Completed" && "This tournament has concluded. Check out the results!"}
+                {tournament.status === "Cancelled" && "This tournament has been cancelled."}
               </p>
-              {tournament.status === "Upcoming" || tournament.status === "Live" ? (
-                 <Button size="lg" className="w-full bg-background text-foreground hover:bg-background/90">
-                   {tournament.status === "Upcoming" ? "Register Now" : "Check In / Join Late"}
+              {(tournament.status === "Upcoming" || tournament.status === "Live") && (
+                 <Button 
+                   size="lg" 
+                   className="w-full bg-background text-foreground hover:bg-background/90"
+                   onClick={handleJoinTournament}
+                   disabled={isRegistered || tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming"}
+                 >
+                   {isRegistered ? "You are Registered" : 
+                    tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming" ? "Registrations Full" :
+                    tournament.status === "Upcoming" ? "Register Now" : "Check In / Join Late"}
                  </Button>
-              ) : (
-                <Button size="lg" className="w-full" disabled>Registration Closed</Button>
+              )}
+               {tournament.status === "Completed" && (
+                 <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
               )}
             </CardContent>
           </Card>
 
-          {/* Organizer/Sponsor Card - Placeholder */}
           <Card>
             <CardHeader>
               <CardTitle>Organizer</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center space-x-3">
-                <Image src={`https://picsum.photos/seed/organizer-logo/50/50`} alt="Organizer" width={40} height={40} className="rounded-full" data-ai-hint="company logo"/>
+                <Image 
+                  src={`https://placehold.co/50x50.png`} // Replace with actual organizer logo if available
+                  alt={tournament.organizer || "Organizer"} 
+                  width={40} height={40} 
+                  className="rounded-full" 
+                  data-ai-hint="company logo"
+                  onError={(e) => e.currentTarget.src = "https://placehold.co/50x50.png"}
+                />
                 <p className="font-medium">{tournament.organizer || "TournamentHub Community"}</p>
               </div>
             </CardContent>

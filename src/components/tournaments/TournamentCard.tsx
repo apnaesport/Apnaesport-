@@ -34,12 +34,13 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
       <CardHeader className="relative p-0 h-48">
         <Image
-          src={tournament.bannerImageUrl || `https://picsum.photos/seed/${tournament.id}/400/200`}
+          src={tournament.bannerImageUrl || `https://placehold.co/400x200.png`}
           alt={tournament.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="tournament banner small"
+          onError={(e) => e.currentTarget.src = `https://placehold.co/400x200.png`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <Badge 

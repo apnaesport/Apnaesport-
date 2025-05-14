@@ -1,5 +1,5 @@
 
-"use client"; // Needs to be client for useAuth
+"use client"; 
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
@@ -9,23 +9,22 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { PlusCircle } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
+import { useAuth } from "@/contexts/AuthContext"; 
 
-// Placeholder data - replace with actual data fetching based on gameId
+// Placeholder data
 const getGameDetails = (gameId: string): Game | undefined => {
   const games: Game[] = [
-    { id: "game-lol", name: "League of Legends", iconUrl: "https://picsum.photos/seed/lol-icon/80/80", bannerUrl: "https://picsum.photos/seed/lol-page-banner/1200/300" },
-    { id: "game-valo", name: "Valorant", iconUrl: "https://picsum.photos/seed/valo-icon/80/80", bannerUrl: "https://picsum.photos/seed/valo-page-banner/1200/300" },
+    { id: "game-lol", name: "League of Legends", iconUrl: "https://placehold.co/80x80.png", bannerUrl: "https://placehold.co/1200x300.png" },
+    { id: "game-valo", name: "Valorant", iconUrl: "https://placehold.co/80x80.png", bannerUrl: "https://placehold.co/1200x300.png" },
   ];
   return games.find(g => g.id === gameId);
 };
 
 const getTournamentsForGame = (gameId: string): Tournament[] => {
-  // Simulating different tournaments for different games
-  const baseTournaments: Omit<Tournament, 'id' | 'gameId' | 'gameName' | 'gameIconUrl'>[] = [
+  const baseTournaments: Omit<Tournament, 'id' | 'gameId' | 'gameName' | 'gameIconUrl' | 'organizerId'>[] = [
     {
       name: "Weekly Skirmish",
-      bannerImageUrl: "https://picsum.photos/seed/tourney-banner1/400/200",
+      bannerImageUrl: "https://placehold.co/400x200.png",
       description: "Join our weekly skirmish for fun and prizes!",
       status: "Upcoming",
       startDate: new Date(new Date().setDate(new Date().getDate() + 3)),
@@ -36,7 +35,7 @@ const getTournamentsForGame = (gameId: string): Tournament[] => {
     },
     {
       name: "Champions Cup",
-      bannerImageUrl: "https://picsum.photos/seed/tourney-banner2/400/200",
+      bannerImageUrl: "https://placehold.co/400x200.png",
       description: "The ultimate test of skill. Compete against the best!",
       status: "Live",
       startDate: new Date(new Date().setDate(new Date().getDate() - 1)),
@@ -47,7 +46,7 @@ const getTournamentsForGame = (gameId: string): Tournament[] => {
     },
     {
       name: "Community Showdown",
-      bannerImageUrl: "https://picsum.photos/seed/tourney-banner3/400/200",
+      bannerImageUrl: "https://placehold.co/400x200.png",
       description: "A friendly tournament for all skill levels.",
       status: "Completed",
       startDate: new Date(new Date().setDate(new Date().getDate() - 10)),
@@ -68,6 +67,7 @@ const getTournamentsForGame = (gameId: string): Tournament[] => {
     gameId: game.id,
     gameName: game.name,
     gameIconUrl: game.iconUrl,
+    organizerId: `user-${index}` // dummy organizer
   }));
 };
 
@@ -77,7 +77,7 @@ interface GameTournamentsPageProps {
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
   const { gameId } = params;
-  const { user } = useAuth(); // Get user for conditional rendering
+  const { user } = useAuth(); 
   const game = getGameDetails(gameId); 
   const tournaments = getTournamentsForGame(gameId); 
 
@@ -101,23 +101,30 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
     <div className="space-y-8">
       <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-lg">
         <Image 
-          src={game.bannerUrl || `https://picsum.photos/seed/${game.id}-banner/1200/300`} 
+          src={game.bannerUrl || `https://placehold.co/1200x300.png`} 
           alt={`${game.name} banner`} 
           layout="fill" 
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="game background art"
+          onError={(e) => e.currentTarget.src = `https://placehold.co/1200x300.png`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
           <div className="flex items-center">
-            <Image src={game.iconUrl} alt={game.name} width={64} height={64} className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large"/>
+            <Image 
+              src={game.iconUrl} 
+              alt={game.name} 
+              width={64} height={64} 
+              className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large"
+              onError={(e) => e.currentTarget.src = `https://placehold.co/64x64.png`}
+            />
             <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
           </div>
         </div>
       </div>
       
-      {user && ( // Only show Create Tournament button if user is logged in
+      {user && ( 
         <div className="flex justify-end">
           <Button asChild>
             <Link href={`/tournaments/new?gameId=${game.id}`}>

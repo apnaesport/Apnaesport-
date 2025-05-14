@@ -27,17 +27,18 @@ export function GamesListHorizontal({ games, title = "Browse Games" }: GamesList
       <ScrollArea className="w-full whitespace-nowrap rounded-md">
         <div className="flex space-x-4 pb-4">
           {games.map((game) => (
-            <Link href={`/games/${game.id}`} key={game.id} legacyBehavior>
-              <a className="block">
+            <Link href={`/games/${game.id}/tournaments`} key={game.id} legacyBehavior>
+              <a className="block group"> {/* Added group class */}
                 <Card className="w-32 h-40 overflow-hidden transition-all duration-300 hover:shadow-primary/30 hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 outline-none rounded-lg">
                   <CardContent className="p-0 relative h-full">
                     <Image
-                      src={game.iconUrl || `https://picsum.photos/seed/${game.id}/200/300`}
+                      src={game.iconUrl || `https://placehold.co/200x300.png`}
                       alt={game.name}
                       layout="fill"
                       objectFit="cover"
                       className="rounded-lg"
                       data-ai-hint="game poster"
+                       onError={(e) => e.currentTarget.src = `https://placehold.co/200x300.png`}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent rounded-lg" />
                     <div className="absolute bottom-0 left-0 p-2 w-full">
