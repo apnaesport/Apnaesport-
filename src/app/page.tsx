@@ -20,5 +20,5 @@ export default function HomePage() {
     }
   }, [user, loading, router]);
 
-  return <LoadingSpinner fullPage text="Initializing TournamentHub..." />;
+  return <LoadingSpinner fullPage showLogo showProgressBar text="Initializing TournamentHub..." />;
 }
