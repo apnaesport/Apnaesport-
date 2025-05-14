@@ -46,9 +46,8 @@ export default function LeaderboardPage() {
     setIsLoading(true);
     try {
       const allUsers = await getAllUsersFromFirestore();
-      // Filter out users with 0 or undefined points before sorting, unless you want to show everyone
-      const playersWithPoints = allUsers.filter(u => (u.points || 0) > 0);
-      const sortedUsers = playersWithPoints.sort((a, b) => (b.points || 0) - (a.points || 0));
+      // Sort all users by points, including those with 0 points
+      const sortedUsers = allUsers.sort((a, b) => (b.points || 0) - (a.points || 0));
       
       setFullLeaderboard(sortedUsers);
       setTop10Players(sortedUsers.slice(0, 10));
@@ -58,7 +57,8 @@ export default function LeaderboardPage() {
         if (userIndex !== -1) {
           setCurrentUserRanking({ rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 });
         } else {
-          setCurrentUserRanking(null); // User has 0 points or not found in sorted list
+          // This case should ideally not happen if the user exists in 'allUsers'
+          setCurrentUserRanking(null); 
         }
       }
 
@@ -177,7 +177,7 @@ export default function LeaderboardPage() {
           </CardContent>
         </Card>
       )}
-       {currentUserRanking === null && user && ( // User is logged in but has 0 points or not on leaderboard
+       {currentUserRanking === null && user && ( // User is logged in but not found on leaderboard (e.g., error state or never got points)
         <Card className="mt-6">
           <CardContent className="p-4 text-center">
             <p className="text-muted-foreground">
@@ -192,5 +192,7 @@ export default function LeaderboardPage() {
     </>
   );
 }
+
+    
 
     
