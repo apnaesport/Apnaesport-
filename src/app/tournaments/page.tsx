@@ -1,7 +1,7 @@
 
 "use client"; 
 
-import type { Metadata } from "next";
+// Removed Metadata import and export as this is a Client Component
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Tournament } from "@/lib/types";
@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
-export const metadata: Metadata = {
-  title: "All Tournaments | Apna Esport",
-  description: "Browse all active, upcoming, and completed esports tournaments on Apna Esport. Find your next challenge!",
-};
+// export const metadata: Metadata = { // Removed: Cannot export metadata from Client Component
+//   title: "All Tournaments | Apna Esport",
+//   description: "Browse all active, upcoming, and completed esports tournaments on Apna Esport. Find your next challenge!",
+// };
 
 export default function AllTournamentsPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
