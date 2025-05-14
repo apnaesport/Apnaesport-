@@ -46,7 +46,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           favoriteGameIds: [],
           streamingChannelUrl: "",
           friendUids: [],
-          teamId: null, 
+          teamId: null,
+          points: 0, // Initialize points
         };
         await setDoc(userDocRef, initialProfileData);
         userDocSnap = await getDoc(userDocRef);
@@ -68,6 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         streamingChannelUrl: userProfileData.streamingChannelUrl || "",
         friendUids: userProfileData.friendUids || [],
         teamId: userProfileData.teamId || null,
+        points: userProfileData.points || 0, // Load points
         emailVerified: firebaseUser.emailVerified,
         isAnonymous: firebaseUser.isAnonymous,
         metadata: firebaseUser.metadata,

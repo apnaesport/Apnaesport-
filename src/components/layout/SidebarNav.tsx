@@ -11,7 +11,8 @@ import {
   BarChart3,
   Loader2,
   Bell,
-  Users // Added Users icon for Social
+  Users,
+  TrendingUp // Added TrendingUp icon for Leaderboard
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,9 +29,10 @@ const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp }, // Added Leaderboard
   { href: "/stats", label: "My Stats", icon: BarChart3 },
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/social", label: "Social", icon: Users }, // Added Social link
+  { href: "/social", label: "Social", icon: Users },
 ];
 
 const secondaryNavItems = [

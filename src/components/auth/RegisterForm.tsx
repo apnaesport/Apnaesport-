@@ -66,7 +66,8 @@ export function RegisterForm() {
         favoriteGameIds: [],
         streamingChannelUrl: "",
         friendUids: [],
-        teamId: null, // Initialize teamId
+        teamId: null,
+        points: 0, // Initialize points
       });
 
       toast({

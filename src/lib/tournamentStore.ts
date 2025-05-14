@@ -119,6 +119,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   if (queryParams?.gameId) {
     // Index needed: gameId (ASC), startDate (DESC) on tournaments collection
     // Example Firestore index creation link: https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
+    // Or if sorting startDate ASC: https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClVwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQARoMCghfX25hbWVfXxAC
     qConstraints = [where("gameId", "==", queryParams.gameId), orderBy("startDate", "desc")]
   }
    if (queryParams?.featured !== undefined) {
@@ -257,6 +258,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
   // Create in Firebase Console if error. Example link:
   // https://console.firebase.google.com/v1/r/project/YOUR_PROJECT_ID/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+  // For this project: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -289,6 +291,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       streamingChannelUrl: data.streamingChannelUrl || "",
       friendUids: data.friendUids || [],
       teamId: data.teamId || null,
+      points: data.points || 0, // Added for leaderboard
       // Dummy FirebaseUser properties - not fully populated from Firestore
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -325,6 +328,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       streamingChannelUrl: data.streamingChannelUrl || "",
       friendUids: data.friendUids || [],
       teamId: data.teamId || null,
+      points: data.points || 0, // Added for leaderboard
       // Dummy FirebaseUser properties
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -348,7 +352,7 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId' | 'points'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const dataToUpdate: any = { ...profileData, updatedAt: serverTimestamp() };
   
@@ -446,16 +450,16 @@ export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | n
 export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly: boolean = false): Promise<Team[]> => {
   let qConstraints: QueryConstraint[] = [];
   if (asLeaderOnly) {
+    // Index needed for leaderUid + orderBy createdAt (ASC or DESC)
+    // Example: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Ck5wcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARoNCglsZWFkZXJVaWQQARoNCgljcmVhdGVkQXQQAhoMCghfX25hbWVfXxAC
     qConstraints.push(where("leaderUid", "==", userId));
   } else {
-    // Index required for memberUids array-contains + orderBy createdAt
-    // Firebase message: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+    // Index required for memberUids array-contains + orderBy createdAt (ASC or DESC)
+    // Example: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
     qConstraints.push(where("memberUids", "array-contains", userId));
   }
   qConstraints.push(orderBy("createdAt", "desc"));
   
-  // Index required for leaderUid + orderBy createdAt (when asLeaderOnly = true)
-  // Example: https://console.firebase.google.com/v1/r/project/YOUR_PROJECT_ID/firestore/indexes?create_composite=Ck5wcm9qZWN0cy9YOUR_PROJECT_ID/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL3RlYW1zL2luZGV4ZXMvXhABGg0KCWxlYWRlclVpZBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, TEAMS_COLLECTION), ...qConstraints);
   const teamsSnapshot = await getDocs(q);
   return teamsSnapshot.docs.map(doc => {
@@ -567,4 +571,3 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-
