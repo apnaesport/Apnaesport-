@@ -11,19 +11,20 @@ export interface UserProfile extends FirebaseUser {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
-  createdAt?: Timestamp; 
-  bio?: string; 
+  createdAt?: Timestamp;
+  bio?: string;
   favoriteGames?: string; // Kept for a short while for smoother transition if needed, but new logic uses favoriteGameIds
-  favoriteGameIds?: string[]; // New field for storing an array of favorite game IDs
-  streamingChannelUrl?: string; 
+  favoriteGameIds?: string[];
+  streamingChannelUrl?: string;
+  friendUids?: string[]; // Added for friends list
 }
 
 export type Game = {
-  id: string; 
+  id: string;
   name: string;
-  iconUrl: string; 
-  bannerUrl?: string; 
-  dataAiHint?: string; 
+  iconUrl: string;
+  bannerUrl?: string;
+  dataAiHint?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
@@ -31,7 +32,7 @@ export type Game = {
 export type TournamentStatus = "Upcoming" | "Live" | "Ongoing" | "Completed" | "Cancelled";
 
 export type Participant = {
-  id: string; 
+  id: string;
   name: string;
   avatarUrl?: string;
 };
@@ -39,23 +40,23 @@ export type Participant = {
 export type Match = {
   id: string;
   round: number;
-  participants: [Participant | null, Participant | null]; 
-  winner?: Participant | null; 
-  score?: string; 
-  startTime?: Date | Timestamp; 
+  participants: [Participant | null, Participant | null];
+  winner?: Participant | null;
+  score?: string;
+  startTime?: Date | Timestamp;
   status: "Pending" | "Live" | "Completed";
 };
 
 export type Tournament = {
-  id: string; 
+  id: string;
   name: string;
-  gameId: string; 
-  gameName: string; 
-  gameIconUrl: string; 
-  bannerImageUrl: string; 
+  gameId: string;
+  gameName: string;
+  gameIconUrl: string;
+  bannerImageUrl: string;
   description: string;
   status: TournamentStatus;
-  startDate: Date | Timestamp; 
+  startDate: Date | Timestamp;
   endDate?: Date | Timestamp;
   participants: Participant[];
   maxParticipants: number;
@@ -65,14 +66,14 @@ export type Tournament = {
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   matches?: Match[];
   featured?: boolean;
-  organizer?: string; 
-  organizerId?: string; 
+  organizer?: string;
+  organizerId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  entryFee?: number; 
-  currency?: string; 
-  sponsorName?: string; 
-  sponsorLogoUrl?: string; 
+  entryFee?: number;
+  currency?: string;
+  sponsorName?: string;
+  sponsorLogoUrl?: string;
 };
 
 export type TournamentFormDataUI = {
@@ -88,10 +89,10 @@ export type TournamentFormDataUI = {
   bannerImageFile?: FileList;
   bannerImageDataUri?: string;
   featured?: boolean;
-  entryFee?: number; 
-  currency?: string; 
-  sponsorName?: string; 
-  sponsorLogoUrl?: string; 
+  entryFee?: number;
+  currency?: string;
+  sponsorName?: string;
+  sponsorLogoUrl?: string;
 };
 
 
@@ -103,7 +104,7 @@ export type StatItem = {
 };
 
 export interface SiteSettings {
-  id?: string; 
+  id?: string;
   siteName: string;
   siteDescription: string;
   maintenanceMode: boolean;
@@ -132,4 +133,3 @@ export interface NotificationFormData {
   type: NotificationType;
   target: NotificationTarget;
 }
-

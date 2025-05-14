@@ -14,7 +14,10 @@ import {
   orderBy,
   limit,
   type QueryConstraint,
-  setDoc
+  setDoc,
+  writeBatch,
+  arrayUnion,
+  arrayRemove
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile } from './types';
@@ -50,8 +53,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined, 
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined, 
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined,
     } as Game;
   });
 };
@@ -115,6 +118,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   if (queryParams?.gameId) {
     // Index needed: gameId (ASC), startDate (DESC)
     // Firebase console link (example): https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
+    // (The above comment is an example, Firebase error usually provides the correct link)
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
    if (queryParams?.featured !== undefined) {
@@ -163,7 +167,7 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
         const numMatches = Math.floor(data.participants.length / 2);
         for(let i = 0; i < numMatches; i++) {
             matches.push({
-                id: `m-auto-${tournamentId}-${i+1}`, 
+                id: `m-auto-${tournamentId}-${i+1}`,
                 round: 1,
                 participants: [data.participants[i*2] || null, data.participants[i*2+1] || null],
                 status: 'Pending'
@@ -180,7 +184,7 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
-      matches: matches, 
+      matches: matches,
       entryFee: data.entryFee || 0,
       currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
       sponsorName: data.sponsorName || undefined,
@@ -203,7 +207,7 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   }
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-  
+
   if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
     if (restData.participants === undefined && !tournamentData.hasOwnProperty('participants')) {
         delete updateData.participants;
@@ -222,7 +226,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournamentData = tournamentSnap.data() as Tournament; 
+    const tournamentData = tournamentSnap.data() as Tournament;
     const currentParticipants = tournamentData.participants || [];
 
     if (currentParticipants.find(p => p.id === participant.id)) {
@@ -258,8 +262,9 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     qConstraints.push(where("target", "==", target));
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // Create in Firebase Console if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
-  // (Replace battlezone-faa03 with your actual project ID if different)
+  // Create in Firebase Console if error. Example link for index creation:
+  // https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+  // Replace YOUR_PROJECT_ID_HERE with your actual Firebase project ID.
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -285,11 +290,12 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, 
+      createdAt: data.createdAt as Timestamp,
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "", // Maintained for short-term compatibility
-      favoriteGameIds: data.favoriteGameIds || [], // New field
+      favoriteGames: data.favoriteGames || "",
+      favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
+      friendUids: data.friendUids || [], // Added for friends list
       // Dummy FirebaseUser properties - not fully populated from Firestore
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -320,11 +326,12 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, 
+      createdAt: data.createdAt as Timestamp,
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "", // Maintained
-      favoriteGameIds: data.favoriteGameIds || [], // New field
+      favoriteGames: data.favoriteGames || "",
+      favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
+      friendUids: data.friendUids || [], // Added for friends list
       // Dummy FirebaseUser properties
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -348,14 +355,59 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGames' | 'favoriteGameIds' | 'streamingChannelUrl'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGames' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
-  // Ensure favoriteGameIds is an array, even if undefined is passed for other fields
   const dataToUpdate = { ...profileData };
   if (profileData.hasOwnProperty('favoriteGameIds') && !Array.isArray(profileData.favoriteGameIds)) {
-    dataToUpdate.favoriteGameIds = []; // Default to empty array if not an array
+    dataToUpdate.favoriteGameIds = [];
+  }
+  if (profileData.hasOwnProperty('friendUids') && !Array.isArray(profileData.friendUids)) {
+    dataToUpdate.friendUids = [];
   }
   await updateDoc(userRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
+};
+
+export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId: string): Promise<UserProfile[]> => {
+  if (!searchTerm.trim()) return [];
+  const lowerSearchTerm = searchTerm.toLowerCase();
+
+  // Firestore does not support case-insensitive search or partial string matching directly on multiple fields easily.
+  // A common workaround is to store a lowercased version of fields you want to search.
+  // For this prototype, we'll fetch all users and filter client-side, which is NOT scalable for large datasets.
+  // For production, consider using a dedicated search service like Algolia or Typesense, or restructuring data.
+  const allUsers = await getAllUsersFromFirestore();
+  return allUsers.filter(user =>
+    user.uid !== currentUserId &&
+    (user.displayName?.toLowerCase().includes(lowerSearchTerm) || user.email?.toLowerCase().includes(lowerSearchTerm))
+  );
+};
+
+export const addFriend = async (currentUserUid: string, targetUserUid: string): Promise<void> => {
+  if (currentUserUid === targetUserUid) throw new Error("Cannot add yourself as a friend.");
+
+  const batch = writeBatch(db);
+  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
+  const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
+
+  // Add targetUserUid to currentUser's friendUids
+  batch.update(currentUserRef, { friendUids: arrayUnion(targetUserUid), updatedAt: serverTimestamp() });
+  // Add currentUserUid to targetUser's friendUids (bilateral friendship)
+  batch.update(targetUserRef, { friendUids: arrayUnion(currentUserUid), updatedAt: serverTimestamp() });
+
+  await batch.commit();
+};
+
+export const removeFriend = async (currentUserUid: string, targetUserUid: string): Promise<void> => {
+  const batch = writeBatch(db);
+  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
+  const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
+
+  // Remove targetUserUid from currentUser's friendUids
+  batch.update(currentUserRef, { friendUids: arrayRemove(targetUserUid), updatedAt: serverTimestamp() });
+  // Remove currentUserUid from targetUser's friendUids
+  batch.update(targetUserRef, { friendUids: arrayRemove(currentUserUid), updatedAt: serverTimestamp() });
+
+  await batch.commit();
 };
 
 
@@ -387,4 +439,3 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-

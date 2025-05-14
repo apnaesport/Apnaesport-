@@ -49,7 +49,7 @@ export function RegisterForm() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
-      
+
       await updateFirebaseProfile(user, { displayName: values.name });
 
       // Store additional user info in Firestore
@@ -58,7 +58,7 @@ export function RegisterForm() {
         uid: user.uid,
         displayName: values.name,
         email: values.email,
-        photoURL: null, 
+        photoURL: null,
         isAdmin: userIsAdmin,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -66,6 +66,7 @@ export function RegisterForm() {
         favoriteGames: "", // Maintained for short-term compatibility
         favoriteGameIds: [], // Initialize as empty array
         streamingChannelUrl: "",
+        friendUids: [], // Initialize friendUids as empty array
       });
 
       toast({

@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   logout: () => Promise<void>;
-  setUser: (user: UserProfile | null) => void; 
+  setUser: (user: UserProfile | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,23 +34,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!userDocSnap.exists()) {
           const userIsAdmin = firebaseUser.email === ADMIN_EMAIL;
-          const initialProfileData = {
+          const initialProfileData: Partial<UserProfile> = { // Use Partial for initial creation
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User",
             email: firebaseUser.email,
             photoURL: firebaseUser.photoURL || null,
             isAdmin: userIsAdmin,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
+            createdAt: serverTimestamp() as Timestamp, // Cast for initial set, Firestore handles conversion
+            updatedAt: serverTimestamp() as Timestamp,
             bio: "",
-            favoriteGames: "", // Maintained for short-term compatibility
-            favoriteGameIds: [], // New field
+            favoriteGames: "",
+            favoriteGameIds: [],
             streamingChannelUrl: "",
+            friendUids: [], // Initialize friendUids
           };
           await setDoc(userDocRef, initialProfileData);
-          userDocSnap = await getDoc(userDocRef); 
+          userDocSnap = await getDoc(userDocRef);
         }
-        
+
         let userProfileData: Partial<UserProfile> = {};
         if (userDocSnap.exists()) {
           userProfileData = userDocSnap.data() as Partial<UserProfile>;
@@ -63,9 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           photoURL: firebaseUser.photoURL || userProfileData.photoURL,
           isAdmin: userProfileData.isAdmin || (firebaseUser.email === ADMIN_EMAIL),
           bio: userProfileData.bio || "",
-          favoriteGames: userProfileData.favoriteGames || "", // Maintained
-          favoriteGameIds: userProfileData.favoriteGameIds || [], // New field
+          favoriteGames: userProfileData.favoriteGames || "",
+          favoriteGameIds: userProfileData.favoriteGameIds || [],
           streamingChannelUrl: userProfileData.streamingChannelUrl || "",
+          friendUids: userProfileData.friendUids || [], // Load friendUids
           emailVerified: firebaseUser.emailVerified,
           isAnonymous: firebaseUser.isAnonymous,
           metadata: firebaseUser.metadata,
@@ -77,9 +79,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           getIdTokenResult: firebaseUser.getIdTokenResult,
           reload: firebaseUser.reload,
           toJSON: firebaseUser.toJSON,
-          phoneNumber: firebaseUser.phoneNumber, 
+          phoneNumber: firebaseUser.phoneNumber,
           providerId: firebaseUser.providerId,
-          createdAt: userProfileData.createdAt, 
+          createdAt: userProfileData.createdAt,
         };
         setUser(profile);
         setIsAdmin(profile.isAdmin || false);
@@ -102,7 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
     router.push("/auth/login");
   };
-  
+
   const setContextUser = (updatedUser: UserProfile | null) => {
     setUser(updatedUser);
     if (updatedUser) {
