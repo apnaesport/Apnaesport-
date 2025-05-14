@@ -60,7 +60,7 @@ export type Tournament = {
   registrationInstructions?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   matches?: Match[];
-  featured?: boolean;
+  featured?: boolean; // New field for featured tournaments
   organizer?: string; // User display name
   organizerId?: string; // UID of the user who created it
   createdAt?: Timestamp;
@@ -71,22 +71,23 @@ export type TournamentFormDataUI = {
   name: string;
   gameId: string;
   description: string;
-  startDate: Date; 
+  startDate: Date;
   maxParticipants: number;
   prizePool?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   rules?: string;
   registrationInstructions?: string;
-  bannerImageFile?: FileList; 
-  bannerImageDataUri?: string; 
+  bannerImageFile?: FileList;
+  bannerImageDataUri?: string;
+  featured?: boolean; // New field
 };
 
 
 export type StatItem = {
   title: string;
   value: string | number;
-  icon?: LucideIconName; 
-  change?: string; 
+  icon?: LucideIconName;
+  change?: string;
 };
 
 export interface SiteSettings {
@@ -97,20 +98,20 @@ export interface SiteSettings {
   allowRegistrations: boolean;
   logoUrl?: string;
   faviconUrl?: string;
-  defaultTheme?: string; 
+  defaultTheme?: string;
   updatedAt?: Timestamp;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
-export type NotificationTarget = "all_users" | "specific_users" | "tournament_participants"; 
+export type NotificationTarget = "all_users" | "specific_users" | "tournament_participants";
 
 export interface NotificationMessage {
-  id: string; 
+  id: string;
   title: string;
   message: string;
   type: NotificationType;
   target: NotificationTarget;
-  createdAt: Timestamp; 
+  createdAt: Timestamp;
 }
 
 export interface NotificationFormData {
@@ -119,4 +120,3 @@ export interface NotificationFormData {
   type: NotificationType;
   target: NotificationTarget;
 }
-

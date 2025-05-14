@@ -14,7 +14,7 @@ import {
   orderBy,
   limit,
   type QueryConstraint,
-  setDoc 
+  setDoc
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile } from './types';
@@ -24,7 +24,7 @@ const TOURNAMENTS_COLLECTION = "tournaments";
 const NOTIFICATIONS_COLLECTION = "notifications";
 const USERS_COLLECTION = "users";
 const SETTINGS_COLLECTION = "settings";
-const GLOBAL_SETTINGS_ID = "global"; 
+const GLOBAL_SETTINGS_ID = "global";
 
 
 // --- Game Functions ---
@@ -32,14 +32,18 @@ const GLOBAL_SETTINGS_ID = "global";
 export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt' | 'updatedAt'>): Promise<Game> => {
   const docRef = await addDoc(collection(db, GAMES_COLLECTION), {
     ...gameData,
+    iconUrl: gameData.iconUrl || `https://placehold.co/40x40.png?text=${(gameData.name || "G").substring(0,2)}`,
+    bannerUrl: gameData.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(gameData.name || "Game Banner")}`,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  const newGameSnapshot = await getDoc(docRef); 
+  const newGameSnapshot = await getDoc(docRef);
   const newGameData = newGameSnapshot.data();
-  return { 
-    id: docRef.id, 
-    ...gameData, 
+  return {
+    id: docRef.id,
+    ...gameData,
+    iconUrl: newGameData?.iconUrl,
+    bannerUrl: newGameData?.bannerUrl,
     createdAt: newGameData?.createdAt as Timestamp,
     updatedAt: newGameData?.updatedAt as Timestamp
   };
@@ -49,8 +53,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
   const gamesSnapshot = await getDocs(query(collection(db, GAMES_COLLECTION), orderBy("name", "asc")));
   return gamesSnapshot.docs.map(doc => {
     const data = doc.data();
-    return { 
-      id: doc.id, 
+    return {
+      id: doc.id,
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
@@ -66,8 +70,8 @@ export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | u
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    return { 
-        id: docSnap.id, 
+    return {
+        id: docSnap.id,
         ...data,
         iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
         bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
@@ -99,25 +103,27 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     startDate: Timestamp.fromDate(startDate),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    matches: tournamentData.matches || [], 
+    matches: tournamentData.matches || [],
+    featured: tournamentData.featured || false, // Default featured to false
     bannerImageUrl: tournamentData.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
   });
   const newTournamentSnapshot = await getDoc(docRef);
   const newTournamentData = newTournamentSnapshot.data();
-  
+
   return {
     ...tournamentData,
     id: docRef.id,
     createdAt: newTournamentData?.createdAt as Timestamp,
     updatedAt: newTournamentData?.updatedAt as Timestamp,
-    startDate: Timestamp.fromDate(startDate), 
+    startDate: Timestamp.fromDate(startDate),
+    featured: newTournamentData?.featured,
     bannerImageUrl: newTournamentData?.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
   };
 };
 
-export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string }): Promise<Tournament[]> => {
+export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [orderBy("startDate", "desc")];
-  
+
   if (queryParams?.status) {
     qConstraints.push(where("status", "==", queryParams.status));
   }
@@ -127,16 +133,19 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     // Firebase error messages will typically provide a link to create this index.
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
+   if (queryParams?.featured !== undefined) { // Allow filtering by featured status
+    qConstraints.push(where("featured", "==", queryParams.featured));
+  }
   if (queryParams?.participantId) {
-    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId })); 
+    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId }));
   }
   if (queryParams?.count) {
     qConstraints.push(limit(queryParams.count));
   }
-  
+
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
   const tournamentsSnapshot = await getDocs(q);
-  
+
   return tournamentsSnapshot.docs.map(doc => {
     const data = doc.data();
     return {
@@ -144,7 +153,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       ...data,
       bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
-      startDate: (data.startDate as Timestamp).toDate(), 
+      startDate: (data.startDate as Timestamp).toDate(),
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
@@ -159,13 +168,13 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    
+
     let matches = data.matches || [];
     if (matches.length === 0 && data.participants && data.participants.length >= 2 && data.bracketType === "Single Elimination") {
         const numMatches = Math.floor(data.participants.length / 2);
         for(let i = 0; i < numMatches; i++) {
             matches.push({
-                id: `m-auto-${tournamentId}-${i+1}`, 
+                id: `m-auto-${tournamentId}-${i+1}`,
                 round: 1,
                 participants: [data.participants[i*2] || null, data.participants[i*2+1] || null],
                 status: 'Pending'
@@ -197,7 +206,7 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   if (endDate) {
     updateData.endDate = Timestamp.fromDate(endDate);
   } else if (tournamentData.hasOwnProperty('endDate') && tournamentData.endDate === null) {
-     updateData.endDate = null; 
+     updateData.endDate = null;
   }
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
@@ -213,7 +222,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournamentData = tournamentSnap.data() as Tournament; 
+    const tournamentData = tournamentSnap.data() as Tournament;
     const currentParticipants = tournamentData.participants || [];
 
     if (currentParticipants.find(p => p.id === participant.id)) {
@@ -223,7 +232,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
       throw new Error("Tournament is full");
     }
     const updatedParticipants = [...currentParticipants, participant];
-    await updateDoc(tournamentRef, { 
+    await updateDoc(tournamentRef, {
         participants: updatedParticipants,
         updatedAt: serverTimestamp()
     });
@@ -254,7 +263,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   if (target) {
     qConstraints.push(where("target", "==", target));
   }
-  
+
   // IMPORTANT: This query might require a composite index in Firestore if 'target' is used.
   // Example: Collection: notifications, Fields: target (ASC), createdAt (DESC).
   // Firebase error messages will typically provide a link to create this index.
@@ -262,13 +271,13 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   // Index Required: target (ASC), createdAt (DESC) on notifications collection.
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
-  
+
   return notificationsSnapshot.docs.map(doc => {
     const data = doc.data();
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt as Timestamp, 
+      createdAt: data.createdAt as Timestamp,
     } as NotificationMessage;
   });
 };
@@ -284,7 +293,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, 
+      createdAt: data.createdAt as Timestamp,
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
       metadata: data.metadata || {},
@@ -314,27 +323,25 @@ export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | nul
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    return { 
-        id: docSnap.id, 
+    return {
+        id: docSnap.id,
         ...data,
         updatedAt: data.updatedAt as Timestamp,
     } as SiteSettings;
   }
-  return null; 
+  return null;
 };
 
 export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSettings, 'id' | 'updatedAt'>): Promise<void> => {
   const docRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
-  await setDoc(docRef, { 
+  await setDoc(docRef, {
     ...settingsData,
     updatedAt: serverTimestamp(),
-  }, { merge: true }); 
+  }, { merge: true });
 };
 
 
-// Aliases for easier use 
+// Aliases for easier use
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-
-    

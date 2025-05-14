@@ -1,5 +1,5 @@
 
-"use client"; 
+"use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamentCard";
@@ -7,8 +7,8 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
-import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
-import { useEffect, useState, useCallback } from "react"; 
+import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore";
+import { useEffect, useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -25,21 +25,33 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       const [allTournaments, allGames] = await Promise.all([
-        getTournamentsFromFirestore(),
+        getTournamentsFromFirestore(), // Fetches all tournaments, ordered by startDate desc by default
         getGamesFromFirestore()
       ]);
 
-      const upcomingTournaments = allTournaments.filter(t => t.status === "Upcoming");
-      const ft = allTournaments.find(t => t.featured && upcomingTournaments.includes(t)) || 
-                   upcomingTournaments[0] || 
-                   allTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0]; 
-      setFeaturedTournament(ft);
+      // Logic for featured tournament
+      const upcomingOrLiveTournaments = allTournaments.filter(t => t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing");
+      const explicitlyFeatured = upcomingOrLiveTournaments.filter(t => t.featured);
+
+      if (explicitlyFeatured.length > 0) {
+        // If multiple are featured, pick the one starting soonest (or already live)
+        explicitlyFeatured.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        setFeaturedTournament(explicitlyFeatured[0]);
+      } else if (upcomingOrLiveTournaments.length > 0) {
+        // Fallback: pick the soonest upcoming/live tournament if none are explicitly featured
+        upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        setFeaturedTournament(upcomingOrLiveTournaments[0]);
+      } else {
+         // Fallback: if no upcoming/live, pick most recently created overall (already sorted by startDate desc)
+        setFeaturedTournament(allTournaments[0]);
+      }
+
 
       setLiveTournaments(allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing"));
       setGames(allGames);
-      
+
       const activeTournamentCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
-      
+
       const placeholderStats: StatItem[] = [
         { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" },
         { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, // Static placeholder
@@ -56,7 +68,7 @@ export default function DashboardPage() {
   }, [toast]);
 
   useEffect(() => {
-    loadData(); 
+    loadData();
   }, [loadData]);
 
 
@@ -106,7 +118,7 @@ export default function DashboardPage() {
           ))}
         </div>
       </section>
-      
+
       <section>
         <GamesListHorizontal games={games} />
       </section>
