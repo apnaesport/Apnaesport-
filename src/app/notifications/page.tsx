@@ -1,7 +1,6 @@
 
 "use client";
 
-import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
 import type { NotificationMessage, NotificationType } from "@/lib/types";
 import { getNotificationsFromFirestore } from "@/lib/tournamentStore";
@@ -46,11 +45,9 @@ export default function UserNotificationsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return; // Should be protected by layout/redirect logic but good to have
+    if (!user) return; 
     setIsLoading(true);
     try {
-      // Users typically see 'all_users' notifications.
-      // More complex targeting would require different query logic.
       const fetchedNotifications = await getNotificationsFromFirestore("all_users");
       setNotifications(fetchedNotifications);
     } catch (error) {
@@ -65,25 +62,25 @@ export default function UserNotificationsPage() {
       fetchNotifications();
     }
      if (!authLoading && !user) {
-      setIsLoading(false); // Stop loading if user is not authenticated
+      setIsLoading(false); 
     }
   }, [authLoading, user, fetchNotifications]);
 
   if (authLoading || isLoading) {
     return (
-      <MainLayout>
+      <>
         <PageTitle title="Notifications" />
         <div className="flex items-center justify-center min-h-[calc(100vh-15rem)]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-3 text-muted-foreground">Loading notifications...</p>
         </div>
-      </MainLayout>
+      </>
     );
   }
 
   if (!user) {
      return (
-      <MainLayout>
+      <>
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
           <PageTitle title="Access Denied" subtitle="You need to be logged in to view notifications." />
            <LogIn className="h-16 w-16 text-primary my-6" />
@@ -91,12 +88,12 @@ export default function UserNotificationsPage() {
             <Link href="/auth/login?redirect=/notifications">Login to View Notifications</Link>
           </Button>
         </div>
-      </MainLayout>
+      </>
     );
   }
 
   return (
-    <MainLayout>
+    <>
       <PageTitle title="Notifications" subtitle="Stay updated with the latest announcements and alerts." />
       
       {notifications.length > 0 ? (
@@ -128,6 +125,6 @@ export default function UserNotificationsPage() {
           </CardContent>
         </Card>
       )}
-    </MainLayout>
+    </>
   );
 }
