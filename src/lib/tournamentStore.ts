@@ -20,7 +20,7 @@ import {
   arrayRemove
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -28,6 +28,7 @@ const NOTIFICATIONS_COLLECTION = "notifications";
 const USERS_COLLECTION = "users";
 const SETTINGS_COLLECTION = "settings";
 const GLOBAL_SETTINGS_ID = "global";
+const TEAMS_COLLECTION = "teams";
 
 
 // --- Game Functions ---
@@ -208,11 +209,21 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
 
+  // Preserve participants array if not explicitly being updated
   if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
+    // This condition seems problematic. If participants is in restData, it's being updated.
+    // If it's not in tournamentData at all, we should not delete it.
+    // Let's adjust to only delete if explicitly set to undefined in tournamentData.
     if (restData.participants === undefined && !tournamentData.hasOwnProperty('participants')) {
-        delete updateData.participants;
+        // This means tournamentData was passed without 'participants' key, so don't touch it.
     }
+  } else if (tournamentData.hasOwnProperty('participants') && tournamentData.participants === undefined) {
+    // This means participants was explicitly passed as undefined, intending to remove/clear it.
+    // This case is unlikely for array updates; usually, one passes an empty array or a new array.
+    // For safety, we usually update with a new array, or use arrayUnion/arrayRemove for specific items.
+    // For this general update function, if tournamentData.participants is provided, it will overwrite.
   }
+
 
   await updateDoc(docRef, updateData);
 };
@@ -235,9 +246,9 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
     if (currentParticipants.length >= tournamentData.maxParticipants) {
       throw new Error("Tournament is full");
     }
-    const updatedParticipants = [...currentParticipants, participant];
+    // Use arrayUnion to add a participant to avoid duplicates if this function is called multiple times concurrently
     await updateDoc(tournamentRef, {
-        participants: updatedParticipants,
+        participants: arrayUnion(participant),
         updatedAt: serverTimestamp()
     });
   } else {
@@ -265,6 +276,8 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   // Create in Firebase Console if error. Example link for index creation:
   // https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
   // Replace YOUR_PROJECT_ID_HERE with your actual Firebase project ID.
+  // Index for battlezone-faa03 already created:
+  // https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -280,6 +293,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
 
 // --- User Functions ---
 export const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
+  if (!userId) return null;
   const userRef = doc(db, USERS_COLLECTION, userId);
   const docSnap = await getDoc(userRef);
   if (docSnap.exists()) {
@@ -292,10 +306,10 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp,
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
-      friendUids: data.friendUids || [], // Added for friends list
+      friendUids: data.friendUids || [],
+      teamId: data.teamId || null,
       // Dummy FirebaseUser properties - not fully populated from Firestore
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -328,10 +342,10 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp,
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
-      friendUids: data.friendUids || [], // Added for friends list
+      friendUids: data.friendUids || [],
+      teamId: data.teamId || null,
       // Dummy FirebaseUser properties
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
@@ -355,26 +369,27 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGames' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
-  const dataToUpdate = { ...profileData };
+  const dataToUpdate: any = { ...profileData, updatedAt: serverTimestamp() };
+  
   if (profileData.hasOwnProperty('favoriteGameIds') && !Array.isArray(profileData.favoriteGameIds)) {
     dataToUpdate.favoriteGameIds = [];
   }
   if (profileData.hasOwnProperty('friendUids') && !Array.isArray(profileData.friendUids)) {
     dataToUpdate.friendUids = [];
   }
-  await updateDoc(userRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
+  if (profileData.hasOwnProperty('teamId') && profileData.teamId === undefined) {
+    dataToUpdate.teamId = null; // Ensure we can clear teamId
+  }
+
+  await updateDoc(userRef, dataToUpdate);
 };
 
 export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId: string): Promise<UserProfile[]> => {
   if (!searchTerm.trim()) return [];
   const lowerSearchTerm = searchTerm.toLowerCase();
 
-  // Firestore does not support case-insensitive search or partial string matching directly on multiple fields easily.
-  // A common workaround is to store a lowercased version of fields you want to search.
-  // For this prototype, we'll fetch all users and filter client-side, which is NOT scalable for large datasets.
-  // For production, consider using a dedicated search service like Algolia or Typesense, or restructuring data.
   const allUsers = await getAllUsersFromFirestore();
   return allUsers.filter(user =>
     user.uid !== currentUserId &&
@@ -389,9 +404,7 @@ export const addFriend = async (currentUserUid: string, targetUserUid: string): 
   const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
   const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
 
-  // Add targetUserUid to currentUser's friendUids
   batch.update(currentUserRef, { friendUids: arrayUnion(targetUserUid), updatedAt: serverTimestamp() });
-  // Add currentUserUid to targetUser's friendUids (bilateral friendship)
   batch.update(targetUserRef, { friendUids: arrayUnion(currentUserUid), updatedAt: serverTimestamp() });
 
   await batch.commit();
@@ -402,12 +415,127 @@ export const removeFriend = async (currentUserUid: string, targetUserUid: string
   const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
   const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
 
-  // Remove targetUserUid from currentUser's friendUids
   batch.update(currentUserRef, { friendUids: arrayRemove(targetUserUid), updatedAt: serverTimestamp() });
-  // Remove currentUserUid from targetUser's friendUids
   batch.update(targetUserRef, { friendUids: arrayRemove(currentUserUid), updatedAt: serverTimestamp() });
 
   await batch.commit();
+};
+
+// --- Team Functions ---
+
+export const createTeamInFirestore = async (teamData: TeamFormData, leader: UserProfile): Promise<string> => {
+  if (!leader) throw new Error("Leader information is required to create a team.");
+  
+  // Check if the leader already has a team (optional, based on rules)
+  const existingTeam = await getTeamsByUserIdFromFirestore(leader.uid, true);
+  if (existingTeam.length > 0) {
+    throw new Error("You can only lead one team.");
+  }
+
+  const teamDocRef = await addDoc(collection(db, TEAMS_COLLECTION), {
+    name: teamData.name,
+    leaderUid: leader.uid,
+    leaderName: leader.displayName || leader.email,
+    memberUids: [leader.uid], // Leader is initially the only member
+    createdAt: serverTimestamp(),
+    lastActivityAt: serverTimestamp(),
+  });
+
+  // Update user's profile with teamId
+  await updateUserTeamInFirestore(leader.uid, teamDocRef.id);
+
+  return teamDocRef.id;
+};
+
+export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | null> => {
+  if (!teamId) return null;
+  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+  const teamSnap = await getDoc(teamRef);
+  if (teamSnap.exists()) {
+    return { id: teamSnap.id, ...teamSnap.data() } as Team;
+  }
+  return null;
+};
+
+export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly: boolean = false): Promise<Team[]> => {
+  let qConstraints: QueryConstraint[] = [];
+  if (asLeaderOnly) {
+    qConstraints.push(where("leaderUid", "==", userId));
+  } else {
+    qConstraints.push(where("memberUids", "array-contains", userId));
+  }
+  qConstraints.push(orderBy("createdAt", "desc"));
+  
+  // Index required for memberUids array-contains + orderBy createdAt
+  // Firestore message: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+  const q = query(collection(db, TEAMS_COLLECTION), ...qConstraints);
+  const teamsSnapshot = await getDocs(q);
+  return teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+};
+
+
+export const updateUserTeamInFirestore = async (userId: string, teamId: string | null): Promise<void> => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  await updateDoc(userRef, { teamId: teamId, updatedAt: serverTimestamp() });
+};
+
+export const addMemberToTeamInFirestore = async (teamId: string, userIdToAdd: string): Promise<void> => {
+  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+  const userRef = doc(db, USERS_COLLECTION, userIdToAdd);
+
+  const batch = writeBatch(db);
+  batch.update(teamRef, { memberUids: arrayUnion(userIdToAdd), lastActivityAt: serverTimestamp() });
+  batch.update(userRef, { teamId: teamId, updatedAt: serverTimestamp() });
+  await batch.commit();
+};
+
+export const removeMemberFromTeamInFirestore = async (teamId: string, userIdToRemove: string): Promise<void> => {
+  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+  const userRef = doc(db, USERS_COLLECTION, userIdToRemove);
+  
+  const teamSnap = await getDoc(teamRef);
+  if (!teamSnap.exists()) throw new Error("Team not found.");
+  const teamData = teamSnap.data() as Team;
+
+  const batch = writeBatch(db);
+  batch.update(teamRef, { memberUids: arrayRemove(userIdToRemove), lastActivityAt: serverTimestamp() });
+  batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
+
+  // If the leader is removing themselves AND they are the last member, consider deleting the team
+  // OR implement leadership transfer (more complex). For now, simple removal.
+  // If leader removed and team still has members, current logic needs leader to explicitly delete team.
+  if (teamData.leaderUid === userIdToRemove && teamData.memberUids.length === 1) {
+    // Last member (leader) is leaving, delete the team
+    batch.delete(teamRef);
+  }
+
+  await batch.commit();
+};
+
+export const deleteTeamFromFirestore = async (teamId: string, currentUserId: string): Promise<void> => {
+  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+  const teamSnap = await getDoc(teamRef);
+
+  if (!teamSnap.exists()) throw new Error("Team not found.");
+  const teamData = teamSnap.data() as Team;
+
+  if (teamData.leaderUid !== currentUserId) {
+    throw new Error("Only the team leader can delete the team.");
+  }
+
+  const batch = writeBatch(db);
+  // Clear teamId for all members
+  for (const memberUid of teamData.memberUids) {
+    const userRef = doc(db, USERS_COLLECTION, memberUid);
+    batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
+  }
+  batch.delete(teamRef); // Delete the team document
+  await batch.commit();
+};
+
+export const updateTeamLastActivity = async (teamId: string): Promise<void> => {
+  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+  await updateDoc(teamRef, { lastActivityAt: serverTimestamp() });
 };
 
 
@@ -439,3 +567,4 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
+

@@ -13,10 +13,10 @@ export interface UserProfile extends FirebaseUser {
   isAdmin?: boolean;
   createdAt?: Timestamp;
   bio?: string;
-  favoriteGames?: string; // Kept for a short while for smoother transition if needed, but new logic uses favoriteGameIds
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
-  friendUids?: string[]; // Added for friends list
+  friendUids?: string[];
+  teamId?: string | null; // Added for team membership
 }
 
 export type Game = {
@@ -132,4 +132,18 @@ export interface NotificationFormData {
   message: string;
   type: NotificationType;
   target: NotificationTarget;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  leaderUid: string;
+  leaderName: string; // Denormalized for easier display
+  memberUids: string[];
+  createdAt: Timestamp;
+  lastActivityAt: Timestamp;
+}
+
+export interface TeamFormData {
+  name: string;
 }

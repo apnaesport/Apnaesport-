@@ -3,7 +3,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -60,13 +60,13 @@ export function RegisterForm() {
         email: values.email,
         photoURL: null,
         isAdmin: userIsAdmin,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        createdAt: serverTimestamp() as Timestamp,
+        updatedAt: serverTimestamp() as Timestamp,
         bio: "",
-        favoriteGames: "", // Maintained for short-term compatibility
-        favoriteGameIds: [], // Initialize as empty array
+        favoriteGameIds: [],
         streamingChannelUrl: "",
-        friendUids: [], // Initialize friendUids as empty array
+        friendUids: [],
+        teamId: null, // Initialize teamId
       });
 
       toast({
