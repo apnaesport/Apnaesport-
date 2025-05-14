@@ -11,6 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+// Removed metadata export as this is a Client Component
+// export const metadata: Metadata = {
+//   title: "Browse Games | Apna Esport",
+//   description: "Discover a wide variety of esports games and find active tournaments on Apna Esport.",
+// };
 
 export default function GamesPage() {
   const [allGames, setAllGames] = useState<Game[]>([]);
@@ -96,3 +101,4 @@ export default function GamesPage() {
 //     <Skeleton className="h-10 w-full" />
 //   </div>
 // );
+

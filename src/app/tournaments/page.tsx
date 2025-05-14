@@ -1,6 +1,7 @@
 
 "use client"; 
 
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Tournament } from "@/lib/types";
@@ -20,6 +21,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+
+export const metadata: Metadata = {
+  title: "All Tournaments | Apna Esport",
+  description: "Browse all active, upcoming, and completed esports tournaments on Apna Esport. Find your next challenge!",
+};
 
 export default function AllTournamentsPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);

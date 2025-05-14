@@ -1,6 +1,7 @@
 
 "use client"; 
 
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Game, Tournament } from "@/lib/types";
@@ -17,6 +18,28 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
+}
+
+type Props = {
+  params: { gameId: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const gameId = params.gameId;
+  const game = await getGameDetails(gameId);
+
+  if (!game) {
+    return {
+      title: "Game Not Found | Apna Esport",
+      description: "The requested game could not be found.",
+    };
+  }
+
+  return {
+    title: `${game.name} Tournaments | Apna Esport`,
+    description: `Find and join ${game.name} tournaments on Apna Esport.`,
+  };
 }
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {

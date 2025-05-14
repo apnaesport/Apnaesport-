@@ -1,6 +1,7 @@
 
 "use client"; 
 
+import type { Metadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import type { Tournament, Participant } from "@/lib/types";
@@ -36,6 +37,29 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 interface TournamentPageProps {
   params: { tournamentId: string };
 }
+
+type Props = {
+  params: { tournamentId: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+};
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const tournamentId = params.tournamentId;
+  const tournament = await getTournamentByIdFromFirestore(tournamentId);
+
+  if (!tournament) {
+    return {
+      title: "Tournament Not Found | Apna Esport",
+      description: "The requested tournament could not be found.",
+    };
+  }
+
+  return {
+    title: `${tournament.name} | Apna Esport`,
+    description: tournament.description || `Details for the ${tournament.name} tournament on Apna Esport.`,
+  };
+}
+
 
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
