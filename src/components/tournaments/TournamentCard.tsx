@@ -10,12 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Gamepad2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
 
 interface TournamentCardProps {
   tournament: Tournament;
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
+  const [formattedStartDate, setFormattedStartDate] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tournament.startDate) {
+      setFormattedStartDate(format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p"));
+    }
+  }, [tournament.startDate]);
+
   const getStatusBadgeVariant = (status: Tournament["status"]) => {
     switch (status) {
       case "Live":
@@ -66,7 +75,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
           <div className="flex items-center text-muted-foreground">
             <CalendarDays className="h-4 w-4 mr-2 text-primary" />
-            <span>{format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p")}</span>
+            <span>{formattedStartDate || "Loading date..."}</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2 text-primary" />
@@ -84,3 +93,4 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
     </Card>
   );
 }
+
