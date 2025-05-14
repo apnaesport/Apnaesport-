@@ -16,78 +16,43 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { useState, useEffect } from "react"; // Added useState and useEffect
-import { useToast } from "@/hooks/use-toast"; // Added useToast
-
-// Placeholder data - replace with actual data fetching
-const initialTournaments: Tournament[] = [
-  {
-    id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/800x400.png", description: "Weekly LoL tournament", status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 5)), 
-    participants: Array(5).fill({id:'', name:''}), maxParticipants: 16, prizePool: "$200", bracketType: "Single Elimination", organizerId: "admin-user"
-  },
-  {
-    id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/800x400.png", description: "Valorant regional qualifier", status: "Live", startDate: new Date(new Date().setDate(new Date().getDate() - 2)), 
-    participants: Array(20).fill({id:'', name:''}), maxParticipants: 32, prizePool: "$5,000", bracketType: "Double Elimination", organizerId: "admin-user"
-  },
-  {
-    id: "t3-cs", name: "CS:2 Open League", gameId: "game-cs", gameName: "Counter-Strike 2", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/800x400.png", description: "Open CS2 league", status: "Completed", startDate: new Date(new Date().setDate(new Date().getDate() - 20)), 
-    participants: Array(50).fill({id:'', name:''}), maxParticipants: 64, prizePool: "$1,000", bracketType: "Round Robin", organizerId: "admin-user"
-  },
-];
-
+import { useState, useEffect } from "react"; 
+import { useToast } from "@/hooks/use-toast";
+import { getTournaments, deleteTournamentFromStore, subscribe } from "@/lib/tournamentStore"; // Updated imports
 
 export default function AdminTournamentsPage() {
-  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const { toast } = useToast();
-  // const [isLoading, setIsLoading] = useState(true); // For real data fetching
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Example: Fetch tournaments from Firestore (uncomment and adapt for real backend)
-  // useEffect(() => {
-  //   const fetchTournaments = async () => {
-  //     setIsLoading(true);
-  //     try {
-  //       // const q = query(collection(db, "tournaments"));
-  //       // const querySnapshot = await getDocs(q);
-  //       // const fetchedTournaments: Tournament[] = querySnapshot.docs.map(doc => {
-  //       //   const data = doc.data();
-  //       //   return { 
-  //       //     id: doc.id, 
-  //       //     ...data, 
-  //       //     startDate: data.startDate?.toDate ? data.startDate.toDate() : new Date(data.startDate), // Firestore timestamp conversion
-  //       //     endDate: data.endDate?.toDate ? data.endDate.toDate() : data.endDate ? new Date(data.endDate) : undefined,
-  //       //   } as Tournament;
-  //       // });
-  //       // setTournaments(fetchedTournaments);
-  //       setTournaments(initialTournaments); // Using placeholder for now
-  //     } catch (error) {
-  //       console.error("Error fetching tournaments:", error);
-  //       toast({ title: "Error", description: "Could not fetch tournaments.", variant: "destructive" });
-  //     }
-  //     setIsLoading(false);
-  //   };
-  //   fetchTournaments();
-  // }, [toast]);
+  useEffect(() => {
+    setIsLoading(true);
+    const tournamentsFromStore = getTournaments();
+    setTournaments(tournamentsFromStore);
+    setIsLoading(false);
+
+    const unsubscribe = subscribe(() => {
+      setTournaments(getTournaments());
+    });
+    return () => unsubscribe();
+  }, []);
+
 
   const handleDeleteTournament = async (tournamentId: string, tournamentName: string) => {
     if (confirm(`Are you sure you want to delete the tournament: "${tournamentName}"? This action cannot be undone.`)) {
-      // setIsLoading(true);
+      setIsLoading(true); // Visually indicate loading, though action is client-side
       try {
-        // Example: Delete tournament from Firestore
-        // await deleteDoc(doc(db, "tournaments", tournamentId));
-        setTournaments(prevTournaments => prevTournaments.filter(t => t.id !== tournamentId));
+        deleteTournamentFromStore(tournamentId);
         toast({ title: "Tournament Deleted", description: `"${tournamentName}" has been removed.`, variant: "destructive" });
       } catch (error) {
         console.error("Error deleting tournament:", error);
         toast({ title: "Error", description: `Could not delete "${tournamentName}".`, variant: "destructive" });
       }
-      // setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // if (isLoading) return <p>Loading tournaments...</p>;
+  if (isLoading && tournaments.length === 0) return <p>Loading tournaments...</p>;
 
   return (
     <div className="space-y-8">
@@ -96,7 +61,7 @@ export default function AdminTournamentsPage() {
         subtitle="Create, edit, and oversee all platform tournaments."
         actions={
           <Button asChild>
-            <Link href="/tournaments/new"> {/* Changed from /admin/tournaments/new */}
+            <Link href="/tournaments/new">
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
             </Link>
           </Button>
@@ -133,12 +98,19 @@ export default function AdminTournamentsPage() {
                       <Eye className="h-4 w-4" />
                     </Link>
                   </Button>
-                  {/* <Button variant="outline" size="sm" asChild>
-                    <Link href={`/admin/tournaments/${tournament.id}/edit`} title="Edit Tournament">
+                  {/* Edit functionality would require a dedicated edit page similar to create tournament */}
+                  {/* <Button variant="outline" size="sm" asChild disabled>
+                    <Link href={`/admin/tournaments/${tournament.id}/edit`} title="Edit Tournament (Coming Soon)">
                        <Edit className="h-4 w-4" />
                     </Link>
                   </Button> */}
-                  <Button variant="destructive" size="sm" title="Delete Tournament" onClick={() => handleDeleteTournament(tournament.id, tournament.name)}>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    title="Delete Tournament" 
+                    onClick={() => handleDeleteTournament(tournament.id, tournament.name)}
+                    disabled={isLoading} // Disable while any delete operation is in progress
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>

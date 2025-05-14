@@ -1,3 +1,4 @@
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { icons } from "lucide-react";
 
@@ -58,6 +59,21 @@ export type Tournament = {
   organizer?: string; // User ID or name
   organizerId?: string; // UID of the user who created it
 };
+
+// This will be used in the create tournament form
+export type TournamentFormDataUI = {
+  name: string;
+  gameId: string;
+  description: string;
+  startDate: Date;
+  maxParticipants: number;
+  prizePool?: string;
+  bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
+  rules?: string;
+  bannerImageFile?: FileList; // For handling the file input
+  bannerImageDataUri?: string; // For storing the Data URL of the image
+};
+
 
 export type StatItem = {
   title: string;

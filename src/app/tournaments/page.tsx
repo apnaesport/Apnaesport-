@@ -3,44 +3,96 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
-import type { Tournament, Game } from "@/lib/types";
+import type { Tournament } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Search, Filter } from "lucide-react"; // Added Search and Filter
 import { useAuth } from "@/contexts/AuthContext"; 
-
-const placeholderGames: Game[] = [
-  { id: "game-lol", name: "League of Legends", iconUrl: "https://placehold.co/40x40.png" },
-  { id: "game-valo", name: "Valorant", iconUrl: "https://placehold.co/40x40.png" },
-  { id: "game-cs", name: "Counter-Strike 2", iconUrl: "https://placehold.co/40x40.png" },
-];
-
-const placeholderTournaments: Tournament[] = [
-  {
-    id: "t1-lol", name: "LoL Summer Skirmish", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/400x200.png", description: "Weekly LoL tournament.",
-    status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 5)), participants: [], maxParticipants: 16, prizePool: "$200", bracketType: "Single Elimination", organizerId: "admin-user"
-  },
-  {
-    id: "t2-valo", name: "Valorant Champions Tour", gameId: "game-valo", gameName: "Valorant", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/400x200.png", description: "Official Valorant regional qualifier.",
-    status: "Live", startDate: new Date(new Date().setDate(new Date().getDate() - 2)), participants: Array(10).fill({ id: '', name: ''}), maxParticipants: 32, prizePool: "$5,000", bracketType: "Double Elimination", organizerId: "admin-user"
-  },
-  {
-    id: "t3-cs", name: "CS:2 Open League", gameId: "game-cs", gameName: "Counter-Strike 2", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/400x200.png", description: "Open league for aspiring CS:2 pros.",
-    status: "Completed", startDate: new Date(new Date().setDate(new Date().getDate() - 20)), endDate: new Date(new Date().setDate(new Date().getDate() - 15)), participants: Array(25).fill({ id: '', name: ''}), maxParticipants: 64, prizePool: "$1,000", bracketType: "Round Robin", organizerId: "admin-user"
-  },
-    {
-    id: "t4-lol", name: "LoL Community Cup", gameId: "game-lol", gameName: "League of Legends", gameIconUrl: "https://placehold.co/40x40.png",
-    bannerImageUrl: "https://placehold.co/400x200.png", description: "Fun community cup for all skill levels.",
-    status: "Upcoming", startDate: new Date(new Date().setDate(new Date().getDate() + 12)), participants: [], maxParticipants: 32, prizePool: "In-game rewards", bracketType: "Single Elimination", organizerId: "community-user"
-  },
-];
+import { getTournaments as fetchTournamentsFromStore, subscribe } from "@/lib/tournamentStore"; // Updated import
+import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input"; // Added Input
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"; // Added DropdownMenu components
 
 export default function AllTournamentsPage() {
-  const tournaments = placeholderTournaments; 
+  const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
+  const [filteredTournaments, setFilteredTournaments] = useState<Tournament[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<Record<Tournament["status"] | "all", boolean>>({
+    "all": true,
+    "Upcoming": false,
+    "Live": false,
+    "Ongoing": false,
+    "Completed": false,
+    "Cancelled": false,
+  });
+
   const { user } = useAuth(); 
+
+  useEffect(() => {
+    const tournamentsFromStore = fetchTournamentsFromStore();
+    setAllTournaments(tournamentsFromStore);
+    
+    const unsubscribe = subscribe(() => {
+      setAllTournaments(fetchTournamentsFromStore());
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    let newFilteredTournaments = allTournaments;
+
+    // Apply search term filter
+    if (searchTerm) {
+      newFilteredTournaments = newFilteredTournaments.filter(tournament =>
+        tournament.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        tournament.gameName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    const activeStatusFilters = Object.entries(statusFilter)
+      .filter(([_, isActive]) => isActive)
+      .map(([status]) => status as Tournament["status"] | "all");
+    
+    if (!activeStatusFilters.includes("all") && activeStatusFilters.length > 0) {
+      newFilteredTournaments = newFilteredTournaments.filter(tournament =>
+        activeStatusFilters.includes(tournament.status)
+      );
+    }
+    
+    setFilteredTournaments(newFilteredTournaments);
+  }, [searchTerm, statusFilter, allTournaments]);
+
+
+  const handleStatusFilterChange = (status: Tournament["status"] | "all") => {
+    setStatusFilter(prev => {
+      const newState = { ...prev };
+      if (status === "all") {
+        // If 'all' is selected, deselect all others and select 'all'
+        Object.keys(newState).forEach(key => newState[key as keyof typeof newState] = false);
+        newState.all = !prev.all; // Toggle 'all'
+        if (!newState.all && !Object.values(newState).some(val => val)) { // If 'all' is deselected and nothing else is selected, re-select 'all'
+           newState.all = true;
+        }
+      } else {
+        // If a specific status is selected, deselect 'all' and toggle the specific status
+        newState.all = false;
+        newState[status] = !prev[status];
+         // If unchecking an item and no other items are checked (except 'all'), then check 'all'
+        if (!newState[status] && !Object.values(newState).some((val, key) => key !== Object.keys(newState).indexOf('all') && val)) {
+          newState.all = true;
+        }
+      }
+      return newState;
+    });
+  };
 
   return (
     <div className="space-y-8">
@@ -58,9 +110,41 @@ export default function AllTournamentsPage() {
         }
       />
 
-      {tournaments.length > 0 ? (
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-grow">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input 
+            placeholder="Search tournaments by name or game..."
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">
+              <Filter className="mr-2 h-4 w-4" /> Filter by Status
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {Object.keys(statusFilter).map((statusKey) => (
+              <DropdownMenuCheckboxItem
+                key={statusKey}
+                checked={statusFilter[statusKey as keyof typeof statusFilter]}
+                onCheckedChange={() => handleStatusFilterChange(statusKey as Tournament["status"] | "all")}
+              >
+                {statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replace('_', ' ')}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {filteredTournaments.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tournaments.map((tournament) => (
+          {filteredTournaments.map((tournament) => (
             <TournamentCard key={tournament.id} tournament={tournament} />
           ))}
         </div>

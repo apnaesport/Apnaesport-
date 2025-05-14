@@ -8,68 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 import { useAuth } from "@/contexts/AuthContext"; 
-
-// Placeholder data
-const getGameDetails = (gameId: string): Game | undefined => {
-  const games: Game[] = [
-    { id: "game-lol", name: "League of Legends", iconUrl: "https://placehold.co/80x80.png", bannerUrl: "https://placehold.co/1200x300.png" },
-    { id: "game-valo", name: "Valorant", iconUrl: "https://placehold.co/80x80.png", bannerUrl: "https://placehold.co/1200x300.png" },
-  ];
-  return games.find(g => g.id === gameId);
-};
-
-const getTournamentsForGame = (gameId: string): Tournament[] => {
-  const baseTournaments: Omit<Tournament, 'id' | 'gameId' | 'gameName' | 'gameIconUrl' | 'organizerId'>[] = [
-    {
-      name: "Weekly Skirmish",
-      bannerImageUrl: "https://placehold.co/400x200.png",
-      description: "Join our weekly skirmish for fun and prizes!",
-      status: "Upcoming",
-      startDate: new Date(new Date().setDate(new Date().getDate() + 3)),
-      participants: [],
-      maxParticipants: 32,
-      prizePool: "$100",
-      bracketType: "Single Elimination",
-    },
-    {
-      name: "Champions Cup",
-      bannerImageUrl: "https://placehold.co/400x200.png",
-      description: "The ultimate test of skill. Compete against the best!",
-      status: "Live",
-      startDate: new Date(new Date().setDate(new Date().getDate() - 1)),
-      participants: Array(10).fill({ id: '', name: ''}),
-      maxParticipants: 16,
-      prizePool: "$1,000",
-      bracketType: "Double Elimination",
-    },
-    {
-      name: "Community Showdown",
-      bannerImageUrl: "https://placehold.co/400x200.png",
-      description: "A friendly tournament for all skill levels.",
-      status: "Completed",
-      startDate: new Date(new Date().setDate(new Date().getDate() - 10)),
-      endDate: new Date(new Date().setDate(new Date().getDate() - 8)),
-      participants: Array(16).fill({ id: '', name: ''}),
-      maxParticipants: 16,
-      prizePool: "Bragging Rights",
-      bracketType: "Round Robin",
-    },
-  ];
-  
-  const game = getGameDetails(gameId);
-  if (!game) return [];
-
-  return baseTournaments.map((t, index) => ({
-    ...t,
-    id: `${gameId}-tourney-${index + 1}`,
-    gameId: game.id,
-    gameName: game.name,
-    gameIconUrl: game.iconUrl,
-    organizerId: `user-${index}` // dummy organizer
-  }));
-};
+import { getGameDetails as fetchGameDetails, getTournamentsForGame as fetchTournamentsForGame, subscribe } from "@/lib/tournamentStore"; // Updated imports
+import { useEffect, useState } from "react";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
@@ -78,12 +20,43 @@ interface GameTournamentsPageProps {
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
   const { gameId } = params;
   const { user } = useAuth(); 
-  const game = getGameDetails(gameId); 
-  const tournaments = getTournamentsForGame(gameId); 
+  const [game, setGame] = useState<Game | undefined>(undefined);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const gameDetails = fetchGameDetails(gameId);
+    setGame(gameDetails);
+    if (gameDetails) {
+      setTournaments(fetchTournamentsForGame(gameId));
+    }
+    setIsLoading(false);
+
+    const unsubscribe = subscribe(() => {
+      const updatedGameDetails = fetchGameDetails(gameId);
+      setGame(updatedGameDetails);
+      if (updatedGameDetails) {
+        setTournaments(fetchTournamentsForGame(gameId));
+      }
+    });
+    return () => unsubscribe();
+  }, [gameId]);
+
+
+  if (isLoading) {
+    return (
+      <div className="text-center py-10">
+        <PageTitle title="Loading Game Tournaments..." />
+        {/* Add Skeleton loaders here if desired */}
+      </div>
+    );
+  }
+
 
   if (!game) {
     return (
       <div className="text-center py-10">
+        <AlertTriangle className="mx-auto h-12 w-12 text-destructive mb-4" />
         <PageTitle title="Game Not Found" />
         <p className="text-muted-foreground">The game you are looking for does not exist.</p>
         <Button asChild className="mt-4">
@@ -107,7 +80,7 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="game background art"
-          onError={(e) => e.currentTarget.src = `https://placehold.co/1200x300.png`}
+          onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x300.png?text=${encodeURIComponent(game.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
@@ -116,8 +89,9 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
               src={game.iconUrl} 
               alt={game.name} 
               width={64} height={64} 
-              className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large"
-              onError={(e) => e.currentTarget.src = `https://placehold.co/64x64.png`}
+              className="rounded-lg mr-4 border-2 border-background shadow-md" 
+              data-ai-hint="game logo large"
+              onError={(e) => (e.currentTarget.src = `https://placehold.co/64x64.png?text=${game.name.substring(0,2)}`)}
             />
             <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
           </div>

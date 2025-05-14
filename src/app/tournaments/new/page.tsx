@@ -17,20 +17,13 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect } from "react";
-import type { Game, Tournament, TournamentStatus } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn } from "lucide-react";
+import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Upload } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-// For a real backend:
-// import { collection, addDoc, serverTimestamp, getDocs, query } from "firebase/firestore";
-// import { db } from "@/lib/firebase";
+import { addTournament, getGames as fetchGamesFromStore } from "@/lib/tournamentStore"; // Updated import
+import Image from "next/image";
 
-// Placeholder games - in a real app, fetch these from your 'games' collection in Firestore
-const placeholderGames: Game[] = [
-  { id: "game-lol", name: "League of Legends", iconUrl: "https://placehold.co/40x40.png" },
-  { id: "game-valo", name: "Valorant", iconUrl: "https://placehold.co/40x40.png" },
-  { id: "game-cs", name: "Counter-Strike 2", iconUrl: "https://placehold.co/40x40.png" },
-];
 
 const tournamentSchema = z.object({
   name: z.string().min(5, "Tournament name must be at least 5 characters."),
@@ -41,19 +34,21 @@ const tournamentSchema = z.object({
   prizePool: z.string().optional(),
   bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
   rules: z.string().optional(),
+  bannerImageFile: z.custom<FileList>().optional(), // For the file input
+  bannerImageDataUri: z.string().optional(), // To store the Data URL
 });
 
-type TournamentFormData = z.infer<typeof tournamentSchema>;
 
 export default function CreateTournamentPage() {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const [availableGames, setAvailableGames] = useState<Game[]>(placeholderGames);
-  const [isLoadingGames, setIsLoadingGames] = useState(false); // Set to true if fetching games
+  const [availableGames, setAvailableGames] = useState<Game[]>([]);
+  const [isLoadingGames, setIsLoadingGames] = useState(true);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
-  const form = useForm<TournamentFormData>({
+  const form = useForm<TournamentFormDataUI>({
     resolver: zodResolver(tournamentSchema),
     defaultValues: {
       name: "",
@@ -64,38 +59,40 @@ export default function CreateTournamentPage() {
       prizePool: "",
       bracketType: "Single Elimination",
       rules: "",
+      bannerImageDataUri: "",
     },
   });
 
-  // Example: Fetch games from Firestore
-  // useEffect(() => {
-  //   const fetchGames = async () => {
-  //     setIsLoadingGames(true);
-  //     try {
-  //       const gamesCollectionRef = collection(db, "games");
-  //       const gamesSnapshot = await getDocs(query(gamesCollectionRef));
-  //       const gamesList = gamesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
-  //       setAvailableGames(gamesList.length > 0 ? gamesList : placeholderGames);
-  //       if(gamesList.length === 0) console.warn("No games found in Firestore, using placeholders.");
-  //     } catch (error) {
-  //       console.error("Error fetching games:", error);
-  //       toast({ title: "Error", description: "Could not fetch games list.", variant: "destructive" });
-  //       setAvailableGames(placeholderGames); // Fallback to placeholders
-  //     }
-  //     setIsLoadingGames(false);
-  //   };
-  //   fetchGames();
-  // }, [toast]);
-  
   useEffect(() => {
+    setIsLoadingGames(true);
+    const gamesFromStore = fetchGamesFromStore();
+    setAvailableGames(gamesFromStore);
+    setIsLoadingGames(false);
+    
     const preselectedGameId = searchParams.get("gameId");
-    if (preselectedGameId) {
+    if (preselectedGameId && gamesFromStore.some(g => g.id === preselectedGameId)) {
       form.setValue("gameId", preselectedGameId);
     }
   }, [searchParams, form]);
 
 
-  const onSubmit: SubmitHandler<TournamentFormData> = async (data) => {
+  const handleBannerImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const dataUri = reader.result as string;
+        form.setValue("bannerImageDataUri", dataUri);
+        setBannerPreview(dataUri);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      form.setValue("bannerImageDataUri", "");
+      setBannerPreview(null);
+    }
+  };
+
+  const onSubmit: SubmitHandler<TournamentFormDataUI> = async (data) => {
     if (!user) {
       toast({ title: "Authentication Error", description: "You must be logged in to create a tournament.", variant: "destructive" });
       return;
@@ -107,32 +104,36 @@ export default function CreateTournamentPage() {
       return;
     }
 
-    const newTournamentData: Omit<Tournament, 'id' | 'participants' | 'status' | 'bannerImageUrl' | 'gameIconUrl' | 'matches'> = {
-      ...data,
+    const newTournament: Tournament = {
+      id: `tourney-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      name: data.name,
+      gameId: data.gameId,
       gameName: selectedGame.name,
-      gameIconUrl: selectedGame.iconUrl, // Will be replaced by actual game icon from DB
+      gameIconUrl: selectedGame.iconUrl,
+      description: data.description,
+      startDate: data.startDate,
+      maxParticipants: data.maxParticipants,
+      prizePool: data.prizePool,
+      bracketType: data.bracketType,
+      rules: data.rules,
+      bannerImageUrl: data.bannerImageDataUri || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       organizerId: user.uid,
       organizer: user.displayName || user.email || "Unknown Organizer",
-      participants: [],
-      status: "Upcoming" as TournamentStatus, // Default status
-      bannerImageUrl: `https://placehold.co/1200x400.png`, // Default banner
-      // startDate: Timestamp.fromDate(data.startDate), // For Firestore
+      participants: [], // Initially no participants
+      status: "Upcoming" as TournamentStatus,
+      matches: [], // Initially no matches
     };
     
-    console.log("Submitting new tournament:", newTournamentData);
+    console.log("Submitting new tournament:", newTournament);
+    form.control.formState.isSubmitting; // to ensure isSubmitting is tracked
 
     try {
-      // Example: Add tournament to Firestore
-      // const docRef = await addDoc(collection(db, "tournaments"), {
-      //   ...newTournamentData,
-      //   createdAt: serverTimestamp(), // Optional: for ordering or tracking
-      // });
+      addTournament(newTournament); // Add to the client-side store
       toast({
-        title: "Tournament Created (Simulated)",
+        title: "Tournament Created!",
         description: `"${data.name}" has been successfully created.`,
       });
-      // router.push(`/tournaments/${docRef.id}`); // Redirect to the new tournament page
-      router.push(`/tournaments`); // Redirect to all tournaments page for now
+      router.push(`/tournaments/${newTournament.id}`); 
     } catch (error) {
       console.error("Error creating tournament:", error);
       toast({ title: "Creation Failed", description: "Could not create tournament. Please try again.", variant: "destructive" });
@@ -197,6 +198,24 @@ export default function CreateTournamentPage() {
               />
               {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
             </div>
+            
+            <div>
+              <Label htmlFor="bannerImageFile">Tournament Banner Image</Label>
+              <Input 
+                id="bannerImageFile" 
+                type="file" 
+                accept="image/png, image/jpeg, image/webp" 
+                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                onChange={handleBannerImageChange} 
+              />
+              {bannerPreview && (
+                <div className="mt-4 relative w-full aspect-[16/9] rounded-md overflow-hidden border">
+                  <Image src={bannerPreview} alt="Banner preview" layout="fill" objectFit="cover" data-ai-hint="tournament banner preview"/>
+                </div>
+              )}
+               <p className="text-xs text-muted-foreground mt-1">Optional. Recommended aspect ratio 16:9. Max file size 2MB.</p>
+            </div>
+
 
             <div>
               <Label htmlFor="description">Description</Label>
@@ -226,7 +245,6 @@ export default function CreateTournamentPage() {
                             selected={field.value}
                             onSelect={(date) => {
                                 if (date) {
-                                    // Preserve time if already set, otherwise default to noon
                                     const currentTime = field.value ? { hours: field.value.getHours(), minutes: field.value.getMinutes() } : { hours: 12, minutes: 0 };
                                     date.setHours(currentTime.hours);
                                     date.setMinutes(currentTime.minutes);
@@ -234,6 +252,7 @@ export default function CreateTournamentPage() {
                                 field.onChange(date);
                             }}
                             initialFocus
+                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} // Disable past dates
                         />
                         <div className="p-3 border-t border-border">
                             <Label>Time (HH:MM)</Label>
@@ -245,6 +264,12 @@ export default function CreateTournamentPage() {
                                     const newDate = field.value ? new Date(field.value) : new Date();
                                     newDate.setHours(hours);
                                     newDate.setMinutes(minutes);
+                                    if (newDate < new Date()) { // Basic past time check for today
+                                      if (new Date(newDate).setHours(0,0,0,0) === new Date().setHours(0,0,0,0) && (hours < new Date().getHours() || (hours === new Date().getHours() && minutes < new Date().getMinutes()))) {
+                                        toast({ title: "Invalid Time", description: "Cannot select a past time for today.", variant: "destructive" });
+                                        return;
+                                      }
+                                    }
                                     field.onChange(newDate);
                                 }}
                             />
