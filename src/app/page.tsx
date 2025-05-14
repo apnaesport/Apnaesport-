@@ -3,22 +3,16 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/contexts/AuthContext";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/auth/login");
-      }
-    }
-  }, [user, loading, router]);
+    // Directly redirect to the main content page, which is now public
+    router.replace("/dashboard");
+  }, [router]);
 
+  // Show a brief loading spinner during the redirection process
   return <LoadingSpinner fullPage showLogo showProgressBar text="Initializing TournamentHub..." />;
 }

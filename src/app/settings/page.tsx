@@ -1,5 +1,5 @@
 
-"use client"; // This page will likely have forms and interactive elements
+"use client";
 
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -8,13 +8,60 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Palette, Shield } from "lucide-react"; // Changed ShieldLock to Shield
+import { Bell, Palette, Shield, LogIn } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import Link from "next/link";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import { Skeleton } from "@/components/ui/skeleton";
+
 
 export default function SettingsPage() {
-  // Placeholder states for settings - in a real app, these would come from user preferences
-  // const [emailNotifications, setEmailNotifications] = useState(true);
-  // const [pushNotifications, setPushNotifications] = useState(false);
-  // const [darkMode, setDarkMode] = useState(true); // Assuming dark mode is default
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageTitle title="Settings" />
+        <div className="space-y-8">
+          <Card>
+            <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+            <CardContent className="space-y-6">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+            <CardContent className="space-y-6">
+              <Skeleton className="h-12 w-full" />
+            </CardContent>
+          </Card>
+           <Card>
+            <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+            <CardContent className="space-y-4">
+              <Skeleton className="h-10 w-32" />
+               <Skeleton className="h-10 w-48" />
+                <Skeleton className="h-10 w-36" />
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
+          <PageTitle title="Access Denied" subtitle="You need to be logged in to manage your settings." />
+           <LogIn className="h-16 w-16 text-primary my-6" />
+          <Button asChild size="lg">
+            <Link href="/auth/login?redirect=/settings">Login to Manage Settings</Link>
+          </Button>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -69,7 +116,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Shield className="mr-2 h-5 w-5 text-primary" /> Account & Security {/* Changed ShieldLock to Shield */}
+              <Shield className="mr-2 h-5 w-5 text-primary" /> Account & Security
             </CardTitle>
             <CardDescription>Manage your account security and data.</CardDescription>
           </CardHeader>
@@ -87,4 +134,3 @@ export default function SettingsPage() {
     </MainLayout>
   );
 }
-

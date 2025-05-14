@@ -2,12 +2,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
+// useRouter and useEffect are removed as auth redirection is handled by individual pages now.
+// import { useRouter } from "next/navigation";
+// import { useEffect } from "react";
+// import { useAuth } from "@/contexts/AuthContext"; // useAuth might still be needed for other parts of MainLayout potentially
 import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
-import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+// import { LoadingSpinner } from "@/components/shared/LoadingSpinner"; // Loading for auth is handled by pages
 import { Logo } from "@/components/shared/Logo";
 import {
   SidebarProvider,
@@ -24,18 +25,20 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
+  // const { user, loading } = useAuth(); // Not needed for redirection anymore
+  // const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/auth/login");
-    }
-  }, [user, loading, router]);
+  // useEffect(() => {
+  //   // This redirection logic is now removed from MainLayout.
+  //   // Individual pages will handle their own authentication checks.
+  //   if (!loading && !user) {
+  //     router.push("/auth/login");
+  //   }
+  // }, [user, loading, router]);
 
-  if (loading || !user) {
-    return <LoadingSpinner fullPage text="Authenticating..." />;
-  }
+  // if (loading || !user) { // This loading state is also removed.
+  //   return <LoadingSpinner fullPage text="Authenticating..." />;
+  // }
 
   return (
     <SidebarProvider defaultOpen={true}>

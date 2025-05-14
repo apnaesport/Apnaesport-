@@ -10,8 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Edit3 } from "lucide-react";
+import { Shield, Edit3, LogIn } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import Link from "next/link";
+import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
 export default function ProfilePage() {
   const { user, loading } = useAuth();
@@ -21,21 +23,37 @@ export default function ProfilePage() {
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
-  if (loading || !user) {
+  if (loading) {
     return (
       <MainLayout>
         <PageTitle title="My Profile" />
         <Card>
           <CardHeader>
-            <Skeleton className="h-8 w-32 mb-2" />
-            <Skeleton className="h-20 w-20 rounded-full mx-auto" />
+            <Skeleton className="h-8 w-32 mb-2 mx-auto md:mx-0" />
+            <Skeleton className="h-32 w-32 rounded-full mx-auto" />
+            <Skeleton className="h-6 w-48 mx-auto md:mx-0 mt-2" />
+            <Skeleton className="h-4 w-56 mx-auto md:mx-0 mt-1" />
           </CardHeader>
           <CardContent className="space-y-4">
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-6 w-full" />
-            <Skeleton className="h-10 w-24" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-32" />
           </CardContent>
         </Card>
+      </MainLayout>
+    );
+  }
+
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
+          <PageTitle title="Access Denied" subtitle="You need to be logged in to view your profile." />
+          <LogIn className="h-16 w-16 text-primary my-6" />
+          <Button asChild size="lg">
+            <Link href="/auth/login?redirect=/profile">Login to View Profile</Link>
+          </Button>
+        </div>
       </MainLayout>
     );
   }

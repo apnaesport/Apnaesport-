@@ -1,13 +1,13 @@
 
+"use client"; // Needs to be client for useAuth
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Tournament, Game } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle } from "lucide-react";
-// For filtering - would require client component or server actions
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { Input } from "@/components/ui/input";
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 
 // Placeholder data
 const placeholderGames: Game[] = [
@@ -40,7 +40,8 @@ const placeholderTournaments: Tournament[] = [
 ];
 
 export default function AllTournamentsPage() {
-  const tournaments = placeholderTournaments; // Replace with actual data fetching and filtering logic
+  const tournaments = placeholderTournaments; 
+  const { user } = useAuth(); // Get user for conditional rendering
 
   return (
     <div className="space-y-8">
@@ -48,11 +49,13 @@ export default function AllTournamentsPage() {
         title="All Tournaments" 
         subtitle="Browse all active, upcoming, and completed tournaments."
         actions={
-          <Button asChild>
-            <Link href="/tournaments/new">
-              <PlusCircle className="mr-2 h-4 w-4" /> Create Tournament
-            </Link>
-          </Button>
+          user && ( // Only show Create Tournament button if user is logged in
+            <Button asChild>
+              <Link href="/tournaments/new">
+                <PlusCircle className="mr-2 h-4 w-4" /> Create Tournament
+              </Link>
+            </Button>
+          )
         }
       />
 

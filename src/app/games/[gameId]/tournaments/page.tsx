@@ -1,4 +1,6 @@
 
+"use client"; // Needs to be client for useAuth
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Game, Tournament } from "@/lib/types";
@@ -7,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { PlusCircle } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext"; // Import useAuth
 
 // Placeholder data - replace with actual data fetching based on gameId
 const getGameDetails = (gameId: string): Game | undefined => {
@@ -74,8 +77,9 @@ interface GameTournamentsPageProps {
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
   const { gameId } = params;
-  const game = getGameDetails(gameId); // Fetch actual game details
-  const tournaments = getTournamentsForGame(gameId); // Fetch tournaments for this game
+  const { user } = useAuth(); // Get user for conditional rendering
+  const game = getGameDetails(gameId); 
+  const tournaments = getTournamentsForGame(gameId); 
 
   if (!game) {
     return (
@@ -107,19 +111,21 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
           <div className="flex items-center">
-            <Image src={game.iconUrl} alt={game.name} width={64} height={64} className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large" />
+            <Image src={game.iconUrl} alt={game.name} width={64} height={64} className="rounded-lg mr-4 border-2 border-background shadow-md" data-ai-hint="game logo large"/>
             <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
           </div>
         </div>
       </div>
       
-      <div className="flex justify-end">
-        <Button asChild>
-          <Link href={`/tournaments/new?gameId=${game.id}`}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
-          </Link>
-        </Button>
-      </div>
+      {user && ( // Only show Create Tournament button if user is logged in
+        <div className="flex justify-end">
+          <Button asChild>
+            <Link href={`/tournaments/new?gameId=${game.id}`}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
+            </Link>
+          </Button>
+        </div>
+      )}
 
       <Tabs defaultValue="upcoming" className="w-full">
         <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
