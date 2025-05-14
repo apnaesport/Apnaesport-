@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, ShieldCog, UsersRound, Save } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save } from "lucide-react"; // Changed ShieldCog to Shield
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -27,6 +27,7 @@ const settingsSchema = z.object({
   allowRegistrations: z.boolean(),
   logoUrl: z.string().url("Must be a valid URL for logo.").or(z.literal('')).optional(),
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
+  defaultTheme: z.string().optional(), // Added defaultTheme to schema
 });
 
 const defaultSettings: SiteSettings = {
@@ -170,8 +171,9 @@ export default function AdminSettingsPage() {
             {form.formState.errors.faviconUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.faviconUrl.message}</p>}
           </div>
           <div className="flex items-center justify-between">
-            <Label className="font-medium">Default Theme</Label>
-            <Input value="Dark (Current)" disabled className="w-auto" />
+            <Label htmlFor="defaultTheme" className="font-medium">Default Theme</Label>
+            {/* This is a display of the current theme, assuming it's 'dark'. Actual theme switching would be more complex. */}
+            <Input id="defaultTheme" {...form.register("defaultTheme")} disabled className="w-auto" />
           </div>
         </CardContent>
       </Card>
@@ -179,7 +181,7 @@ export default function AdminSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <ShieldCog className="mr-2 h-5 w-5 text-primary" /> Security & API Settings
+            <Shield className="mr-2 h-5 w-5 text-primary" /> Security & API Settings 
           </CardTitle>
           <CardDescription>Manage API keys and security configurations.</CardDescription>
         </CardHeader>
