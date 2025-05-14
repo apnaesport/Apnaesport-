@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info, Loader2, DollarSign } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info, Loader2, DollarSign, ShieldCheck, Building } from "lucide-react"; 
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,8 +106,6 @@ export default function TournamentPage({ params }: TournamentPageProps) {
             description: `Entry Fee: ${tournament.entryFee} ${tournament.currency || 'USD'}. Payment system not implemented in prototype. Joining for free for now.`,
             duration: 5000,
         });
-        // In a real app, you would redirect to a payment flow here.
-        // For prototype, we proceed to join.
     }
 
 
@@ -234,7 +232,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
           <Tabs defaultValue="bracket" className="w-full">
-            <ScrollArea className="w-full whitespace-nowrap">
+            <ScrollArea className="w-full whitespace-nowrap pb-2">
               <TabsList className="inline-flex w-auto">
                 <TabsTrigger value="bracket">Bracket</TabsTrigger>
                 <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -419,6 +417,31 @@ export default function TournamentPage({ params }: TournamentPageProps) {
               </div>
             </CardContent>
           </Card>
+
+          {(tournament.sponsorName || tournament.sponsorLogoUrl) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary"/>Sponsored By</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center text-center">
+                {tournament.sponsorLogoUrl && (
+                  <Image 
+                    src={tournament.sponsorLogoUrl}
+                    alt={tournament.sponsorName || "Sponsor"}
+                    width={80}
+                    height={80}
+                    className="rounded-md object-contain mb-2"
+                    data-ai-hint="sponsor logo"
+                    onError={(e) => e.currentTarget.style.display = 'none'} // Hide if logo fails
+                  />
+                )}
+                {tournament.sponsorName && (
+                  <p className="font-medium text-foreground">{tournament.sponsorName}</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
 
           {(isAdmin || isTournamentCreator) && tournament.status !== "Completed" && (
             <Card>

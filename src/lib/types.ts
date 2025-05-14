@@ -68,8 +68,10 @@ export type Tournament = {
   organizerId?: string; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  entryFee?: number; // New: Entry fee for the tournament
-  currency?: string; // New: Currency for the entry fee (e.g., "USD", "INR")
+  entryFee?: number; 
+  currency?: string; 
+  sponsorName?: string; // New
+  sponsorLogoUrl?: string; // New
 };
 
 export type TournamentFormDataUI = {
@@ -85,8 +87,10 @@ export type TournamentFormDataUI = {
   bannerImageFile?: FileList;
   bannerImageDataUri?: string;
   featured?: boolean;
-  entryFee?: number; // New
-  currency?: string; // New
+  entryFee?: number; 
+  currency?: string; 
+  sponsorName?: string; // New
+  sponsorLogoUrl?: string; // New
 };
 
 

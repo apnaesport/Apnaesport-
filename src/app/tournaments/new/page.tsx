@@ -18,11 +18,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, DollarSign } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, DollarSign, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
+import { Checkbox } from "@/components/ui/checkbox";
 
 
 const tournamentSchema = z.object({
@@ -39,11 +40,17 @@ const tournamentSchema = z.object({
   bannerImageDataUri: z.string().optional(),
   entryFee: z.coerce.number().min(0, "Entry fee cannot be negative.").optional(),
   currency: z.string().optional(),
+  featured: z.boolean().optional(),
+  sponsorName: z.string().optional(),
+  sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
+}).refine(data => (data.entryFee && data.entryFee > 0) ? !!data.currency : true, {
+  message: "Currency is required if entry fee is set.",
+  path: ["currency"],
 });
 
 
 export default function CreateTournamentPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -52,7 +59,7 @@ export default function CreateTournamentPage() {
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
-  const defaultCurrency = "USD"; // You can make this configurable later
+  const defaultCurrency = "USD"; 
 
   const form = useForm<TournamentFormDataUI>({
     resolver: zodResolver(tournamentSchema),
@@ -70,6 +77,8 @@ export default function CreateTournamentPage() {
       entryFee: 0,
       currency: defaultCurrency,
       featured: false,
+      sponsorName: "",
+      sponsorLogoUrl: "",
     },
   });
 
@@ -158,6 +167,8 @@ export default function CreateTournamentPage() {
       featured: data.featured || false,
       entryFee: data.entryFee || 0,
       currency: data.entryFee && data.entryFee > 0 ? data.currency || defaultCurrency : undefined,
+      sponsorName: data.sponsorName,
+      sponsorLogoUrl: data.sponsorLogoUrl,
     };
     
     try {
@@ -369,7 +380,12 @@ export default function CreateTournamentPage() {
                     name="currency"
                     control={form.control}
                     render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || (form.watch("entryFee") || 0) === 0}>
+                        <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value} 
+                            defaultValue={field.value} 
+                            disabled={isSubmittingForm || (form.watch("entryFee") || 0) === 0}
+                        >
                             <SelectTrigger id="currency">
                                 <SelectValue placeholder="Select currency..."/>
                             </SelectTrigger>
@@ -378,7 +394,6 @@ export default function CreateTournamentPage() {
                                 <SelectItem value="EUR">EUR (€)</SelectItem>
                                 <SelectItem value="GBP">GBP (£)</SelectItem>
                                 <SelectItem value="INR">INR (₹)</SelectItem>
-                                {/* Add more currencies as needed */}
                             </SelectContent>
                         </Select>
                     )}
@@ -386,7 +401,6 @@ export default function CreateTournamentPage() {
                 {form.formState.errors.currency && <p className="text-destructive text-xs mt-1">{form.formState.errors.currency.message}</p>}
               </div>
             </div>
-
 
             <div>
               <Label htmlFor="prizePool">Prize Pool (Optional)</Label>
@@ -404,14 +418,13 @@ export default function CreateTournamentPage() {
               {form.formState.errors.registrationInstructions && <p className="text-destructive text-xs mt-1">{form.formState.errors.registrationInstructions.message}</p>}
             </div>
             
-            <div>
+            {isAdmin && (
                 <div className="flex items-center space-x-2">
                     <Controller
                         name="featured"
                         control={form.control}
                         render={({ field }) => (
-                            <Input
-                                type="checkbox"
+                            <Checkbox
                                 id="featured"
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
@@ -421,10 +434,30 @@ export default function CreateTournamentPage() {
                         )}
                     />
                     <Label htmlFor="featured" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Feature this tournament? (Visible to admins)
+                        Feature this tournament?
                     </Label>
                 </div>
-            </div>
+            )}
+
+            <Card className="mt-6 border-dashed border-primary/50">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" /> Sponsorship (Optional)
+                </CardTitle>
+                <CardDescription>Add sponsor details if this tournament is sponsored.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="sponsorName">Sponsor Name</Label>
+                  <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={isSubmittingForm} />
+                </div>
+                <div>
+                  <Label htmlFor="sponsorLogoUrl">Sponsor Logo URL</Label>
+                  <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={isSubmittingForm} />
+                  {form.formState.errors.sponsorLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.sponsorLogoUrl.message}</p>}
+                </div>
+              </CardContent>
+            </Card>
 
 
             <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading} className="w-full md:w-auto">
@@ -441,4 +474,3 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
-

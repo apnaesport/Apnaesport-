@@ -50,8 +50,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-      createdAt: data.createdAt as Timestamp,
-      updatedAt: data.updatedAt as Timestamp,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined, // Ensure it's a Timestamp
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined, // Ensure it's a Timestamp
     } as Game;
   });
 };
@@ -100,6 +100,8 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     entryFee: tournamentData.entryFee || 0,
     currency: tournamentData.entryFee && tournamentData.entryFee > 0 ? tournamentData.currency || 'USD' : null,
     bannerImageUrl: tournamentData.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
+    sponsorName: tournamentData.sponsorName || null,
+    sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
   });
  return docRef.id;
 };
@@ -111,10 +113,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("status", "==", queryParams.status));
   }
   if (queryParams?.gameId) {
-    // IMPORTANT: Querying by gameId AND ordering by startDate may require a composite index in Firestore.
-    // Example: Collection: tournaments, Fields: gameId (ASC), startDate (DESC).
-    // Firebase error messages will typically provide a link to create this index: gameId ASC, startDate DESC
-    // Link for this query if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
+    // Index needed: gameId (ASC), startDate (DESC)
+    // Firebase console link (example): https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
    if (queryParams?.featured !== undefined) {
@@ -143,6 +143,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       updatedAt: data.updatedAt as Timestamp,
       entryFee: data.entryFee || 0,
       currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
+      sponsorName: data.sponsorName || undefined,
+      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
   });
 };
@@ -181,6 +183,8 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       matches: matches, 
       entryFee: data.entryFee || 0,
       currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
+      sponsorName: data.sponsorName || undefined,
+      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
   }
   return undefined;
@@ -200,9 +204,20 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
   
+  // Prevent accidentally overwriting participants array with undefined if not explicitly passed
   if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
-    delete updateData.participants; 
+    // This condition is tricky. If 'participants' key is in restData but its value is undefined,
+    // it means we want to set it to undefined/delete it.
+    // If 'participants' is NOT in restData at all, we don't want to touch it.
+    // The current logic of spreading restData will handle this:
+    // if `participants` is in `restData` (even as undefined), it will be included.
+    // if `participants` is NOT in `restData`, it won't be.
+    // Let's be more explicit to avoid accidentally deleting it with `undefined`
+    if (restData.participants === undefined && !tournamentData.hasOwnProperty('participants')) {
+        delete updateData.participants;
+    }
   }
+
   await updateDoc(docRef, updateData);
 };
 
@@ -251,7 +266,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     qConstraints.push(where("target", "==", target));
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // Link for this query if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
+  // Create in Firebase Console if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -277,7 +292,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, // Assuming createdAt is a Firestore Timestamp
+      createdAt: data.createdAt as Timestamp, 
       bio: data.bio || "",
       favoriteGames: data.favoriteGames || "",
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -311,7 +326,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, // Assuming createdAt is a Firestore Timestamp
+      createdAt: data.createdAt as Timestamp, 
       bio: data.bio || "",
       favoriteGames: data.favoriteGames || "",
       streamingChannelUrl: data.streamingChannelUrl || "",
