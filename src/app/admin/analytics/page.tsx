@@ -49,7 +49,7 @@ export default function AdminAnalyticsPage() {
       <PageTitle title="Platform Analytics" subtitle="Key metrics and insights for TournamentHub." />
 
       <section>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6"> {/* Adjusted to 3 for better spacing */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"> {/* Adjusted from xl:grid-cols-3 to lg:grid-cols-3 for consistency */}
           {platformAnalytics.map((stat) => (
             <StatsCard key={stat.title} item={stat} className="bg-card border-border"/>
           ))}
@@ -62,8 +62,8 @@ export default function AdminAnalyticsPage() {
             <CardTitle>User Growth</CardTitle>
             <CardDescription>Total registered users over time.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] w-full p-0">
-            <ChartContainer config={chartConfigUserGrowth} className="min-h-[300px] w-full">
+          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]"> {/* Changed fixed height to min-height */}
+            <ChartContainer config={chartConfigUserGrowth} className="min-h-[300px] w-full h-full"> {/* Ensured chart container takes full height of parent */}
               <LineChart accessibilityLayer data={userGrowthData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3"/>
                 <XAxis dataKey="date" tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })} tickLine={false} axisLine={false} tickMargin={10} />
@@ -81,8 +81,8 @@ export default function AdminAnalyticsPage() {
             <CardTitle>Tournament Activity</CardTitle>
             <CardDescription>Number of tournaments created vs. completed per month.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[350px] w-full p-0">
-            <ChartContainer config={chartConfigTournamentActivity} className="min-h-[300px] w-full">
+          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]"> {/* Changed fixed height to min-height */}
+            <ChartContainer config={chartConfigTournamentActivity} className="min-h-[300px] w-full h-full"> {/* Ensured chart container takes full height of parent */}
               <BarChart accessibilityLayer data={tournamentActivityData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
