@@ -1,7 +1,6 @@
 
 "use client";
 
-import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile } from "@/lib/types";
@@ -30,7 +29,7 @@ const getInitials = (name: string | null | undefined) => {
 
 const RankIcon = ({ rank }: { rank: number }) => {
   if (rank === 1) return <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400" />;
-  if (rank === 2) return <Medal className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />;
+  if (rank === 2) return <Medal className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />; // Silver
   if (rank === 3) return <Medal className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />; // Bronze-ish
   return <span className="font-semibold text-sm sm:text-base">{rank}</span>;
 };
@@ -59,7 +58,7 @@ export default function LeaderboardPage() {
         if (userIndex !== -1) {
           setCurrentUserRanking({ rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 });
         } else {
-          setCurrentUserRanking(null);
+          setCurrentUserRanking(null); // User has 0 points or not found in sorted list
         }
       }
 
@@ -80,18 +79,18 @@ export default function LeaderboardPage() {
 
   if (authLoading || isLoading) {
     return (
-      <MainLayout>
+      <>
         <PageTitle title="Leaderboard" subtitle="See who's on top in Apna Esport!" />
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="ml-3 text-muted-foreground mt-4 text-lg">Loading leaderboard...</p>
         </div>
-      </MainLayout>
+      </>
     );
   }
 
   return (
-    <MainLayout>
+    <>
       <PageTitle title="Leaderboard" subtitle="Top players on Apna Esport. Points are illustrative for now." />
       
       <Card className="shadow-xl border-border hover:shadow-primary/10 transition-shadow duration-300">
@@ -121,8 +120,10 @@ export default function LeaderboardPage() {
                       key={player.uid}
                       className={cn(
                         "transition-colors hover:bg-muted/50",
-                        user && player.uid === user.uid && "bg-primary/10 hover:bg-primary/20",
-                        index < 3 && "font-bold" 
+                        user && player.uid === user.uid && "bg-primary/10 hover:bg-primary/20 border-l-2 border-r-2 border-primary",
+                        index === 0 && "bg-yellow-400/10 hover:bg-yellow-400/20", // Gold accent for 1st
+                        index === 1 && "bg-slate-400/10 hover:bg-slate-400/20", // Silver accent for 2nd
+                        index === 2 && "bg-amber-600/10 hover:bg-amber-600/20"  // Bronze accent for 3rd
                       )}
                     >
                       <TableCell className="text-center">
@@ -132,12 +133,17 @@ export default function LeaderboardPage() {
                         <div className="flex items-center gap-2 sm:gap-3">
                           <Avatar className="h-8 w-8 sm:h-10 sm:w-10 border-2 border-muted">
                             <AvatarImage src={player.photoURL || ""} alt={player.displayName || "Player"} data-ai-hint="user avatar" />
-                            <AvatarFallback className={cn("text-xs sm:text-sm", index < 3 && "bg-accent text-accent-foreground")}>{getInitials(player.displayName)}</AvatarFallback>
+                            <AvatarFallback className={cn(
+                              "text-xs sm:text-sm", 
+                              index === 0 && "bg-yellow-400 text-background",
+                              index === 1 && "bg-slate-400 text-background",
+                              index === 2 && "bg-amber-700 text-background"
+                              )}>{getInitials(player.displayName)}</AvatarFallback>
                           </Avatar>
-                          <span className="truncate text-sm sm:text-base">{player.displayName || "Anonymous Player"}</span>
+                          <span className={cn("truncate text-sm sm:text-base", index < 3 && "font-semibold")}>{player.displayName || "Anonymous Player"}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm sm:text-base">{player.points || 0}</TableCell>
+                      <TableCell className={cn("text-right font-mono text-sm sm:text-base", index < 3 && "font-bold")}>{player.points || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -171,7 +177,7 @@ export default function LeaderboardPage() {
           </CardContent>
         </Card>
       )}
-       {currentUserRanking === null && user && (
+       {currentUserRanking === null && user && ( // User is logged in but has 0 points or not on leaderboard
         <Card className="mt-6">
           <CardContent className="p-4 text-center">
             <p className="text-muted-foreground">
@@ -183,6 +189,8 @@ export default function LeaderboardPage() {
           </CardContent>
         </Card>
       )}
-    </MainLayout>
+    </>
   );
 }
+
+    
