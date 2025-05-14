@@ -125,7 +125,6 @@ export default function CreateTournamentPage() {
     };
     
     console.log("Submitting new tournament:", newTournament);
-    form.control.formState.isSubmitting; // to ensure isSubmitting is tracked
 
     try {
       addTournament(newTournament); // Add to the client-side store
@@ -333,3 +332,4 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
