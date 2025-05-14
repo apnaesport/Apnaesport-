@@ -54,8 +54,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined,
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
     } as Game;
   });
 };
@@ -71,8 +71,8 @@ export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | u
         ...data,
         iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
         bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-        createdAt: data.createdAt as Timestamp,
-        updatedAt: data.updatedAt as Timestamp,
+        createdAt: data.createdAt as Timestamp, // Keep as Timestamp
+        updatedAt: data.updatedAt as Timestamp, // Keep as Timestamp
     } as Game;
   }
   return undefined;
@@ -117,10 +117,9 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("status", "==", queryParams.status));
   }
   if (queryParams?.gameId) {
-    // Index needed: gameId (ASC), startDate (DESC)
-    // Firebase console link (example): https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
-    // (The above comment is an example, Firebase error usually provides the correct link)
-    qConstraints.push(where("gameId", "==", queryParams.gameId));
+    // Index needed: gameId (ASC), startDate (DESC) on tournaments collection
+    // Example Firestore index creation link: https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
+    qConstraints = [where("gameId", "==", queryParams.gameId), orderBy("startDate", "desc")]
   }
    if (queryParams?.featured !== undefined) {
     qConstraints.push(where("featured", "==", queryParams.featured));
@@ -208,23 +207,6 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   }
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-
-  // Preserve participants array if not explicitly being updated
-  if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
-    // This condition seems problematic. If participants is in restData, it's being updated.
-    // If it's not in tournamentData at all, we should not delete it.
-    // Let's adjust to only delete if explicitly set to undefined in tournamentData.
-    if (restData.participants === undefined && !tournamentData.hasOwnProperty('participants')) {
-        // This means tournamentData was passed without 'participants' key, so don't touch it.
-    }
-  } else if (tournamentData.hasOwnProperty('participants') && tournamentData.participants === undefined) {
-    // This means participants was explicitly passed as undefined, intending to remove/clear it.
-    // This case is unlikely for array updates; usually, one passes an empty array or a new array.
-    // For safety, we usually update with a new array, or use arrayUnion/arrayRemove for specific items.
-    // For this general update function, if tournamentData.participants is provided, it will overwrite.
-  }
-
-
   await updateDoc(docRef, updateData);
 };
 
@@ -273,11 +255,8 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     qConstraints.push(where("target", "==", target));
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // Create in Firebase Console if error. Example link for index creation:
-  // https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
-  // Replace YOUR_PROJECT_ID_HERE with your actual Firebase project ID.
-  // Index for battlezone-faa03 already created:
-  // https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
+  // Create in Firebase Console if error. Example link:
+  // https://console.firebase.google.com/v1/r/project/YOUR_PROJECT_ID/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -286,7 +265,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt as Timestamp,
+      createdAt: data.createdAt as Timestamp, // Keep as Timestamp for now, convert to Date in component
     } as NotificationMessage;
   });
 };
@@ -390,7 +369,7 @@ export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId
   if (!searchTerm.trim()) return [];
   const lowerSearchTerm = searchTerm.toLowerCase();
 
-  const allUsers = await getAllUsersFromFirestore();
+  const allUsers = await getAllUsersFromFirestore(); // Inefficient for large user bases
   return allUsers.filter(user =>
     user.uid !== currentUserId &&
     (user.displayName?.toLowerCase().includes(lowerSearchTerm) || user.email?.toLowerCase().includes(lowerSearchTerm))
@@ -426,22 +405,23 @@ export const removeFriend = async (currentUserUid: string, targetUserUid: string
 export const createTeamInFirestore = async (teamData: TeamFormData, leader: UserProfile): Promise<string> => {
   if (!leader) throw new Error("Leader information is required to create a team.");
   
-  // Check if the leader already has a team (optional, based on rules)
-  const existingTeam = await getTeamsByUserIdFromFirestore(leader.uid, true);
-  if (existingTeam.length > 0) {
+  const existingTeamsLed = await getTeamsByUserIdFromFirestore(leader.uid, true);
+  if (existingTeamsLed.length > 0) {
     throw new Error("You can only lead one team.");
+  }
+  if (leader.teamId) {
+      throw new Error("You are already part of a team. Leave your current team to create a new one.");
   }
 
   const teamDocRef = await addDoc(collection(db, TEAMS_COLLECTION), {
     name: teamData.name,
     leaderUid: leader.uid,
     leaderName: leader.displayName || leader.email,
-    memberUids: [leader.uid], // Leader is initially the only member
+    memberUids: [leader.uid], 
     createdAt: serverTimestamp(),
     lastActivityAt: serverTimestamp(),
   });
 
-  // Update user's profile with teamId
   await updateUserTeamInFirestore(leader.uid, teamDocRef.id);
 
   return teamDocRef.id;
@@ -452,7 +432,13 @@ export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | n
   const teamRef = doc(db, TEAMS_COLLECTION, teamId);
   const teamSnap = await getDoc(teamRef);
   if (teamSnap.exists()) {
-    return { id: teamSnap.id, ...teamSnap.data() } as Team;
+    const data = teamSnap.data();
+    return { 
+        id: teamSnap.id, 
+        ...data,
+        createdAt: data.createdAt as Timestamp,
+        lastActivityAt: data.lastActivityAt as Timestamp,
+     } as Team;
   }
   return null;
 };
@@ -462,15 +448,25 @@ export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly
   if (asLeaderOnly) {
     qConstraints.push(where("leaderUid", "==", userId));
   } else {
+    // Index required for memberUids array-contains + orderBy createdAt
+    // Firebase message: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
     qConstraints.push(where("memberUids", "array-contains", userId));
   }
   qConstraints.push(orderBy("createdAt", "desc"));
   
-  // Index required for memberUids array-contains + orderBy createdAt
-  // Firestore message: The query requires an index. You can create it here: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
+  // Index required for leaderUid + orderBy createdAt (when asLeaderOnly = true)
+  // Example: https://console.firebase.google.com/v1/r/project/YOUR_PROJECT_ID/firestore/indexes?create_composite=Ck5wcm9qZWN0cy9YOUR_PROJECT_ID/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL3RlYW1zL2luZGV4ZXMvXhABGg0KCWxlYWRlclVpZBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, TEAMS_COLLECTION), ...qConstraints);
   const teamsSnapshot = await getDocs(q);
-  return teamsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Team));
+  return teamsSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return { 
+          id: doc.id, 
+          ...data,
+          createdAt: data.createdAt as Timestamp,
+          lastActivityAt: data.lastActivityAt as Timestamp,
+        } as Team
+    });
 };
 
 
@@ -482,6 +478,11 @@ export const updateUserTeamInFirestore = async (userId: string, teamId: string |
 export const addMemberToTeamInFirestore = async (teamId: string, userIdToAdd: string): Promise<void> => {
   const teamRef = doc(db, TEAMS_COLLECTION, teamId);
   const userRef = doc(db, USERS_COLLECTION, userIdToAdd);
+  
+  const userSnap = await getDoc(userRef);
+  if (userSnap.exists() && userSnap.data().teamId) {
+      throw new Error("User is already in another team.");
+  }
 
   const batch = writeBatch(db);
   batch.update(teamRef, { memberUids: arrayUnion(userIdToAdd), lastActivityAt: serverTimestamp() });
@@ -501,11 +502,10 @@ export const removeMemberFromTeamInFirestore = async (teamId: string, userIdToRe
   batch.update(teamRef, { memberUids: arrayRemove(userIdToRemove), lastActivityAt: serverTimestamp() });
   batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
 
-  // If the leader is removing themselves AND they are the last member, consider deleting the team
-  // OR implement leadership transfer (more complex). For now, simple removal.
-  // If leader removed and team still has members, current logic needs leader to explicitly delete team.
-  if (teamData.leaderUid === userIdToRemove && teamData.memberUids.length === 1) {
-    // Last member (leader) is leaving, delete the team
+  // If the leader is being removed AND they are the last member, or if the team becomes empty, delete the team.
+  // This simple logic deletes the team if the removed member was the last one.
+  // A more robust system might involve transferring leadership if the leader leaves and others remain.
+  if (teamData.memberUids.length === 1 && teamData.memberUids.includes(userIdToRemove)) {
     batch.delete(teamRef);
   }
 
