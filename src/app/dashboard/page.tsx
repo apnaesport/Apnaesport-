@@ -9,13 +9,19 @@ import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
 import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore";
 import { useEffect, useState, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { TournamentCard } from "@/components/tournaments/TournamentCard";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | undefined>(undefined);
   const [liveTournaments, setLiveTournaments] = useState<Tournament[]>([]);
+  const [recommendedTournaments, setRecommendedTournaments] = useState<Tournament[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -25,38 +31,45 @@ export default function DashboardPage() {
     setIsLoading(true);
     try {
       const [allTournaments, allGames] = await Promise.all([
-        getTournamentsFromFirestore(), // Fetches all tournaments, ordered by startDate desc by default
+        getTournamentsFromFirestore(), 
         getGamesFromFirestore()
       ]);
 
-      // Logic for featured tournament
       const upcomingOrLiveTournaments = allTournaments.filter(t => t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing");
       const explicitlyFeatured = upcomingOrLiveTournaments.filter(t => t.featured);
 
       if (explicitlyFeatured.length > 0) {
-        // If multiple are featured, pick the one starting soonest (or already live)
         explicitlyFeatured.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
         setFeaturedTournament(explicitlyFeatured[0]);
       } else if (upcomingOrLiveTournaments.length > 0) {
-        // Fallback: pick the soonest upcoming/live tournament if none are explicitly featured
         upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
         setFeaturedTournament(upcomingOrLiveTournaments[0]);
       } else {
-         // Fallback: if no upcoming/live, pick most recently created overall (already sorted by startDate desc)
-        setFeaturedTournament(allTournaments[0]);
+        setFeaturedTournament(allTournaments.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0]);
       }
-
 
       setLiveTournaments(allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing"));
       setGames(allGames);
+
+      // Personalized recommendations
+      if (user && user.favoriteGameIds && user.favoriteGameIds.length > 0) {
+        const userFavGameIds = user.favoriteGameIds;
+        const recommendations = allTournaments.filter(t => 
+          userFavGameIds.includes(t.gameId) && 
+          (t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing")
+        ).sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        setRecommendedTournaments(recommendations.slice(0, 3)); // Show top 3 recommendations
+      } else {
+        setRecommendedTournaments([]);
+      }
 
       const activeTournamentCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
 
       const placeholderStats: StatItem[] = [
         { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" },
-        { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, // Static placeholder
-        { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, // Static placeholder
-        { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, // Static placeholder
+        { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, 
+        { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, 
+        { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, 
       ];
       setStats(placeholderStats);
 
@@ -65,7 +78,7 @@ export default function DashboardPage() {
         toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive"});
     }
     setIsLoading(false);
-  }, [toast]);
+  }, [toast, user]);
 
   useEffect(() => {
     loadData();
@@ -90,12 +103,57 @@ export default function DashboardPage() {
           <FeaturedTournamentCard tournament={featuredTournament} />
         </section>
       ) : (
-        !isLoading && ( // Only show "No featured" if not loading
+        !isLoading && ( 
           <div className="bg-card p-8 rounded-lg shadow-md text-center">
             <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
           </div>
         )
       )}
+
+      {user && recommendedTournaments.length > 0 && (
+        <section>
+          <h2 className="text-2xl font-semibold mb-4 text-foreground flex items-center">
+            <Heart className="mr-2 h-6 w-6 text-primary fill-primary" />
+            Recommended For You
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recommendedTournaments.map((tournament) => (
+              <TournamentCard key={tournament.id} tournament={tournament} />
+            ))}
+          </div>
+        </section>
+      )}
+      
+      {user && recommendedTournaments.length === 0 && user.favoriteGameIds && user.favoriteGameIds.length > 0 && !isLoading && (
+         <section>
+          <h2 className="text-2xl font-semibold mb-4 text-foreground flex items-center">
+            <Heart className="mr-2 h-6 w-6 text-primary fill-primary" />
+            Recommended For You
+          </h2>
+           <div className="bg-card p-6 rounded-lg shadow-sm text-center">
+              <p className="text-muted-foreground">No upcoming tournaments match your favorite games right now. Check back later or explore all tournaments!</p>
+              <Button asChild variant="link" className="mt-2">
+                <Link href="/tournaments">Browse All Tournaments</Link>
+              </Button>
+           </div>
+        </section>
+      )}
+
+      {user && (!user.favoriteGameIds || user.favoriteGameIds.length === 0) && !isLoading && (
+         <section>
+          <h2 className="text-2xl font-semibold mb-4 text-foreground flex items-center">
+            <Heart className="mr-2 h-6 w-6 text-primary fill-primary" />
+            Recommended For You
+          </h2>
+           <div className="bg-card p-6 rounded-lg shadow-sm text-center">
+              <p className="text-muted-foreground">Add some favorite games to your profile to see personalized recommendations here!</p>
+              <Button asChild variant="link" className="mt-2">
+                <Link href="/profile">Update Your Profile</Link>
+              </Button>
+           </div>
+        </section>
+      )}
+
 
       <section>
         <h2 className="text-2xl font-semibold mb-4 text-foreground">Live Now</h2>

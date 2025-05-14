@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   BarChart3,
   Loader2,
-  Bell // Added Bell for notifications
+  Bell,
+  Users // Added Users icon for Social
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -28,7 +29,8 @@ const mainNavItems = [
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/stats", label: "My Stats", icon: BarChart3 },
-  { href: "/notifications", label: "Notifications", icon: Bell }, // Added Notifications link
+  { href: "/notifications", label: "Notifications", icon: Bell },
+  { href: "/social", label: "Social", icon: Users }, // Added Social link
 ];
 
 const secondaryNavItems = [
