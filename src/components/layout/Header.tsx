@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu, Bell } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -23,7 +23,7 @@ export function Header() {
   const { toggleSidebar, isMobile } = useSidebar();
 
   const getInitials = (name: string | null | undefined) => {
-    if (!name) return "TH";
+    if (!name) return "AE"; // Apna Esport
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
@@ -40,7 +40,15 @@ export function Header() {
         <Logo size="md" className="hidden sm:flex" />
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
+        {user && (
+          <Button variant="ghost" size="icon" asChild>
+            <Link href="/notifications" title="Notifications">
+              <Bell className="h-5 w-5" />
+              <span className="sr-only">Notifications</span>
+            </Link>
+          </Button>
+        )}
         {loading ? (
           <Skeleton className="h-10 w-10 rounded-full" />
         ) : user ? (

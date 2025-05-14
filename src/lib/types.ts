@@ -99,3 +99,25 @@ export interface SiteSettings {
   faviconUrl?: string;
   defaultTheme?: string; // Example: "dark" or "light"
 }
+
+export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
+export type NotificationTarget = "all_users" | "specific_users" | "tournament_participants"; // Add more as needed
+
+export interface NotificationMessage {
+  id: string; // Firestore document ID
+  title: string;
+  message: string;
+  type: NotificationType;
+  target: NotificationTarget;
+  // specificUserIds?: string[]; // For 'specific_users'
+  // tournamentId?: string; // For 'tournament_participants'
+  createdAt: Timestamp; // Timestamp of when the notification was created/sent
+  // isRead?: boolean; // If we implement per-user read status
+}
+
+export interface NotificationFormData {
+  title: string;
+  message: string;
+  type: NotificationType;
+  target: NotificationTarget;
+}

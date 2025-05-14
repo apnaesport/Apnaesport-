@@ -23,6 +23,17 @@ import {
   DialogTitle,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState, useEffect, useCallback } from "react";
@@ -50,6 +61,7 @@ export default function AdminGamesPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true); 
   const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
@@ -107,23 +119,24 @@ export default function AdminGamesPage() {
     let finalIconUrl = data.iconUrl;
     let finalBannerUrl = data.bannerUrl;
 
-    if (iconPreview && iconPreview.startsWith('data:image')) { // Prefer Data URI from preview if available
+    if (iconPreview && iconPreview.startsWith('data:image')) { 
         finalIconUrl = iconPreview;
-    } else if (!finalIconUrl && !editingGame?.iconUrl) {
+    } else if (!finalIconUrl && !editingGame?.iconUrl) { // Only set placeholder if no URL and no existing icon
          finalIconUrl = `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`;
     }
 
-    if (bannerPreview && bannerPreview.startsWith('data:image')) { // Prefer Data URI from preview
+    if (bannerPreview && bannerPreview.startsWith('data:image')) {
         finalBannerUrl = bannerPreview;
-    } else if (!finalBannerUrl && !editingGame?.bannerUrl) {
+    } else if (!finalBannerUrl && !editingGame?.bannerUrl) { // Only set placeholder if no URL and no existing banner
         finalBannerUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`;
     }
     
-    if (finalIconUrl && !finalIconUrl.startsWith('data:image') && !finalIconUrl.startsWith('https://placehold.co') && !finalIconUrl.startsWith('http')) {
-      form.setError("iconUrl", { type: "manual", message: "Icon URL must be a valid URL or a Data URI." });
+    // Validate URLs if they are not Data URIs or known placeholder service
+    if (finalIconUrl && !finalIconUrl.startsWith('data:image') && !finalIconUrl.startsWith('https://placehold.co') && !z.string().url().safeParse(finalIconUrl).success) {
+      form.setError("iconUrl", { type: "manual", message: "Icon URL must be a valid URL." });
     }
-    if (finalBannerUrl && !finalBannerUrl.startsWith('data:image') && !finalBannerUrl.startsWith('https://placehold.co') && !finalBannerUrl.startsWith('http')) {
-      form.setError("bannerUrl", { type: "manual", message: "Banner URL must be a valid URL or a Data URI." });
+    if (finalBannerUrl && !finalBannerUrl.startsWith('data:image') && !finalBannerUrl.startsWith('https://placehold.co') && !z.string().url().safeParse(finalBannerUrl).success) {
+      form.setError("bannerUrl", { type: "manual", message: "Banner URL must be a valid URL." });
     }
 
     if (Object.keys(form.formState.errors).length > 0) {
@@ -163,29 +176,26 @@ export default function AdminGamesPage() {
     setEditingGame(game);
     form.reset({ 
       name: game.name, 
-      iconUrl: game.iconUrl.startsWith('data:image') ? game.iconUrl : game.iconUrl,
-      bannerUrl: game.bannerUrl?.startsWith('data:image') ? game.bannerUrl : game.bannerUrl || "",
+      iconUrl: game.iconUrl,
+      bannerUrl: game.bannerUrl || "",
       dataAiHint: game.dataAiHint || ""
     });
-    // Set previews regardless of whether it's data URI or URL for consistency in display
     setIconPreview(game.iconUrl);
     setBannerPreview(game.bannerUrl || null);
     setIsDialogOpen(true);
   };
   
   const handleDelete = async (gameId: string, gameName: string) => {
-    if (confirm(`Are you sure you want to delete the game: "${gameName}"? This action cannot be undone.`)) {
-      setIsSubmitting(true); 
-      try {
-        await deleteGameFromFirestore(gameId);
-        toast({ title: "Game Deleted", description: `"${gameName}" has been removed.`, variant: "destructive" });
-        await fetchGames(); 
-      } catch (error) {
-        console.error("Error deleting game:", error);
-        toast({ title: "Error", description: `Could not delete "${gameName}".`, variant: "destructive" });
-      }
-      setIsSubmitting(false);
+    setIsDeleting(gameId); 
+    try {
+      await deleteGameFromFirestore(gameId);
+      toast({ title: "Game Deleted", description: `"${gameName}" has been removed.`, variant: "destructive" });
+      await fetchGames(); 
+    } catch (error) {
+      console.error("Error deleting game:", error);
+      toast({ title: "Error", description: `Could not delete "${gameName}".`, variant: "destructive" });
     }
+    setIsDeleting(null);
   };
 
   const openNewGameDialog = () => {
@@ -225,6 +235,7 @@ export default function AdminGamesPage() {
           setIconPreview(null);
           setBannerPreview(null);
           setEditingGame(null);
+          form.clearErrors(); // Clear errors when dialog closes
         }
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
@@ -245,10 +256,10 @@ export default function AdminGamesPage() {
               <Label htmlFor="iconFile" className="text-right">Icon</Label>
               <Input id="iconFile" type="file" {...form.register("iconFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')} disabled={isSubmitting}/>
             </div>
-            {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="col-start-2 col-span-3 rounded-md border object-cover" data-ai-hint='game icon preview' unoptimized={iconPreview.startsWith('data:image')}/>}
+            {iconPreview && <div className="col-start-2 col-span-3"><Image src={iconPreview} alt="Icon preview" width={40} height={40} className="rounded-md border object-cover" data-ai-hint='game icon preview' unoptimized={iconPreview.startsWith('data:image')}/></div>}
             <div className="grid grid-cols-4 items-center gap-4">
                  <Label htmlFor="iconUrl" className="text-right">Or Icon URL</Label>
-                 <Input id="iconUrl" {...form.register("iconUrl")} className="col-span-3" placeholder="https://placehold.co/40x40.png" disabled={isSubmitting}/>
+                 <Input id="iconUrl" {...form.register("iconUrl")} className="col-span-3" placeholder="https://example.com/icon.png" disabled={isSubmitting}/>
                  {form.formState.errors.iconUrl && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.iconUrl.message}</p>}
             </div>
 
@@ -256,10 +267,10 @@ export default function AdminGamesPage() {
               <Label htmlFor="bannerFile" className="text-right">Banner</Label>
               <Input id="bannerFile" type="file" {...form.register("bannerFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isSubmitting}/>
             </div>
-            {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={150} className="col-start-2 col-span-3 rounded-md border object-cover" data-ai-hint='game banner preview' unoptimized={bannerPreview.startsWith('data:image')}/>}
+            {bannerPreview && <div className="col-start-2 col-span-3"><Image src={bannerPreview} alt="Banner preview" width={200} height={112} className="rounded-md border object-cover aspect-[16/9]" data-ai-hint='game banner preview' unoptimized={bannerPreview.startsWith('data:image')}/></div>}
             <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="bannerUrl" className="text-right">Or Banner URL</Label>
-                <Input id="bannerUrl" {...form.register("bannerUrl")} className="col-span-3" placeholder="https://placehold.co/400x300.png" disabled={isSubmitting}/>
+                <Input id="bannerUrl" {...form.register("bannerUrl")} className="col-span-3" placeholder="https://example.com/banner.png" disabled={isSubmitting}/>
                 {form.formState.errors.bannerUrl && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.bannerUrl.message}</p>}
             </div>
             
@@ -298,7 +309,7 @@ export default function AdminGamesPage() {
               <TableRow key={game.id}>
                 <TableCell>
                   <Image 
-                    src={game.iconUrl || "https://placehold.co/40x40.png"} 
+                    src={game.iconUrl || `https://placehold.co/40x40.png?text=${game.name.substring(0,1)}`} 
                     alt={game.name} 
                     width={40} 
                     height={40} 
@@ -310,14 +321,32 @@ export default function AdminGamesPage() {
                 <TableCell className="font-medium">{game.name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{game.dataAiHint}</TableCell>
                 <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap text-right">
-                  <Button variant="outline" size="sm" onClick={() => handleEdit(game)} disabled={isSubmitting}>
+                  <Button variant="outline" size="sm" onClick={() => handleEdit(game)} disabled={isSubmitting || isDeleting === game.id}>
                     <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
                     <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
                   </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleDelete(game.id, game.name)} disabled={isSubmitting}>
-                    {isDeleting === game.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
-                     <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" size="sm" disabled={isSubmitting || isDeleting === game.id}>
+                        {isDeleting === game.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                        <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action cannot be undone. This will permanently delete the game "{game.name}".
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(game.id, game.name)}>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </TableCell>
               </TableRow>
             )) : (

@@ -13,6 +13,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getGameDetails, getTournamentsForGame } from "@/lib/tournamentStore";
 import { useEffect, useState, use, useCallback } from "react"; 
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
@@ -37,7 +38,7 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
         const gameTournaments = await getTournamentsForGame(gameId);
         setTournaments(gameTournaments);
       } else {
-        setTournaments([]); // No game, no tournaments
+        setTournaments([]); 
         toast({ title: "Not Found", description: "Game not found.", variant: "destructive" });
       }
     } catch (error) {
@@ -83,29 +84,32 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
 
   return (
     <div className="space-y-8">
-      <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-lg">
+      <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-xl border border-border">
         <Image 
           src={game.bannerUrl || `https://placehold.co/1200x300.png`} 
           alt={`${game.name} banner`} 
           layout="fill" 
           className="object-cover transition-transform duration-500 group-hover:scale-105"
-          data-ai-hint="game background art"
+          data-ai-hint={game.dataAiHint || "game background art"}
           unoptimized={game.bannerUrl?.startsWith('data:image')}
           onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x300.png?text=${encodeURIComponent(game.name)}`)}
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
-        <div className="absolute bottom-0 left-0 p-6 md:p-8">
+        <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
           <div className="flex items-center">
-            <Image 
-              src={game.iconUrl} 
-              alt={game.name} 
-              width={64} height={64} 
-              className="rounded-lg mr-4 border-2 border-background shadow-md object-cover" 
-              data-ai-hint="game logo large"
-              unoptimized={game.iconUrl?.startsWith('data:image')}
-              onError={(e) => (e.currentTarget.src = `https://placehold.co/64x64.png?text=${game.name.substring(0,2)}`)}
-            />
-            <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
+            <div className="relative w-16 h-16 md:w-20 md:h-20 mr-4 shrink-0">
+              <Image 
+                src={game.iconUrl} 
+                alt={game.name} 
+                layout="fill"
+                className="rounded-lg border-2 border-background shadow-md object-cover" 
+                data-ai-hint={game.dataAiHint || "game logo large"}
+                unoptimized={game.iconUrl?.startsWith('data:image')}
+                onError={(e) => (e.currentTarget.src = `https://placehold.co/80x80.png?text=${game.name.substring(0,2)}`)}
+              />
+            </div>
+            <PageTitle title={`${game.name} Tournaments`} className="mb-0 text-white text-shadow !text-2xl md:!text-3xl" />
           </div>
         </div>
       </div>
@@ -121,11 +125,14 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
       )}
 
       <Tabs defaultValue="upcoming" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:inline-flex">
-          <TabsTrigger value="upcoming">Upcoming ({upcomingTournaments.length})</TabsTrigger>
-          <TabsTrigger value="live">Live ({liveTournaments.length})</TabsTrigger>
-          <TabsTrigger value="completed">Completed ({completedTournaments.length})</TabsTrigger>
-        </TabsList>
+        <ScrollArea className="w-full whitespace-nowrap pb-2">
+          <TabsList className="inline-flex w-auto">
+            <TabsTrigger value="upcoming">Upcoming ({upcomingTournaments.length})</TabsTrigger>
+            <TabsTrigger value="live">Live ({liveTournaments.length})</TabsTrigger>
+            <TabsTrigger value="completed">Completed ({completedTournaments.length})</TabsTrigger>
+          </TabsList>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
         
         <TabsContent value="upcoming" className="mt-6">
           {upcomingTournaments.length > 0 ? (

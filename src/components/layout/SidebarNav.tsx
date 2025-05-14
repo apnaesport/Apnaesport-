@@ -9,7 +9,8 @@ import {
   LogOut,
   ShieldCheck,
   BarChart3,
-  Loader2
+  Loader2,
+  Bell // Added Bell for notifications
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,6 +28,7 @@ const mainNavItems = [
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/stats", label: "My Stats", icon: BarChart3 },
+  { href: "/notifications", label: "Notifications", icon: Bell }, // Added Notifications link
 ];
 
 const secondaryNavItems = [
@@ -39,18 +41,17 @@ export function SidebarNav() {
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   const isActive = (href: string) => {
-    if (href === "/dashboard") return pathname === href; // Exact match for dashboard
-    if (href === "/admin/dashboard" && pathname.startsWith("/admin")) return true; // Special case for admin root
-    return pathname.startsWith(href) && href !== "/admin/dashboard"; // StartsWith for others, but not admin root itself unless on it
+    if (href === "/dashboard") return pathname === href; 
+    if (href === "/admin/dashboard" && pathname.startsWith("/admin")) return true; 
+    return pathname.startsWith(href) && href !== "/admin/dashboard"; 
   };
   
   useEffect(() => {
-    // Clear navigation indicator when pathname changes
     setNavigatingTo(null);
   }, [pathname]);
 
   const handleNavigate = (href: string) => {
-    if (pathname !== href) { // Only set if navigating to a different page
+    if (pathname !== href) { 
       setNavigatingTo(href);
     }
   };
@@ -63,7 +64,7 @@ export function SidebarNav() {
           <SidebarMenuItem key={item.href}>
             <Link href={item.href} passHref legacyBehavior>
               <SidebarMenuButton
-                as="a" // Use 'a' for proper Link behavior
+                as="a" 
                 isActive={isActive(item.href)}
                 tooltip={item.label}
                 onClick={() => handleNavigate(item.href)}
@@ -79,7 +80,7 @@ export function SidebarNav() {
         ))}
       </SidebarMenu>
       
-      <div className="mt-auto"> {/* Pushes secondary items and logout to the bottom */}
+      <div className="mt-auto"> 
         <SidebarMenu>
           {isAdmin && (
              <SidebarMenuItem>
@@ -120,7 +121,6 @@ export function SidebarNav() {
           <SidebarMenuItem>
             <SidebarMenuButton 
               onClick={() => {
-                // Optionally, set navigatingTo state here if logout involves a route change that isn't immediate
                 logout();
               }} 
               tooltip="Logout" 
