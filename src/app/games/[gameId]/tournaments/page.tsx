@@ -11,14 +11,16 @@ import Image from "next/image";
 import { PlusCircle, AlertTriangle } from "lucide-react"; // Added AlertTriangle
 import { useAuth } from "@/contexts/AuthContext"; 
 import { getGameDetails as fetchGameDetails, getTournamentsForGame as fetchTournamentsForGame, subscribe } from "@/lib/tournamentStore"; // Updated imports
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react"; // Added 'use'
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
 }
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
-  const { gameId } = params;
+  const resolvedParams = use(params); // Use React.use() to unwrap params
+  const { gameId } = resolvedParams;
+
   const { user } = useAuth(); 
   const [game, setGame] = useState<Game | undefined>(undefined);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
