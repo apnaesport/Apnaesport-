@@ -14,7 +14,7 @@ import {
   orderBy,
   limit,
   type QueryConstraint,
-  setDoc // Added for setting doc with specific ID
+  setDoc 
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile } from './types';
@@ -24,7 +24,7 @@ const TOURNAMENTS_COLLECTION = "tournaments";
 const NOTIFICATIONS_COLLECTION = "notifications";
 const USERS_COLLECTION = "users";
 const SETTINGS_COLLECTION = "settings";
-const GLOBAL_SETTINGS_ID = "global"; // Fixed ID for the single site settings document
+const GLOBAL_SETTINGS_ID = "global"; 
 
 
 // --- Game Functions ---
@@ -52,6 +52,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
     return { 
       id: doc.id, 
       ...data,
+      iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
+      bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
     } as Game;
@@ -67,6 +69,8 @@ export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | u
     return { 
         id: docSnap.id, 
         ...data,
+        iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
+        bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
         createdAt: data.createdAt as Timestamp,
         updatedAt: data.updatedAt as Timestamp,
     } as Game;
@@ -96,6 +100,7 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     matches: tournamentData.matches || [], 
+    bannerImageUrl: tournamentData.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
   });
   const newTournamentSnapshot = await getDoc(docRef);
   const newTournamentData = newTournamentSnapshot.data();
@@ -106,6 +111,7 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     createdAt: newTournamentData?.createdAt as Timestamp,
     updatedAt: newTournamentData?.updatedAt as Timestamp,
     startDate: Timestamp.fromDate(startDate), 
+    bannerImageUrl: newTournamentData?.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
   };
 };
 
@@ -117,17 +123,12 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   }
   if (queryParams?.gameId) {
     // IMPORTANT: Querying by gameId AND ordering by startDate may require a composite index in Firestore.
-    // Example: Collection: tournaments, Fields: gameId (ASC), startDate (DESC or ASC depending on Firestore's suggestion).
+    // Example: Collection: tournaments, Fields: gameId (ASC), startDate (DESC).
     // Firebase error messages will typically provide a link to create this index.
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
   if (queryParams?.participantId) {
-    // This queries if the participantId string is present in the 'participants' array (if it's an array of UIDs).
-    // If 'participants' is an array of objects, you'd query a specific field in those objects,
-    // e.g., where("participantIds", "array-contains", queryParams.participantId) if you had a denormalized array of IDs.
-    // For complex objects, you might need to adjust your data structure or use array-contains-any with up to 10 UIDs.
-    // A common approach is to filter client-side for broader participation checks or structure data for easier querying.
-    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId })); // Assuming participants is an array of objects with an id field
+    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId })); 
   }
   if (queryParams?.count) {
     qConstraints.push(limit(queryParams.count));
@@ -141,6 +142,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     return {
       id: doc.id,
       ...data,
+      bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
+      gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
       startDate: (data.startDate as Timestamp).toDate(), 
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
@@ -173,6 +176,8 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
     return {
       id: docSnap.id,
       ...data,
+      bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
+      gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
       startDate: (data.startDate as Timestamp).toDate(),
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
@@ -208,7 +213,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournamentData = tournamentSnap.data() as Tournament; // Type assertion
+    const tournamentData = tournamentSnap.data() as Tournament; 
     const currentParticipants = tournamentData.participants || [];
 
     if (currentParticipants.find(p => p.id === participant.id)) {
@@ -253,6 +258,8 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   // IMPORTANT: This query might require a composite index in Firestore if 'target' is used.
   // Example: Collection: notifications, Fields: target (ASC), createdAt (DESC).
   // Firebase error messages will typically provide a link to create this index.
+  // Firestore Error Code: FAILED_PRECONDITION
+  // Index Required: target (ASC), createdAt (DESC) on notifications collection.
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
   
@@ -273,12 +280,11 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
     const data = doc.data();
     return {
       uid: doc.id,
-      displayName: data.displayName || null,
+      displayName: data.displayName || "Unknown User",
       email: data.email || null,
-      photoURL: data.photoURL || null,
+      photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp, // Assuming createdAt is stored
-      // FirebaseUser specific fields (fill with defaults or ensure they exist)
+      createdAt: data.createdAt as Timestamp, 
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
       metadata: data.metadata || {},
@@ -322,7 +328,7 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
   await setDoc(docRef, { 
     ...settingsData,
     updatedAt: serverTimestamp(),
-  }, { merge: true }); // Use merge: true to create or update
+  }, { merge: true }); 
 };
 
 
@@ -330,8 +336,5 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-// addTournament and addGame are already clear as addTournamentToFirestore and addGameToFirestore
-// updateGameInStore, deleteGameFromStore, deleteTournamentFromStore are good as updateGameInFirestore, etc.
-// getTournaments and getGames are clear
 
     
