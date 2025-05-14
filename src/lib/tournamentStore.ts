@@ -12,10 +12,11 @@ import {
   Timestamp,
   serverTimestamp,
   orderBy,
-  limit
+  limit,
+  type QueryConstraint // Import QueryConstraint
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -87,16 +88,16 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
 };
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number }): Promise<Tournament[]> => {
-  let qConstraints = [orderBy("startDate", "desc")];
+  let qConstraints: QueryConstraint[] = [orderBy("startDate", "desc")];
   
   if (queryParams?.status) {
-    qConstraints.push(where("status", "==", queryParams.status) as any);
+    qConstraints.push(where("status", "==", queryParams.status));
   }
   if (queryParams?.gameId) {
-    qConstraints.push(where("gameId", "==", queryParams.gameId) as any);
+    qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
   if (queryParams?.count) {
-    qConstraints.push(limit(queryParams.count) as any);
+    qConstraints.push(limit(queryParams.count));
   }
 
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
@@ -120,13 +121,12 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
   if (docSnap.exists()) {
     const data = docSnap.data();
     
-    // Basic placeholder match generation if none exist and participants are present for Single Elimination
     let matches = data.matches || [];
     if (matches.length === 0 && data.participants && data.participants.length >= 2 && data.bracketType === "Single Elimination") {
         const numMatches = Math.floor(data.participants.length / 2);
         for(let i = 0; i < numMatches; i++) {
             matches.push({
-                id: `m-auto-${tournamentId}-${i+1}`, // Auto-generated ID prefix
+                id: `m-auto-${tournamentId}-${i+1}`, 
                 round: 1,
                 participants: [data.participants[i*2] || null, data.participants[i*2+1] || null],
                 status: 'Pending'
@@ -154,7 +154,7 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   if (endDate) {
     updateData.endDate = Timestamp.fromDate(endDate);
   } else if (tournamentData.hasOwnProperty('endDate') && tournamentData.endDate === null) {
-     updateData.endDate = null; // Explicitly set to null if passed
+     updateData.endDate = null; 
   }
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
@@ -166,8 +166,11 @@ export const deleteTournamentFromFirestore = async (tournamentId: string): Promi
 };
 
 export const addParticipantToTournament = async (tournamentId: string, participant: Participant): Promise<void> => {
-  const tournament = await getTournamentByIdFromFirestore(tournamentId);
-  if (tournament) {
+  const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+  const tournamentSnap = await getDoc(tournamentRef);
+
+  if (tournamentSnap.exists()) {
+    const tournament = tournamentSnap.data() as Tournament;
     if (tournament.participants.find(p => p.id === participant.id)) {
       throw new Error("Participant already registered");
     }
@@ -175,7 +178,10 @@ export const addParticipantToTournament = async (tournamentId: string, participa
       throw new Error("Tournament is full");
     }
     const updatedParticipants = [...tournament.participants, participant];
-    await updateTournamentInFirestore(tournamentId, { participants: updatedParticipants });
+    await updateDoc(tournamentRef, { 
+        participants: updatedParticipants,
+        updatedAt: serverTimestamp()
+    });
   } else {
     throw new Error("Tournament not found");
   }
@@ -197,13 +203,15 @@ export const sendNotificationToFirestore = async (notificationData: Notification
 };
 
 export const getNotificationsFromFirestore = async (target?: NotificationTarget): Promise<NotificationMessage[]> => {
-  let qConstraints = [orderBy("createdAt", "desc")];
+  let qConstraints: QueryConstraint[] = [orderBy("createdAt", "desc")];
 
   if (target) {
-    qConstraints.push(where("target", "==", target) as any);
+    qConstraints.push(where("target", "==", target));
   }
   
-  // Fetch all notifications if no specific target or for admin view
+  // IMPORTANT: This query might require a composite index in Firestore if 'target' is used.
+  // The index would be: collection 'notifications', fields 'target' (ASC), 'createdAt' (DESC).
+  // Firestore usually provides a link in the console error (like the one you received) to create this index.
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
   
@@ -212,7 +220,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt as Timestamp, // Ensure createdAt is Timestamp
+      createdAt: data.createdAt as Timestamp, 
     } as NotificationMessage;
   });
 };
