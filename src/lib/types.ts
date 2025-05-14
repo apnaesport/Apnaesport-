@@ -11,7 +11,7 @@ export interface UserProfile extends FirebaseUser {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
-  // Add any other custom user properties
+  createdAt?: Timestamp; // Added for user creation date
 }
 
 export type Game = {
@@ -67,19 +67,18 @@ export type Tournament = {
   updatedAt?: Timestamp;
 };
 
-// This will be used in the create tournament form
 export type TournamentFormDataUI = {
   name: string;
   gameId: string;
   description: string;
-  startDate: Date; // Client-side form uses Date object
+  startDate: Date; 
   maxParticipants: number;
   prizePool?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   rules?: string;
   registrationInstructions?: string;
-  bannerImageFile?: FileList; // For handling the file input
-  bannerImageDataUri?: string; // For storing the Data URL of the image
+  bannerImageFile?: FileList; 
+  bannerImageDataUri?: string; 
 };
 
 
@@ -87,32 +86,31 @@ export type StatItem = {
   title: string;
   value: string | number;
   icon?: LucideIconName; 
-  change?: string; // e.g., "+5%"
+  change?: string; 
 };
 
 export interface SiteSettings {
+  id?: string; // Typically "global" or a fixed ID
   siteName: string;
   siteDescription: string;
   maintenanceMode: boolean;
   allowRegistrations: boolean;
   logoUrl?: string;
   faviconUrl?: string;
-  defaultTheme?: string; // Example: "dark" or "light"
+  defaultTheme?: string; 
+  updatedAt?: Timestamp;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
-export type NotificationTarget = "all_users" | "specific_users" | "tournament_participants"; // Add more as needed
+export type NotificationTarget = "all_users" | "specific_users" | "tournament_participants"; 
 
 export interface NotificationMessage {
-  id: string; // Firestore document ID
+  id: string; 
   title: string;
   message: string;
   type: NotificationType;
   target: NotificationTarget;
-  // specificUserIds?: string[]; // For 'specific_users'
-  // tournamentId?: string; // For 'tournament_participants'
-  createdAt: Timestamp; // Timestamp of when the notification was created/sent
-  // isRead?: boolean; // If we implement per-user read status
+  createdAt: Timestamp; 
 }
 
 export interface NotificationFormData {
@@ -121,3 +119,4 @@ export interface NotificationFormData {
   type: NotificationType;
   target: NotificationTarget;
 }
+

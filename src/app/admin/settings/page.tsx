@@ -9,13 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2 } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import type { SiteSettings } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { getSiteSettingsFromFirestore, saveSiteSettingsToFirestore } from "@/lib/tournamentStore";
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
@@ -27,33 +28,53 @@ const settingsSchema = z.object({
   defaultTheme: z.string().optional(), 
 });
 
-const defaultSettings: SiteSettings = {
+const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt'> = {
   siteName: "Apna Esport",
   siteDescription: "Your Ultimate Gaming Tournament Platform",
   maintenanceMode: false,
   allowRegistrations: true,
-  logoUrl: "https://placehold.co/150x50.png", // Will be updated via Logo component, this is for form
-  faviconUrl: "https://placehold.co/32x32.png",
-  defaultTheme: "dark",
+  logoUrl: "", // Default empty, Logo component handles fallback
+  faviconUrl: "",
+  defaultTheme: "dark", // Theme is hardcoded dark for now
 };
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false); 
+  const [isFetchingSettings, setIsFetchingSettings] = useState(true);
   
   const form = useForm<SiteSettings>({
     resolver: zodResolver(settingsSchema),
-    defaultValues: defaultSettings,
+    defaultValues: defaultSettingsValues,
   });
+
+  const fetchSettings = useCallback(async () => {
+    setIsFetchingSettings(true);
+    try {
+      const loadedSettings = await getSiteSettingsFromFirestore();
+      if (loadedSettings) {
+        form.reset(loadedSettings);
+      } else {
+        form.reset(defaultSettingsValues); // Reset to defaults if nothing in DB
+      }
+    } catch (error) {
+      console.error("Error fetching site settings:", error);
+      toast({ title: "Error", description: "Could not load site settings. Using defaults.", variant: "destructive" });
+      form.reset(defaultSettingsValues);
+    }
+    setIsFetchingSettings(false);
+  }, [form, toast]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
+
 
   const onSubmit: SubmitHandler<SiteSettings> = async (data) => {
     setIsLoading(true);
-    console.log("Saving settings:", data);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
     try {
-      // Example: Save settings (e.g., to localStorage or a backend)
-      // localStorage.setItem("siteSettings", JSON.stringify(data));
+      const { id, updatedAt, ...settingsToSave } = data; // Exclude local/readonly fields
+      await saveSiteSettingsToFirestore(settingsToSave);
       toast({
         title: "Settings Saved",
         description: "Site settings have been updated successfully.",
@@ -65,13 +86,15 @@ export default function AdminSettingsPage() {
     setIsLoading(false);
   };
 
-  // Example: Load settings from localStorage (if previously saved)
-  // useEffect(() => {
-  //   const savedSettings = localStorage.getItem("siteSettings");
-  //   if (savedSettings) {
-  //     form.reset(JSON.parse(savedSettings));
-  //   }
-  // }, [form]);
+  if (isFetchingSettings) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading settings...</p>
+      </div>
+    );
+  }
+
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -87,12 +110,12 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="siteName">Site Name</Label>
-            <Input id="siteName" {...form.register("siteName")} />
+            <Input id="siteName" {...form.register("siteName")} disabled={isLoading}/>
             {form.formState.errors.siteName && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteName.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="siteDescription">Site Description / Motto</Label>
-            <Textarea id="siteDescription" {...form.register("siteDescription")} />
+            <Textarea id="siteDescription" {...form.register("siteDescription")} disabled={isLoading}/>
             {form.formState.errors.siteDescription && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteDescription.message}</p>}
           </div>
           <Separator />
@@ -100,12 +123,12 @@ export default function AdminSettingsPage() {
             name="maintenanceMode"
             control={form.control}
             render={({ field }) => (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-2 border rounded-md">
                 <div>
-                  <Label htmlFor="maintenanceMode" className="font-medium">Maintenance Mode</Label>
+                  <Label htmlFor="maintenanceModeSwitch" className="font-medium">Maintenance Mode</Label>
                   <p className="text-sm text-muted-foreground">Temporarily disable access to the site for users.</p>
                 </div>
-                <Switch id="maintenanceMode" checked={field.value} onCheckedChange={field.onChange} />
+                <Switch id="maintenanceModeSwitch" checked={field.value} onCheckedChange={field.onChange} disabled={isLoading}/>
               </div>
             )}
           />
@@ -115,7 +138,7 @@ export default function AdminSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <UsersRound className="mr-2 h-5 w-5 text-primary" /> User & Registration Settings
+            <UsersRound className="mr-2 h-5 w-5 text-primary" /> User &amp; Registration Settings
           </CardTitle>
           <CardDescription>Manage user registration and default roles.</CardDescription>
         </CardHeader>
@@ -124,12 +147,12 @@ export default function AdminSettingsPage() {
             name="allowRegistrations"
             control={form.control}
             render={({ field }) => (
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between p-2 border rounded-md">
                 <div>
-                  <Label htmlFor="allowRegistrations" className="font-medium">Allow New Registrations</Label>
+                  <Label htmlFor="allowRegistrationsSwitch" className="font-medium">Allow New Registrations</Label>
                   <p className="text-sm text-muted-foreground">Enable or disable new users from signing up.</p>
                 </div>
-                <Switch id="allowRegistrations" checked={field.value} onCheckedChange={field.onChange} />
+                <Switch id="allowRegistrationsSwitch" checked={field.value} onCheckedChange={field.onChange} disabled={isLoading}/>
               </div>
             )}
           />
@@ -145,18 +168,22 @@ export default function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-2">
-            <Label htmlFor="logoUrl">Logo URL (Currently managed by Logo component)</Label>
-            <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://placehold.co/150x50.png" disabled />
+            <Label htmlFor="logoUrl">Logo URL</Label>
+            <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://example.com/logo.png" disabled={isLoading}/>
+            <p className="text-xs text-muted-foreground">If empty, the default site logo component will be used.</p>
             {form.formState.errors.logoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.logoUrl.message}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="faviconUrl">Favicon URL</Label>
-            <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://placehold.co/32x32.png" />
+            <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://example.com/favicon.ico" disabled={isLoading}/>
             {form.formState.errors.faviconUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.faviconUrl.message}</p>}
           </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="defaultTheme" className="font-medium">Default Theme</Label>
-            <Input id="defaultTheme" {...form.register("defaultTheme")} disabled className="w-auto" />
+          <div className="flex items-center justify-between p-2 border rounded-md">
+            <div>
+                <Label htmlFor="defaultTheme" className="font-medium">Default Theme</Label>
+                 <p className="text-sm text-muted-foreground">Currently, only dark theme is applied globally.</p>
+            </div>
+            <Input id="defaultTheme" {...form.register("defaultTheme")} value="dark" disabled className="w-auto bg-muted" readOnly/>
           </div>
         </CardContent>
       </Card>
@@ -164,7 +191,7 @@ export default function AdminSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Shield className="mr-2 h-5 w-5 text-primary" /> Security & API Settings 
+            <Shield className="mr-2 h-5 w-5 text-primary" /> Security &amp; API Settings 
           </CardTitle>
           <CardDescription>Manage API keys and security configurations.</CardDescription>
         </CardHeader>
@@ -174,8 +201,9 @@ export default function AdminSettingsPage() {
       </Card>
 
       <div className="flex justify-end">
-        <Button type="submit" size="lg" disabled={isLoading || form.formState.isSubmitting}>
-          <Save className="mr-2 h-4 w-4" /> {isLoading || form.formState.isSubmitting ? "Saving..." : "Save All Settings"}
+        <Button type="submit" size="lg" disabled={isLoading || form.formState.isSubmitting || isFetchingSettings}>
+          {isLoading || form.formState.isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4" />}
+          {isLoading || form.formState.isSubmitting ? "Saving..." : "Save All Settings"}
         </Button>
       </div>
     </form>

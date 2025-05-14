@@ -13,14 +13,19 @@ import {
   serverTimestamp,
   orderBy,
   limit,
-  type QueryConstraint // Import QueryConstraint
+  type QueryConstraint,
+  setDoc // Added for setting doc with specific ID
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
 const NOTIFICATIONS_COLLECTION = "notifications";
+const USERS_COLLECTION = "users";
+const SETTINGS_COLLECTION = "settings";
+const GLOBAL_SETTINGS_ID = "global"; // Fixed ID for the single site settings document
+
 
 // --- Game Functions ---
 
@@ -30,18 +35,27 @@ export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt'
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  const newGame: Game = { 
+  const newGameSnapshot = await getDoc(docRef); // Fetch to get server timestamp
+  const newGameData = newGameSnapshot.data();
+  return { 
     id: docRef.id, 
     ...gameData, 
-    createdAt: Timestamp.now(), // Client-side approximation
-    updatedAt: Timestamp.now()  // Client-side approximation
+    createdAt: newGameData?.createdAt as Timestamp,
+    updatedAt: newGameData?.updatedAt as Timestamp
   };
-  return newGame;
 };
 
 export const getGamesFromFirestore = async (): Promise<Game[]> => {
   const gamesSnapshot = await getDocs(query(collection(db, GAMES_COLLECTION), orderBy("name", "asc")));
-  return gamesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Game));
+  return gamesSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return { 
+      id: doc.id, 
+      ...data,
+      createdAt: data.createdAt as Timestamp,
+      updatedAt: data.updatedAt as Timestamp,
+    } as Game;
+  });
 };
 
 export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | undefined> => {
@@ -49,7 +63,13 @@ export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | u
   const docRef = doc(db, GAMES_COLLECTION, gameId);
   const docSnap = await getDoc(docRef);
   if (docSnap.exists()) {
-    return { id: docSnap.id, ...docSnap.data() } as Game;
+    const data = docSnap.data();
+    return { 
+        id: docSnap.id, 
+        ...data,
+        createdAt: data.createdAt as Timestamp,
+        updatedAt: data.updatedAt as Timestamp,
+    } as Game;
   }
   return undefined;
 };
@@ -72,22 +92,24 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
   const { startDate, ...restData } = tournamentData;
   const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
     ...restData,
-    startDate: Timestamp.fromDate(startDate), // Convert Date to Timestamp
+    startDate: Timestamp.fromDate(startDate),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    matches: tournamentData.matches || [], // Ensure matches array exists
+    matches: tournamentData.matches || [], 
   });
+  const newTournamentSnapshot = await getDoc(docRef);
+  const newTournamentData = newTournamentSnapshot.data();
   
-  const newTournament: Tournament = {
+  return {
     ...tournamentData,
     id: docRef.id,
-    createdAt: Timestamp.now(), // Client-side approximation
-    updatedAt: Timestamp.now()  // Client-side approximation
+    createdAt: newTournamentData?.createdAt as Timestamp,
+    updatedAt: newTournamentData?.updatedAt as Timestamp,
+    startDate: Timestamp.fromDate(startDate), // Ensure it's a Timestamp for consistency
   };
-  return newTournament;
 };
 
-export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number }): Promise<Tournament[]> => {
+export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [orderBy("startDate", "desc")];
   
   if (queryParams?.status) {
@@ -96,9 +118,19 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   if (queryParams?.gameId) {
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
+  if (queryParams?.participantId) {
+    qConstraints.push(where("participants", "array-contains", queryParams.participantId)); // This is a simplified way to check participation. For actual participant objects, you'd check for objects containing the id. See note below.
+  }
   if (queryParams?.count) {
     qConstraints.push(limit(queryParams.count));
   }
+  // Note: Firestore's array-contains query works for primitive values in an array.
+  // If participants is an array of objects, you'd query `where("participants.id", "==", participantId)` if `participants` field was an array of maps, 
+  // but for `array-contains` to work on an array of objects, the entire object must match.
+  // A common workaround is to store an array of participant IDs alongside the array of participant objects, or restructure.
+  // For now, the participantId filter will assume `participants` field contains an array of UIDs if that's how it's queried.
+  // Given Participant is {id, name, avatarUrl}, a more robust query for "user participated in" would be harder without denormalizing participant IDs into a separate array field.
+  // Let's assume for the stats page, we fetch all tournaments and filter client-side for participation for now.
 
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
   const tournamentsSnapshot = await getDocs(q);
@@ -108,11 +140,14 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     return {
       id: doc.id,
       ...data,
-      startDate: (data.startDate as Timestamp).toDate(), // Convert Timestamp to Date
+      startDate: (data.startDate as Timestamp).toDate(), 
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
+      createdAt: data.createdAt as Timestamp,
+      updatedAt: data.updatedAt as Timestamp,
     } as Tournament;
   });
 };
+
 
 export const getTournamentByIdFromFirestore = async (tournamentId: string): Promise<Tournament | undefined> => {
   if (!tournamentId) return undefined;
@@ -139,6 +174,8 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       ...data,
       startDate: (data.startDate as Timestamp).toDate(),
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
+      createdAt: data.createdAt as Timestamp,
+      updatedAt: data.updatedAt as Timestamp,
       matches: matches,
     } as Tournament;
   }
@@ -165,19 +202,23 @@ export const deleteTournamentFromFirestore = async (tournamentId: string): Promi
   await deleteDoc(doc(db, TOURNAMENTS_COLLECTION, tournamentId));
 };
 
-export const addParticipantToTournament = async (tournamentId: string, participant: Participant): Promise<void> => {
+export const addParticipantToTournamentFirestore = async (tournamentId: string, participant: Participant): Promise<void> => {
   const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournament = tournamentSnap.data() as Tournament;
-    if (tournament.participants.find(p => p.id === participant.id)) {
+    const tournamentData = tournamentSnap.data() as Tournament;
+    // Convert Firestore Timestamps back to Date objects for comparison if necessary, or ensure types are consistent
+    // For this logic, we primarily care about participant list and maxParticipants
+    const currentParticipants = tournamentData.participants || [];
+
+    if (currentParticipants.find(p => p.id === participant.id)) {
       throw new Error("Participant already registered");
     }
-    if (tournament.participants.length >= tournament.maxParticipants) {
+    if (currentParticipants.length >= tournamentData.maxParticipants) {
       throw new Error("Tournament is full");
     }
-    const updatedParticipants = [...tournament.participants, participant];
+    const updatedParticipants = [...currentParticipants, participant];
     await updateDoc(tournamentRef, { 
         participants: updatedParticipants,
         updatedAt: serverTimestamp()
@@ -194,12 +235,13 @@ export const sendNotificationToFirestore = async (notificationData: Notification
     ...notificationData,
     createdAt: serverTimestamp(),
   });
-  const newNotification: NotificationMessage = {
+  const newNotificationSnapshot = await getDoc(docRef);
+  const newNotificationData = newNotificationSnapshot.data();
+  return {
     id: docRef.id,
     ...notificationData,
-    createdAt: Timestamp.now(), // Client-side approximation
+    createdAt: newNotificationData?.createdAt as Timestamp,
   };
-  return newNotification;
 };
 
 export const getNotificationsFromFirestore = async (target?: NotificationTarget): Promise<NotificationMessage[]> => {
@@ -225,15 +267,76 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   });
 };
 
+// --- User Functions ---
+export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
+  const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), orderBy("displayName", "asc")));
+  return usersSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      // Ensure all fields from UserProfile are mapped, falling back if necessary
+      uid: doc.id,
+      displayName: data.displayName || null,
+      email: data.email || null,
+      photoURL: data.photoURL || null,
+      isAdmin: data.isAdmin || false,
+      createdAt: data.createdAt as Timestamp,
+      // FirebaseUser specific fields (less relevant for display, but good for type)
+      emailVerified: data.emailVerified || false,
+      isAnonymous: data.isAnonymous || false,
+      metadata: data.metadata || {},
+      providerData: data.providerData || [],
+      refreshToken: data.refreshToken || '',
+      tenantId: data.tenantId || null,
+      delete: async () => {}, // Placeholder, not directly callable from client
+      getIdToken: async () => '', // Placeholder
+      getIdTokenResult: async () => ({} as any), // Placeholder
+      reload: async () => {}, // Placeholder
+      toJSON: () => ({}), // Placeholder
+      phoneNumber: data.phoneNumber || null,
+      providerId: data.providerId || '',
+    } as UserProfile;
+  });
+};
 
-// Aliases for easier use from components
+export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: boolean): Promise<void> => {
+  const userRef = doc(db, USERS_COLLECTION, userId);
+  await updateDoc(userRef, { isAdmin });
+};
+
+
+// --- Site Settings Functions ---
+export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | null> => {
+  const docRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
+  const docSnap = await getDoc(docRef);
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    return { 
+        id: docSnap.id, 
+        ...data,
+        updatedAt: data.updatedAt as Timestamp,
+    } as SiteSettings;
+  }
+  return null; // No settings found
+};
+
+export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSettings, 'id' | 'updatedAt'>): Promise<void> => {
+  const docRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
+  await setDoc(docRef, { // Use setDoc to create or overwrite
+    ...settingsData,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+
+// Aliases for easier use (some might be deprecated if replaced by direct Firestore calls in components)
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-export const addTournament = addTournamentToFirestore;
-export const addGame = addGameToFirestore;
-export const updateGameInStore = updateGameInFirestore;
-export const deleteGameFromStore = deleteGameFromFirestore;
-export const deleteTournamentFromStore = deleteTournamentFromFirestore;
-export const getTournaments = () => getTournamentsFromFirestore();
-export const getGames = getGamesFromFirestore;
+export const addTournament = addTournamentToFirestore; // Kept for potential direct use
+export const addGame = addGameToFirestore; // Kept
+export const updateGameInStore = updateGameInFirestore; // Renamed for clarity vs Firestore
+export const deleteGameFromStore = deleteGameFromFirestore; // Renamed
+export const deleteTournamentFromStore = deleteTournamentFromFirestore; // Renamed
+export const getTournaments = () => getTournamentsFromFirestore(); // Kept
+export const getGames = getGamesFromFirestore; // Kept
+

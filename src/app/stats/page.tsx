@@ -4,8 +4,8 @@
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard"; 
-import type { StatItem } from "@/lib/types";
-import { Activity, LogIn } from "lucide-react"; 
+import type { StatItem, Tournament } from "@/lib/types";
+import { Activity, LogIn, Loader2, Swords, Trophy, Percent, Zap, ListChecks } from "lucide-react"; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts" 
@@ -13,13 +13,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const placeholderUserOverallStats: StatItem[] = [
-  { title: "Total Matches Played", value: 0, icon: "Swords" },
-  { title: "Tournaments Won", value: 0, icon: "Trophy" },
-  { title: "Win Rate", value: "0%", icon: "Percent" },
-  { title: "Average K/D Ratio", value: "0.0", icon: "Zap" },
-];
+import { useEffect, useState, useCallback } from "react";
+import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const placeholderPerformanceData = [
   { month: "Jan", wins: 0, losses: 0 }, { month: "Feb", wins: 0, losses: 0 },
@@ -34,29 +31,74 @@ const chartConfig = {
 
 
 export default function StatsPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [userOverallStats, setUserOverallStats] = useState<StatItem[]>([]);
+  const [participatedTournaments, setParticipatedTournaments] = useState<Tournament[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Actual data fetching would happen here if user is logged in
-  const userOverallStats = placeholderUserOverallStats; // Use placeholder or fetched data
-  const performanceData = placeholderPerformanceData; // Use placeholder or fetched data
+  const fetchUserStats = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const allTournaments = await getTournamentsFromFirestore();
+      const joinedTournaments = allTournaments.filter(t => 
+        t.participants.some(p => p.id === user.uid)
+      );
+      setParticipatedTournaments(joinedTournaments);
+
+      let totalMatchesPlayed = 0;
+      joinedTournaments.forEach(t => {
+        totalMatchesPlayed += t.matches?.length || 0;
+        // Basic estimation for Round Robin if no explicit matches yet
+        if (t.bracketType === "Round Robin" && (!t.matches || t.matches.length === 0) && t.participants.length > 1) {
+            totalMatchesPlayed += (t.participants.length * (t.participants.length - 1) / 2);
+        }
+      });
+      
+      // Placeholder values for stats not yet implemented
+      const tournamentsWon = 0; // Needs backend logic for tracking winners
+      const winRate = "0%"; // Needs match outcome tracking
+      const avgKDRatio = "N/A"; // Highly game-specific, not tracked
+
+      setUserOverallStats([
+        { title: "Tournaments Joined", value: joinedTournaments.length, icon: ListChecks },
+        { title: "Total Matches Played (Est.)", value: totalMatchesPlayed, icon: Swords },
+        { title: "Tournaments Won", value: tournamentsWon, icon: Trophy },
+        // { title: "Win Rate", value: winRate, icon: Percent }, // Hiding until implementable
+        // { title: "Average K/D Ratio", value: avgKDRatio, icon: Zap }, // Hiding until implementable
+      ]);
+
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+      toast({ title: "Error", description: "Could not load your statistics.", variant: "destructive" });
+      setUserOverallStats([
+        { title: "Tournaments Joined", value: 0, icon: ListChecks },
+        { title: "Total Matches Played", value: 0, icon: Swords },
+        { title: "Tournaments Won", value: 0, icon: Trophy },
+      ]);
+    }
+    setIsLoading(false);
+  }, [user, toast]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchUserStats();
+    }
+  }, [authLoading, fetchUserStats]);
 
 
-  if (loading) {
+  if (authLoading || isLoading) {
      return (
       <MainLayout>
         <PageTitle title="My Statistics" />
-        <section className="mb-8">
-          <Skeleton className="h-6 w-48 mb-4" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(4)].map((_, i) => <Card key={i}><CardHeader><Skeleton className="h-5 w-24"/></CardHeader><CardContent><Skeleton className="h-8 w-16"/></CardContent></Card>)}
-          </div>
-        </section>
-        <section className="mb-8">
-          <Card>
-            <CardHeader><Skeleton className="h-6 w-56" /></CardHeader>
-            <CardContent className="h-[350px] w-full p-0"><Skeleton className="h-full w-full"/></CardContent>
-          </Card>
-        </section>
+         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)]">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-3 text-muted-foreground">Loading your stats...</p>
+        </div>
       </MainLayout>
     );
   }
@@ -77,15 +119,19 @@ export default function StatsPage() {
 
   return (
     <MainLayout>
-      <PageTitle title="My Statistics" subtitle="Track your performance and achievements on Apna Esport." />
+      <PageTitle title="My Statistics" subtitle={`Track your performance, ${user.displayName || 'Player'}!`} />
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold mb-4 text-foreground">Overall Performance</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {userOverallStats.map((stat) => (
-            <StatsCard key={stat.title} item={stat} />
-          ))}
-        </div>
+        {userOverallStats.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {userOverallStats.map((stat) => (
+                <StatsCard key={stat.title} item={stat} />
+            ))}
+            </div>
+        ) : (
+            <p className="text-muted-foreground">No performance stats available yet.</p>
+        )}
       </section>
 
       <section className="mb-8">
@@ -94,11 +140,11 @@ export default function StatsPage() {
             <CardTitle className="flex items-center">
               <Activity className="mr-2 h-5 w-5 text-primary" /> Monthly Performance Trend
             </CardTitle>
-            <CardDescription>Your wins and losses over the past few months.</CardDescription>
+            <CardDescription>Your wins and losses over the past few months. (Illustrative Data)</CardDescription>
           </CardHeader>
           <CardContent className="h-[350px] w-full p-0">
              <ChartContainer config={chartConfig} className="min-h-[200px] w-full">
-              <BarChart accessibilityLayer data={performanceData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
+              <BarChart accessibilityLayer data={placeholderPerformanceData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="month"
@@ -127,17 +173,25 @@ export default function StatsPage() {
             <CardDescription>A summary of your participation in recent tournaments.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground">Your tournament history will be displayed here. (Example data)</p>
-            <ul className="mt-4 space-y-3">
-              <li className="p-3 border rounded-md bg-card hover:bg-secondary/50">
-                <h4 className="font-semibold">LoL Summer Skirmish - <span className="text-green-400">1st Place</span></h4>
-                <p className="text-xs text-muted-foreground">June 15, 2024 - League of Legends</p>
-              </li>
-               <li className="p-3 border rounded-md bg-card hover:bg-secondary/50">
-                <h4 className="font-semibold">Valorant Weekly Clash #10 - Top 8</h4>
-                <p className="text-xs text-muted-foreground">June 10, 2024 - Valorant</p>
-              </li>
-            </ul>
+            {participatedTournaments.length > 0 ? (
+                <ul className="mt-4 space-y-3 max-h-96 overflow-y-auto">
+                {participatedTournaments.map(tournament => (
+                    <li key={tournament.id} className="p-3 border rounded-md bg-card hover:bg-secondary/50">
+                        <div className="flex justify-between items-center">
+                            <Link href={`/tournaments/${tournament.id}`} className="font-semibold hover:underline">{tournament.name}</Link>
+                            <Badge variant={tournament.status === "Completed" ? "secondary" : "outline"}>{tournament.status}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {tournament.gameName} - {format(new Date(tournament.startDate), "MMM dd, yyyy")}
+                        </p>
+                         {/* Placeholder for placement, would require more data */}
+                        {/* <p className="text-sm text-green-400">1st Place</p>  */}
+                    </li>
+                ))}
+                </ul>
+            ) : (
+                <p className="text-muted-foreground">You haven't participated in any tournaments yet.</p>
+            )}
           </CardContent>
         </Card>
       </section>

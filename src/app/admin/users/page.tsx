@@ -1,9 +1,9 @@
 
-"use client"; // Added "use client"
+"use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Edit, Ban, ShieldCheck, ShieldAlert, Users } from "lucide-react"; 
+import { UserPlus, Edit, Ban, ShieldCheck, Users, Loader2, ShieldAlert } from "lucide-react"; 
 import Link from "next/link";
 import type { UserProfile } from "@/lib/types"; 
 import {
@@ -17,29 +17,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { ADMIN_EMAIL } from "@/lib/firebase";
-import { useState, useEffect } from "react"; // Added useState and useEffect
-import { useToast } from "@/hooks/use-toast"; // Added useToast
-// For a real backend, you would import Firebase functions e.g.:
-// import { collection, getDocs, query, doc, updateDoc } from "firebase/firestore";
-// import { db } from "@/lib/firebase"; 
-// import { getAuth, admin } from "firebase-admin"; // For setting custom claims (backend)
-
-
-// Placeholder data
-const initialUsers: UserProfile[] = [
-  { 
-    uid: "user1", displayName: "John Doe", email: "john.doe@example.com", photoURL: "https://placehold.co/40x40.png", isAdmin: false,
-    emailVerified: true, isAnonymous: false, metadata: {} as any, providerData: [], refreshToken: '', tenantId: null, delete: async () => {}, getIdToken: async () => '', getIdTokenResult: async () => ({} as any), reload: async () => {}, toJSON: () => ({}), phoneNumber: null, providerId: ''
-  },
-  { 
-    uid: "user2", displayName: "Jane Smith", email: "jane.smith@example.com", photoURL: "https://placehold.co/40x40.png", isAdmin: false,
-    emailVerified: true, isAnonymous: false, metadata: {} as any, providerData: [], refreshToken: '', tenantId: null, delete: async () => {}, getIdToken: async () => '', getIdTokenResult: async () => ({} as any), reload: async () => {}, toJSON: () => ({}), phoneNumber: null, providerId: ''
-  },
-  { 
-    uid: "adminUser", displayName: "Admin User", email: ADMIN_EMAIL, photoURL: "https://placehold.co/40x40.png", isAdmin: true,
-    emailVerified: true, isAnonymous: false, metadata: {} as any, providerData: [], refreshToken: '', tenantId: null, delete: async () => {}, getIdToken: async () => '', getIdTokenResult: async () => ({} as any), reload: async () => {}, toJSON: () => ({}), phoneNumber: null, providerId: ''
-  },
-];
+import { useState, useEffect, useCallback } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { getAllUsersFromFirestore, updateUserAdminStatusInFirestore } from "@/lib/tournamentStore";
+import { useAuth } from "@/contexts/AuthContext";
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -47,58 +28,69 @@ const getInitials = (name: string | null | undefined) => {
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<UserProfile[]>(initialUsers);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const { toast } = useToast();
-  // const [isLoading, setIsLoading] = useState(true);
+  const { user: currentUser } = useAuth(); // Get the currently logged-in admin
+  const [isLoading, setIsLoading] = useState(true);
+  const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null); // Store UID of user being updated
 
-  // Example: Fetch users from Firestore (uncomment and adapt)
-  // useEffect(() => {
-  //   const fetchUsers = async () => {
-  //     setIsLoading(true);
-  //     try {
-  //       // const usersCollectionRef = collection(db, "users");
-  //       // const usersSnapshot = await getDocs(query(usersCollectionRef));
-  //       // const fetchedUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), uid: doc.id } as UserProfile));
-  //       // setUsers(fetchedUsers);
-  //       setUsers(initialUsers); // Using placeholder
-  //     } catch (error) {
-  //       console.error("Error fetching users:", error);
-  //       toast({ title: "Error", description: "Could not fetch users.", variant: "destructive" });
-  //     }
-  //     setIsLoading(false);
-  //   };
-  //   fetchUsers();
-  // }, [toast]);
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedUsers = await getAllUsersFromFirestore();
+      setUsers(fetchedUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      toast({ title: "Error", description: "Could not fetch users.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  }, [toast]);
 
-  const handleToggleAdmin = async (userId: string, currentIsAdmin: boolean | undefined, displayName: string | null) => {
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleToggleAdmin = async (userIdToUpdate: string, currentIsAdmin: boolean | undefined, displayName: string | null) => {
+    if (currentUser && userIdToUpdate === currentUser.uid) {
+        toast({ title: "Action Not Allowed", description: "You cannot change your own admin status.", variant: "destructive" });
+        return;
+    }
+    if (users.find(u => u.uid === userIdToUpdate)?.email === ADMIN_EMAIL && currentIsAdmin) {
+         toast({ title: "Action Not Allowed", description: `The primary admin (${ADMIN_EMAIL}) cannot be demoted.`, variant: "destructive" });
+        return;
+    }
+
     const newIsAdmin = !currentIsAdmin;
     if (confirm(`Are you sure you want to ${newIsAdmin ? 'promote' : 'demote'} ${displayName || 'this user'} ${newIsAdmin ? 'to' : 'from'} admin?`)) {
-      // setIsLoading(true);
+      setIsUpdatingRole(userIdToUpdate);
       try {
-        // TODO: Implement backend logic to set custom claims for admin role
-        // This typically involves a Firebase Function callable from the client or an admin SDK on a server.
-        // Example (conceptual - requires backend):
-        // await setAdminClaim({ userId, isAdmin: newIsAdmin }); // This would be a call to your Firebase Function
-
-        // For client-side simulation/update in Firestore user document:
-        // await updateDoc(doc(db, "users", userId), { isAdmin: newIsAdmin });
-        
-        setUsers(users.map(u => u.uid === userId ? { ...u, isAdmin: newIsAdmin } : u));
+        await updateUserAdminStatusInFirestore(userIdToUpdate, newIsAdmin);
         toast({ title: "User Role Updated", description: `${displayName || 'User'}'s role has been changed.` });
+        await fetchUsers(); // Re-fetch users to reflect changes
       } catch (error) {
         console.error("Error updating user role:", error);
         toast({ title: "Error", description: "Could not update user role.", variant: "destructive" });
+      } finally {
+        setIsUpdatingRole(null);
       }
-      // setIsLoading(false);
     }
   };
   
   const handleBanUser = (userId: string, displayName: string | null) => {
-    // TODO: Implement ban logic (e.g., disable Firebase Auth user, set 'banned' flag in Firestore)
-    alert(`Simulating ban for user: ${displayName || userId}. This requires backend implementation.`);
+    // This is a placeholder. True user banning requires Firebase Admin SDK (backend).
+    // For UI simulation, you could add an `isBanned` flag to the user's Firestore document.
+    alert(`Simulating ban for user: ${displayName || userId}. This requires backend implementation to disable Firebase Auth user.`);
+    toast({ title: "Ban Action (Simulated)", description: `Banning ${displayName || userId} would typically involve backend actions.`});
   };
 
-  // if (isLoading) return <p>Loading users...</p>;
+  if (isLoading) {
+    return (
+         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p className="mt-4 text-lg text-muted-foreground">Loading users...</p>
+        </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -107,7 +99,6 @@ export default function AdminUsersPage() {
         subtitle="View, edit roles, and manage platform users."
         actions={
           <Button asChild disabled>
-            {/* Link to a "Create User" page if needed, or handle via Firebase console */}
             <Link href="#"> 
               <UserPlus className="mr-2 h-4 w-4" /> Add New User (Manual - Disabled)
             </Link>
@@ -122,7 +113,7 @@ export default function AdminUsersPage() {
               <TableHead>User</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="hidden md:table-cell">Joined</TableHead>
               <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -133,10 +124,10 @@ export default function AdminUsersPage() {
                   <div className="flex items-center gap-3">
                     <Avatar>
                       <AvatarImage 
-                        src={user.photoURL || "https://placehold.co/40x40.png"} 
+                        src={user.photoURL || ""} 
                         alt={user.displayName || "User"} 
                         data-ai-hint="user avatar"
-                        onError={(e) => e.currentTarget.src = "https://placehold.co/40x40.png"}
+                        onError={(e) => e.currentTarget.src = `https://placehold.co/40x40.png?text=${getInitials(user.displayName)}`}
                       />
                       <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                     </Avatar>
@@ -146,30 +137,31 @@ export default function AdminUsersPage() {
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   {user.isAdmin ? (
-                    <Badge variant="destructive"><ShieldAlert className="mr-1 h-3 w-3"/>Admin</Badge>
+                    <Badge variant="destructive" className="whitespace-nowrap"><ShieldAlert className="mr-1 h-3 w-3"/>Admin</Badge>
                   ) : (
                     <Badge variant="secondary">Player</Badge>
                   )}
                 </TableCell>
-                <TableCell>
-                  <Badge variant="outline">Active</Badge> 
+                <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                    {user.createdAt ? new Date(user.createdAt.seconds * 1000).toLocaleDateString() : 'N/A'}
                 </TableCell>
-                <TableCell className="space-x-2 whitespace-nowrap">
-                  <Button variant="outline" size="sm" title="Edit User Details (Coming Soon)" disabled>
+                <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap">
+                  <Button variant="outline" size="icon" title="Edit User Details (Coming Soon)" disabled className="h-8 w-8 sm:h-9 sm:w-9">
                     <Edit className="h-4 w-4" />
                   </Button>
-                   {user.email !== ADMIN_EMAIL && ( 
+                   {user.email !== ADMIN_EMAIL && user.uid !== currentUser?.uid && ( 
                     <>
                      <Button 
                         variant={user.isAdmin ? "secondary" : "default"} 
-                        size="sm" 
+                        size="icon" 
                         title={user.isAdmin ? "Demote to Player" : "Promote to Admin"}
                         onClick={() => handleToggleAdmin(user.uid, user.isAdmin, user.displayName)}
-                        // disabled={isLoading}
+                        disabled={isUpdatingRole === user.uid}
+                        className="h-8 w-8 sm:h-9 sm:w-9"
                       >
-                        {user.isAdmin ? <Users className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+                        {isUpdatingRole === user.uid ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.isAdmin ? <Users className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />) }
                       </Button>
-                      <Button variant="destructive" size="sm" title="Ban User" onClick={() => handleBanUser(user.uid, user.displayName)} /*disabled={isLoading}*/>
+                      <Button variant="destructive" size="icon" title="Ban User (Simulated)" onClick={() => handleBanUser(user.uid, user.displayName)} className="h-8 w-8 sm:h-9 sm:w-9">
                         <Ban className="h-4 w-4" />
                       </Button>
                     </>
