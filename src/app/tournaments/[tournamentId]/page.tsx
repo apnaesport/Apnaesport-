@@ -8,15 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle } from "lucide-react"; // Added AlertTriangle
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle } from "lucide-react"; 
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentDetails as fetchTournamentDetails, subscribe, addTournament } from "@/lib/tournamentStore"; // Updated imports
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { getTournamentDetails as fetchTournamentDetails, subscribe, addTournament as upsertTournamentInStore } from "@/lib/tournamentStore"; 
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 
 interface TournamentPageProps {
@@ -28,11 +29,13 @@ export default function TournamentPage({ params }: TournamentPageProps) {
   const [tournament, setTournament] = useState<Tournament | undefined>(undefined);
   const { user } = useAuth(); 
   const router = useRouter(); 
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isRegistered, setIsRegistered] = useState(false);
 
   useEffect(() => {
     const loadTournament = () => {
+      setIsLoading(true);
       const fetchedTournament = fetchTournamentDetails(tournamentId);
       setTournament(fetchedTournament);
       if (fetchedTournament && user) {
@@ -42,9 +45,9 @@ export default function TournamentPage({ params }: TournamentPageProps) {
     };
 
     loadTournament();
-    const unsubscribe = subscribe(loadTournament); // Re-fetch on store changes
+    const unsubscribe = subscribe(loadTournament); 
     return () => unsubscribe();
-  }, [tournamentId, user]); // Rerun if user changes to update registration status
+  }, [tournamentId, user]); 
 
   const handleJoinTournament = () => {
     if (!user) {
@@ -52,38 +55,19 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       return;
     }
     if (tournament && !isRegistered && tournament.participants.length < tournament.maxParticipants) {
-      const updatedParticipants: Participant[] = [...tournament.participants, { id: user.uid, name: user.displayName || "Anonymous", avatarUrl: user.photoURL || undefined }];
+      const newParticipant: Participant = { 
+        id: user.uid, 
+        name: user.displayName || "Anonymous Player", 
+        avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
+      };
+      const updatedParticipants = [...tournament.participants, newParticipant];
       const updatedTournament: Tournament = { ...tournament, participants: updatedParticipants };
       
-      // This would ideally be an API call to update the tournament on the backend.
-      // For prototype, we update the store directly (if store supports update, otherwise re-add)
-      // Let's simulate by re-adding which will update it due to ID collision (not ideal for production)
-      // A proper store would have an updateTournament function.
-      // For simplicity, we'll rely on the subscription to re-fetch, assuming `addTournament` can also update.
-      // Or better, modify the store to allow updates.
-      // For now, let's assume addTournament replaces if ID exists or we modify it locally then re-render.
-      
-      // Simulating update:
-      const currentTournaments = fetchTournamentDetails(tournamentId); // get all
-      if (currentTournaments) { // Check if currentTournaments is not undefined
-        const index = currentTournaments ? currentTournaments.id === tournamentId ? 0 : -1 : -1; //This line needs fixing as currentTournaments is not an array
-         if (index !== -1) {
-          // A proper update function would be better in tournamentStore.ts
-          // For now, we'll just update the local state and rely on the store update if possible.
-          // This is a hacky way for the prototype to show immediate effect.
-          // @ts-ignore / This part is tricky without a proper update function in the store.
-          // For now, let's just update local state and hope store updates are handled correctly.
-          // A more robust way would be to have an `updateTournamentInStore` function.
-         }
-      }
+      upsertTournamentInStore(updatedTournament); // This will update the tournament in the store
 
-
-      setTournament(updatedTournament); // Optimistic UI update
-      setIsRegistered(true);
-
-      // Simulate saving to store (this part needs better handling in store)
-      // This would replace addTournament with updateTournament if it existed
-      addTournament(updatedTournament); // This will replace if ID is the same in a simple store.
+      // Optimistic UI updates are handled by the subscription useEffect
+      // setTournament(updatedTournament); 
+      // setIsRegistered(true);
 
       toast({
         title: "Successfully Registered!",
@@ -98,14 +82,6 @@ export default function TournamentPage({ params }: TournamentPageProps) {
     }
   };
 
-  // Helper for toast - needs to be imported or defined
-  const toast = (options: { title: string; description?: string; variant?: "default" | "destructive" }) => {
-    // Basic toast implementation, replace with actual useToast hook if available globally
-    console.log(`Toast: ${options.title} - ${options.description}`);
-    if (typeof window !== 'undefined' && window.alert) { // Check if window.alert is available
-      window.alert(`${options.title}${options.description ? ': ' + options.description : ''}`);
-    }
-  };
 
   if (isLoading) {
     return (
@@ -149,7 +125,9 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         <Image 
           src={tournament.bannerImageUrl} 
           alt={`${tournament.name} banner`} 
-          layout="fill" 
+          fill
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+          priority
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports event stage"
@@ -158,7 +136,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6 md:p-8">
           <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-sm px-3 py-1">{tournament.status}</Badge>
-          <PageTitle title={tournament.name} className="mb-0 text-shadow" />
+          <PageTitle title={tournament.name} className="mb-0 text-shadow text-white" /> {/* Ensure text is visible on banner */}
           <div className="flex items-center mt-2 text-sm text-slate-200 drop-shadow-sm">
             <Image 
               src={tournament.gameIconUrl} 

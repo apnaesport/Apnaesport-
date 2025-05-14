@@ -1,5 +1,5 @@
 
-"use client"; // Add "use client"
+"use client"; 
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamentCard";
@@ -7,70 +7,69 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
-import { getTournaments, getGames, subscribe } from "@/lib/tournamentStore"; // Import from store
-import { useEffect, useState } from "react"; // Import useEffect and useState
-
-// Placeholder data - replace with actual data fetching
-const placeholderStats: StatItem[] = [
-  { title: "Active Tournaments", value: 0, icon: "Trophy" as LucideIconName, change: "+0" }, // Value updated dynamically
-  { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, // Static for now
-  { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, // Static for now
-  { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, // Static for now
-];
+import { getTournaments, getGames, subscribe } from "@/lib/tournamentStore"; 
+import { useEffect, useState } from "react"; 
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function DashboardPage() {
   const [featuredTournament, setFeaturedTournament] = useState<Tournament | undefined>(undefined);
   const [liveTournaments, setLiveTournaments] = useState<Tournament[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [stats, setStats] = useState<StatItem[]>(placeholderStats);
+  const [stats, setStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadData = () => {
+      setIsLoading(true);
       const allTournaments = getTournaments();
       const allGames = getGames();
 
-      // Find featured tournament (e.g., first upcoming with 'featured: true' or just first upcoming)
       const ft = allTournaments.find(t => t.featured && t.status === "Upcoming") || 
                    allTournaments.find(t => t.status === "Upcoming") || 
-                   allTournaments[0]; // Fallback
+                   allTournaments[0]; 
       setFeaturedTournament(ft);
 
       setLiveTournaments(allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing"));
       setGames(allGames);
       
-      // Update stats based on current data
-      setStats(prevStats => prevStats.map(stat => {
-        if (stat.title === "Active Tournaments") {
-          const activeCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
-          // Basic change detection simulation
-          const prevActiveCount = parseInt(stat.value as string) || 0;
-          const change = activeCount - prevActiveCount;
-          return { ...stat, value: activeCount.toString(), change: change >= 0 ? `+${change}` : `${change}` };
-        }
-        return stat;
-      }));
+      const activeTournamentCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
+      // Note: Other stats are placeholders as they need specific user data or more complex calculations
+      const placeholderStats: StatItem[] = [
+        { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" }, // Dynamic
+        { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, // Static placeholder
+        { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, // Static placeholder
+        { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, // Static placeholder
+      ];
+      setStats(placeholderStats);
 
       setIsLoading(false);
     };
 
-    loadData(); // Initial load
-    const unsubscribe = subscribe(loadData); // Subscribe to changes in the store
+    loadData(); 
+    const unsubscribe = subscribe(loadData); 
 
-    return () => unsubscribe(); // Cleanup subscription
+    return () => unsubscribe(); 
   }, []);
 
 
   if (isLoading) {
-    // You can return a skeleton loader here
     return (
       <div className="space-y-8">
         <PageTitle title="Dashboard" subtitle="Welcome back to TournamentHub!" />
-         {/* Add skeleton loaders for sections */}
-        <div className="h-80 w-full bg-muted animate-pulse rounded-lg"></div>
-        <div className="h-40 w-full bg-muted animate-pulse rounded-lg"></div>
-        <div className="h-20 w-full bg-muted animate-pulse rounded-lg"></div>
+        <Skeleton className="h-80 w-full rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-40 w-full rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+            <Skeleton className="h-28 w-full rounded-lg" />
+        </div>
+        <Skeleton className="h-48 w-full rounded-lg" />
       </div>
     );
   }

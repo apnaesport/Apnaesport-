@@ -3,23 +3,14 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import type { StatItem } from "@/lib/types";
-// Removed direct icon imports as they will be handled in StatsCard
-// import { Users, Swords, Gamepad2, Activity, DollarSign, Eye } from "lucide-react";
+import type { StatItem, Tournament } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts"; // Removed RechartsTooltip as it's not used
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts";
+import { useEffect, useState } from "react";
+import { getTournaments, subscribe } from "@/lib/tournamentStore";
 
-// Placeholder admin stats
-const platformAnalytics: StatItem[] = [
-  { title: "Total Registered Users", value: "1,250", icon: "Users" },
-  { title: "Total Tournaments Hosted", value: 85, icon: "Swords" },
-  { title: "Total Matches Played", value: "3,420", icon: "Gamepad2" },
-  { title: "Daily Active Users (Avg)", value: 230, icon: "Eye" },
-  // { title: "Total Revenue (Placeholder)", value: "$5,670", icon: "DollarSign" },
-];
-
-// Placeholder data for charts
+// Placeholder data for charts - making these dynamic from store would be complex for now
 const userGrowthData = [
   { date: "2024-01-01", users: 100 }, { date: "2024-02-01", users: 150 },
   { date: "2024-03-01", users: 220 }, { date: "2024-04-01", users: 310 },
@@ -44,12 +35,46 @@ const chartConfigTournamentActivity = {
 
 
 export default function AdminAnalyticsPage() {
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [platformAnalytics, setPlatformAnalytics] = useState<StatItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = () => {
+      setIsLoading(true);
+      const currentTournaments = getTournaments();
+      setTournaments(currentTournaments);
+
+      const totalMatchesPlayed = currentTournaments.reduce((acc, t) => acc + (t.matches?.length || 0), 0);
+      
+      // Note: "Total Registered Users" and "Daily Active Users" are placeholders without a backend.
+      const placeholderTotalUsers = "1,250"; // This would come from a user service
+      const placeholderDailyActive = 230; // This would come from analytics service
+
+      setPlatformAnalytics([
+        { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, // Placeholder
+        { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, // Dynamic
+        { title: "Total Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" }, // Dynamic (based on current matches in store)
+        { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, // Placeholder
+      ]);
+      setIsLoading(false);
+    };
+
+    loadData();
+    const unsubscribe = subscribe(loadData);
+    return () => unsubscribe();
+  }, []);
+
+  if (isLoading) {
+    return <p>Loading analytics...</p>;
+  }
+
   return (
     <div className="space-y-8">
       <PageTitle title="Platform Analytics" subtitle="Key metrics and insights for TournamentHub." />
 
       <section>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"> {/* Adjusted from xl:grid-cols-3 to lg:grid-cols-3 for consistency */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {platformAnalytics.map((stat) => (
             <StatsCard key={stat.title} item={stat} className="bg-card border-border"/>
           ))}
@@ -60,10 +85,10 @@ export default function AdminAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>User Growth</CardTitle>
-            <CardDescription>Total registered users over time.</CardDescription>
+            <CardDescription>Total registered users over time. (Illustrative)</CardDescription>
           </CardHeader>
-          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]"> {/* Changed fixed height to min-height */}
-            <ChartContainer config={chartConfigUserGrowth} className="min-h-[300px] w-full h-full"> {/* Ensured chart container takes full height of parent */}
+          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]">
+            <ChartContainer config={chartConfigUserGrowth} className="min-h-[300px] w-full h-full">
               <LineChart accessibilityLayer data={userGrowthData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
                 <CartesianGrid vertical={false} strokeDasharray="3 3"/>
                 <XAxis dataKey="date" tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', year: '2-digit' })} tickLine={false} axisLine={false} tickMargin={10} />
@@ -79,10 +104,10 @@ export default function AdminAnalyticsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Tournament Activity</CardTitle>
-            <CardDescription>Number of tournaments created vs. completed per month.</CardDescription>
+            <CardDescription>Number of tournaments created vs. completed per month. (Illustrative)</CardDescription>
           </CardHeader>
-          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]"> {/* Changed fixed height to min-height */}
-            <ChartContainer config={chartConfigTournamentActivity} className="min-h-[300px] w-full h-full"> {/* Ensured chart container takes full height of parent */}
+          <CardContent className="w-full p-0 min-h-[300px] md:min-h-[350px]">
+            <ChartContainer config={chartConfigTournamentActivity} className="min-h-[300px] w-full h-full">
               <BarChart accessibilityLayer data={tournamentActivityData} margin={{ top: 20, right: 20, left: 0, bottom: 5 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
@@ -97,14 +122,12 @@ export default function AdminAnalyticsPage() {
         </Card>
       </div>
       
-      {/* Placeholder for more detailed reports or tables */}
       <Card>
         <CardHeader>
           <CardTitle>Popular Games</CardTitle>
-          <CardDescription>Most frequently featured games in tournaments.</CardDescription>
+          <CardDescription>Most frequently featured games in tournaments. (Placeholder)</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* TODO: Replace with a table or list of popular games */}
           <p className="text-muted-foreground">Data on popular games will be displayed here.</p>
         </CardContent>
       </Card>

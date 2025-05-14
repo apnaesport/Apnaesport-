@@ -1,28 +1,63 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
-import { StatsCard } from "@/components/dashboard/StatsCard"; // Reusing StatsCard
-import type { StatItem } from "@/lib/types";
-import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react"; // Kept for quickActions, not StatsCard
+import { StatsCard } from "@/components/dashboard/StatsCard";
+import type { StatItem, Game, Tournament } from "@/lib/types";
+import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-
-// Placeholder admin stats - replace with actual data
-const adminStats: StatItem[] = [
-  { title: "Total Users", value: "1,250", icon: "Users", change: "+20 this week" },
-  { title: "Active Tournaments", value: 15, icon: "Swords", change: "+3" },
-  { title: "Supported Games", value: 8, icon: "Gamepad2" },
-  { title: "Pending Approvals", value: 3, icon: "Bell", change: "Action needed" },
-];
+import { useEffect, useState } from "react";
+import { getGames, getTournaments, subscribe } from "@/lib/tournamentStore";
 
 const quickActions = [
-    {label: "Create Tournament", href: "/admin/tournaments/new", icon: PlusCircle},
+    {label: "Create Tournament", href: "/tournaments/new", icon: PlusCircle},
     {label: "Manage Users", href: "/admin/users", icon: Users},
     {label: "Add New Game", href: "/admin/games", icon: Gamepad2},
     {label: "Send Notification", href: "/admin/notifications", icon: Bell},
-]
+];
 
 export default function AdminDashboardPage() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [adminStats, setAdminStats] = useState<StatItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = () => {
+      setIsLoading(true);
+      const currentGames = getGames();
+      const currentTournaments = getTournaments();
+      setGames(currentGames);
+      setTournaments(currentTournaments);
+
+      const activeTournaments = currentTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
+      
+      // Note: "Total Users" and "Pending Approvals" are placeholders without a backend for users.
+      const placeholderTotalUsers = "1,250"; // This would come from a user service
+      const placeholderPendingApprovals = 3; // This would come from an approval system
+
+      setAdminStats([
+        { title: "Total Users", value: placeholderTotalUsers, icon: "Users", change: "+0 this week" }, // Placeholder
+        { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: "" }, // Dynamic
+        { title: "Supported Games", value: currentGames.length, icon: "Gamepad2" }, // Dynamic
+        { title: "Pending Approvals", value: placeholderPendingApprovals, icon: "Bell", change: "Action needed" }, // Placeholder
+      ]);
+      setIsLoading(false);
+    };
+    
+    loadData();
+    const unsubscribe = subscribe(loadData);
+    return () => unsubscribe();
+  }, []);
+
+
+  if (isLoading) {
+    // Basic loading state, can be enhanced with skeletons
+    return <p>Loading admin dashboard...</p>;
+  }
+
   return (
     <div className="space-y-8">
       <PageTitle title="Admin Dashboard" subtitle="Oversee and manage TournamentHub." />
