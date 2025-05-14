@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Edit3, LogIn, Save, Loader2 } from "lucide-react";
+import { Shield, Edit3, LogIn, Save, Loader2, Gamepad2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -19,64 +19,72 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
-import type { UserProfile } from "@/lib/types";
-import { updateUserProfileInFirestore, getUserProfileFromFirestore } from "@/lib/tournamentStore";
-import { updateProfile as updateFirebaseProfile } from "firebase/auth"; // For Firebase Auth display name
+import type { UserProfile, Game } from "@/lib/types";
+import { updateUserProfileInFirestore, getUserProfileFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore";
+import { updateProfile as updateFirebaseProfile } from "firebase/auth"; 
 import { auth } from "@/lib/firebase";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters."),
   bio: z.string().max(500, "Bio can be max 500 characters.").optional(),
-  favoriteGames: z.string().max(200, "Favorite games list too long.").optional(),
+  favoriteGameIds: z.array(z.string()).optional(),
   streamingChannelUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
-  // photoURL is handled separately for now
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, setUser: setAuthContextUser } = useAuth(); // Get setUser to update context
+  const { user, loading: authLoading, setUser: setAuthContextUser } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
+  const [availableGames, setAvailableGames] = useState<Game[]>([]);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
       displayName: "",
       bio: "",
-      favoriteGames: "",
+      favoriteGameIds: [],
       streamingChannelUrl: "",
     },
   });
 
-  const fetchUserProfile = useCallback(async (uid: string) => {
+  const fetchUserProfileAndGames = useCallback(async (uid: string) => {
     setPageLoading(true);
     try {
-      const userProfile = await getUserProfileFromFirestore(uid);
+      const [userProfile, games] = await Promise.all([
+        getUserProfileFromFirestore(uid),
+        getGamesFromFirestore()
+      ]);
+      
+      setAvailableGames(games);
+
       if (userProfile) {
         form.reset({
           displayName: userProfile.displayName || "",
           bio: userProfile.bio || "",
-          favoriteGames: userProfile.favoriteGames || "",
+          favoriteGameIds: userProfile.favoriteGameIds || [],
           streamingChannelUrl: userProfile.streamingChannelUrl || "",
         });
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
-      toast({ title: "Error", description: "Could not load your profile data.", variant: "destructive" });
+      console.error("Error fetching profile or games:", error);
+      toast({ title: "Error", description: "Could not load your profile data or game list.", variant: "destructive" });
     }
     setPageLoading(false);
   }, [form, toast]);
 
   useEffect(() => {
     if (!authLoading && user) {
-      fetchUserProfile(user.uid);
+      fetchUserProfileAndGames(user.uid);
     } else if (!authLoading && !user) {
-      setPageLoading(false); // Not logged in, stop loading
+      setPageLoading(false); 
     }
-  }, [user, authLoading, fetchUserProfile]);
+  }, [user, authLoading, fetchUserProfileAndGames]);
 
 
   const getInitials = (name: string | null | undefined) => {
@@ -91,25 +99,22 @@ export default function ProfilePage() {
     }
     setIsSubmitting(true);
     try {
-      // Update Firestore document
+      
       await updateUserProfileInFirestore(user.uid, {
         displayName: data.displayName,
         bio: data.bio,
-        favoriteGames: data.favoriteGames,
+        favoriteGameIds: data.favoriteGameIds,
         streamingChannelUrl: data.streamingChannelUrl,
       });
 
-      // Update Firebase Auth display name if it changed
       if (auth.currentUser && auth.currentUser.displayName !== data.displayName) {
         await updateFirebaseProfile(auth.currentUser, { displayName: data.displayName });
       }
       
-      // Update AuthContext state
       const updatedUserProfile = await getUserProfileFromFirestore(user.uid);
       if (updatedUserProfile) {
-        setAuthContextUser(updatedUserProfile); // This updates the user object in AuthContext
+        setAuthContextUser(updatedUserProfile); 
       }
-
 
       toast({ title: "Profile Updated", description: "Your profile information has been saved." });
     } catch (error) {
@@ -164,7 +169,7 @@ export default function ProfilePage() {
           <Card className="text-center">
             <CardHeader>
               <Avatar className="h-32 w-32 mx-auto mb-4 border-4 border-primary shadow-lg">
-                <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} />
+                <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} data-ai-hint="user avatar" />
                 <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
                   {getInitials(user.displayName)}
                 </AvatarFallback>
@@ -178,7 +183,7 @@ export default function ProfilePage() {
               )}
             </CardHeader>
             <CardContent>
-              <Button variant="outline" disabled> {/* Photo upload not implemented in this iteration */}
+              <Button variant="outline" disabled> 
                 <Edit3 className="mr-2 h-4 w-4" /> Change Profile Picture
               </Button>
             </CardContent>
@@ -207,11 +212,40 @@ export default function ProfilePage() {
                   <Textarea id="bio" {...form.register("bio")} placeholder="Tell us a bit about yourself..." disabled={isSubmitting} rows={3}/>
                   {form.formState.errors.bio && <p className="text-destructive text-xs mt-1">{form.formState.errors.bio.message}</p>}
                 </div>
-                 <div>
-                  <Label htmlFor="favoriteGames">Favorite Games</Label>
-                  <Input id="favoriteGames" {...form.register("favoriteGames")} placeholder="e.g., Valorant, CS:GO, LoL" disabled={isSubmitting}/>
-                  {form.formState.errors.favoriteGames && <p className="text-destructive text-xs mt-1">{form.formState.errors.favoriteGames.message}</p>}
+                
+                <div>
+                  <Label>Favorite Games</Label>
+                   <Controller
+                    name="favoriteGameIds"
+                    control={form.control}
+                    render={({ field }) => (
+                      <ScrollArea className="h-40 w-full rounded-md border p-4 mt-1">
+                        {availableGames.length > 0 ? availableGames.map((game) => (
+                          <div key={game.id} className="flex items-center space-x-2 mb-2">
+                            <Checkbox
+                              id={`fav-game-${game.id}`}
+                              checked={field.value?.includes(game.id)}
+                              onCheckedChange={(checked) => {
+                                const currentFavs = field.value || [];
+                                if (checked) {
+                                  field.onChange([...currentFavs, game.id]);
+                                } else {
+                                  field.onChange(currentFavs.filter((id) => id !== game.id));
+                                }
+                              }}
+                              disabled={isSubmitting}
+                            />
+                            <Label htmlFor={`fav-game-${game.id}`} className="font-normal cursor-pointer">
+                              {game.name}
+                            </Label>
+                          </div>
+                        )) : <p className="text-sm text-muted-foreground">No games available to select.</p>}
+                      </ScrollArea>
+                    )}
+                  />
+                  {form.formState.errors.favoriteGameIds && <p className="text-destructive text-xs mt-1">{form.formState.errors.favoriteGameIds.message}</p>}
                 </div>
+
                  <div>
                   <Label htmlFor="streamingChannelUrl">Streaming Channel URL</Label>
                   <Input id="streamingChannelUrl" {...form.register("streamingChannelUrl")} placeholder="https://twitch.tv/yourchannel" disabled={isSubmitting}/>

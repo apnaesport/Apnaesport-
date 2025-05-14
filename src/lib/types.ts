@@ -13,7 +13,8 @@ export interface UserProfile extends FirebaseUser {
   isAdmin?: boolean;
   createdAt?: Timestamp; 
   bio?: string; 
-  favoriteGames?: string; 
+  favoriteGames?: string; // Kept for a short while for smoother transition if needed, but new logic uses favoriteGameIds
+  favoriteGameIds?: string[]; // New field for storing an array of favorite game IDs
   streamingChannelUrl?: string; 
 }
 
@@ -70,8 +71,8 @@ export type Tournament = {
   updatedAt?: Timestamp;
   entryFee?: number; 
   currency?: string; 
-  sponsorName?: string; // New
-  sponsorLogoUrl?: string; // New
+  sponsorName?: string; 
+  sponsorLogoUrl?: string; 
 };
 
 export type TournamentFormDataUI = {
@@ -89,8 +90,8 @@ export type TournamentFormDataUI = {
   featured?: boolean;
   entryFee?: number; 
   currency?: string; 
-  sponsorName?: string; // New
-  sponsorLogoUrl?: string; // New
+  sponsorName?: string; 
+  sponsorLogoUrl?: string; 
 };
 
 

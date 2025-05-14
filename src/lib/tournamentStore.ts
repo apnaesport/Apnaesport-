@@ -50,8 +50,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined, // Ensure it's a Timestamp
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined, // Ensure it's a Timestamp
+      createdAt: data.createdAt instanceof Timestamp ? data.createdAt : undefined, 
+      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt : undefined, 
     } as Game;
   });
 };
@@ -204,15 +204,7 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
   
-  // Prevent accidentally overwriting participants array with undefined if not explicitly passed
   if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
-    // This condition is tricky. If 'participants' key is in restData but its value is undefined,
-    // it means we want to set it to undefined/delete it.
-    // If 'participants' is NOT in restData at all, we don't want to touch it.
-    // The current logic of spreading restData will handle this:
-    // if `participants` is in `restData` (even as undefined), it will be included.
-    // if `participants` is NOT in `restData`, it won't be.
-    // Let's be more explicit to avoid accidentally deleting it with `undefined`
     if (restData.participants === undefined && !tournamentData.hasOwnProperty('participants')) {
         delete updateData.participants;
     }
@@ -267,6 +259,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
   // Create in Firebase Console if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
+  // (Replace battlezone-faa03 with your actual project ID if different)
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -294,7 +287,8 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp, 
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "",
+      favoriteGames: data.favoriteGames || "", // Maintained for short-term compatibility
+      favoriteGameIds: data.favoriteGameIds || [], // New field
       streamingChannelUrl: data.streamingChannelUrl || "",
       // Dummy FirebaseUser properties - not fully populated from Firestore
       emailVerified: data.emailVerified || false,
@@ -328,7 +322,8 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp, 
       bio: data.bio || "",
-      favoriteGames: data.favoriteGames || "",
+      favoriteGames: data.favoriteGames || "", // Maintained
+      favoriteGameIds: data.favoriteGameIds || [], // New field
       streamingChannelUrl: data.streamingChannelUrl || "",
       // Dummy FirebaseUser properties
       emailVerified: data.emailVerified || false,
@@ -353,9 +348,14 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGames' | 'streamingChannelUrl'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGames' | 'favoriteGameIds' | 'streamingChannelUrl'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
-  await updateDoc(userRef, { ...profileData, updatedAt: serverTimestamp() });
+  // Ensure favoriteGameIds is an array, even if undefined is passed for other fields
+  const dataToUpdate = { ...profileData };
+  if (profileData.hasOwnProperty('favoriteGameIds') && !Array.isArray(profileData.favoriteGameIds)) {
+    dataToUpdate.favoriteGameIds = []; // Default to empty array if not an array
+  }
+  await updateDoc(userRef, { ...dataToUpdate, updatedAt: serverTimestamp() });
 };
 
 

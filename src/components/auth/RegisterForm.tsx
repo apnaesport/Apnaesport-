@@ -63,7 +63,8 @@ export function RegisterForm() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         bio: "",
-        favoriteGames: "",
+        favoriteGames: "", // Maintained for short-term compatibility
+        favoriteGameIds: [], // Initialize as empty array
         streamingChannelUrl: "",
       });
 
