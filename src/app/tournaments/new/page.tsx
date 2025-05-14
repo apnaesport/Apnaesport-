@@ -16,12 +16,12 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
 import { CalendarIcon, PlusCircle, Loader2, LogIn } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { addTournament, getGames as fetchGamesFromStore } from "@/lib/tournamentStore"; 
+import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 
 
@@ -29,12 +29,12 @@ const tournamentSchema = z.object({
   name: z.string().min(5, "Tournament name must be at least 5 characters."),
   gameId: z.string().min(1, "Please select a game."),
   description: z.string().min(20, "Description must be at least 20 characters.").max(500, "Description must be 500 characters or less."),
-  startDate: z.date({ required_error: "Start date is required."}),
+  startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), // Prevent past dates
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
   prizePool: z.string().optional(),
   bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
   rules: z.string().optional(),
-  registrationInstructions: z.string().optional(), // New field
+  registrationInstructions: z.string().optional(),
   bannerImageFile: z.custom<FileList>().optional(), 
   bannerImageDataUri: z.string().optional(), 
 });
@@ -47,6 +47,7 @@ export default function CreateTournamentPage() {
   const { toast } = useToast();
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const form = useForm<TournamentFormDataUI>({
@@ -65,17 +66,27 @@ export default function CreateTournamentPage() {
     },
   });
 
-  useEffect(() => {
+  const fetchGames = useCallback(async () => {
     setIsLoadingGames(true);
-    const gamesFromStore = fetchGamesFromStore();
-    setAvailableGames(gamesFromStore);
-    setIsLoadingGames(false);
-    
-    const preselectedGameId = searchParams.get("gameId");
-    if (preselectedGameId && gamesFromStore.some(g => g.id === preselectedGameId)) {
-      form.setValue("gameId", preselectedGameId);
+    try {
+      const gamesFromDb = await getGamesFromFirestore();
+      setAvailableGames(gamesFromDb);
+      const preselectedGameId = searchParams.get("gameId");
+      if (preselectedGameId && gamesFromDb.some(g => g.id === preselectedGameId)) {
+        form.setValue("gameId", preselectedGameId);
+      }
+    } catch (error) {
+      console.error("Error fetching games:", error);
+      toast({ title: "Error", description: "Could not load games.", variant: "destructive" });
     }
-  }, [searchParams, form]);
+    setIsLoadingGames(false);
+  }, [searchParams, form, toast]);
+
+  useEffect(() => {
+    if (user) { // Fetch games only if user is logged in
+        fetchGames();
+    }
+  }, [user, fetchGames]);
 
 
   const handleBannerImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -99,21 +110,34 @@ export default function CreateTournamentPage() {
       toast({ title: "Authentication Error", description: "You must be logged in to create a tournament.", variant: "destructive" });
       return;
     }
+    setIsSubmittingForm(true);
 
     const selectedGame = availableGames.find(g => g.id === data.gameId);
     if (!selectedGame) {
       toast({ title: "Game Error", description: "Selected game is not valid.", variant: "destructive" });
+      setIsSubmittingForm(false);
       return;
     }
 
-    const newTournament: Tournament = {
-      id: `tourney-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    // Ensure startDate has time component if not set by time input explicitly
+    let finalStartDate = data.startDate;
+    if (finalStartDate && finalStartDate.getHours() === 0 && finalStartDate.getMinutes() === 0 && finalStartDate.getSeconds() === 0) {
+        const now = new Date();
+        finalStartDate.setHours(now.getHours(), now.getMinutes());
+        if (finalStartDate < new Date()) { // If setting time makes it past for today, adjust
+            finalStartDate = new Date(data.startDate); // reset to original date part
+            finalStartDate.setHours(23, 59); // default to end of day
+        }
+    }
+
+
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
       gameIconUrl: selectedGame.iconUrl,
       description: data.description,
-      startDate: data.startDate,
+      startDate: finalStartDate, // Already a Date object from the form
       maxParticipants: data.maxParticipants,
       prizePool: data.prizePool,
       bracketType: data.bracketType,
@@ -127,25 +151,28 @@ export default function CreateTournamentPage() {
       matches: [], 
     };
     
-    console.log("Submitting new tournament:", newTournament);
+    console.log("Submitting new tournament to Firestore:", newTournamentData);
 
     try {
-      addTournament(newTournament); 
+      const createdTournament = await addTournamentToFirestore(newTournamentData); 
       toast({
         title: "Tournament Created!",
         description: `"${data.name}" has been successfully created.`,
       });
-      router.push(`/tournaments/${newTournament.id}`); 
+      router.push(`/tournaments/${createdTournament.id}`); 
     } catch (error) {
       console.error("Error creating tournament:", error);
       toast({ title: "Creation Failed", description: "Could not create tournament. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSubmittingForm(false);
     }
   };
 
-  if (authLoading || isLoadingGames) {
+  if (authLoading || (user && isLoadingGames)) { // Show loader if auth is loading OR user is logged in and games are loading
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-12rem)]">
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading creation tools...</p>
       </div>
     );
   }
@@ -176,7 +203,7 @@ export default function CreateTournamentPage() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div>
               <Label htmlFor="name">Tournament Name</Label>
-              <Input id="name" {...form.register("name")} />
+              <Input id="name" {...form.register("name")} disabled={isSubmittingForm} />
               {form.formState.errors.name && <p className="text-destructive text-xs mt-1">{form.formState.errors.name.message}</p>}
             </div>
 
@@ -186,11 +213,12 @@ export default function CreateTournamentPage() {
                 name="gameId"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || isLoadingGames}>
                     <SelectTrigger id="gameId">
                       <SelectValue placeholder="Select a game..." />
                     </SelectTrigger>
                     <SelectContent>
+                      {availableGames.length === 0 && isLoadingGames && <SelectItem value="loading" disabled>Loading games...</SelectItem>}
                       {availableGames.map(game => (
                         <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>
                       ))}
@@ -209,19 +237,19 @@ export default function CreateTournamentPage() {
                 accept="image/png, image/jpeg, image/webp" 
                 className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
                 onChange={handleBannerImageChange} 
+                disabled={isSubmittingForm}
               />
               {bannerPreview && (
                 <div className="mt-4 relative w-full aspect-[16/9] rounded-md overflow-hidden border">
-                  <Image src={bannerPreview} alt="Banner preview" layout="fill" objectFit="cover" data-ai-hint="tournament banner preview"/>
+                  <Image src={bannerPreview} alt="Banner preview" layout="fill" objectFit="cover" data-ai-hint="tournament banner preview" unoptimized />
                 </div>
               )}
                <p className="text-xs text-muted-foreground mt-1">Optional. Recommended aspect ratio 16:9. Max file size 2MB.</p>
             </div>
 
-
             <div>
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...form.register("description")} rows={4} />
+              <Textarea id="description" {...form.register("description")} rows={4} disabled={isSubmittingForm} />
               {form.formState.errors.description && <p className="text-destructive text-xs mt-1">{form.formState.errors.description.message}</p>}
             </div>
             
@@ -236,6 +264,7 @@ export default function CreateTournamentPage() {
                         <Button
                             variant={"outline"}
                             className={`w-full justify-start text-left font-normal ${!field.value && "text-muted-foreground"}`}
+                            disabled={isSubmittingForm}
                         >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {field.value ? format(field.value, "PPP HH:mm") : <span>Pick a date and time</span>}
@@ -254,23 +283,30 @@ export default function CreateTournamentPage() {
                                 field.onChange(date);
                             }}
                             initialFocus
-                            disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} 
+                            disabled={isSubmittingForm || ((date) => date < new Date(new Date().setDate(new Date().getDate() -1)))} 
                         />
                         <div className="p-3 border-t border-border">
                             <Label>Time (HH:MM)</Label>
                             <Input 
                                 type="time" 
                                 defaultValue={field.value ? format(field.value, "HH:mm") : "12:00"}
+                                disabled={isSubmittingForm}
                                 onChange={(e) => {
                                     const [hours, minutes] = e.target.value.split(':').map(Number);
-                                    const newDate = field.value ? new Date(field.value) : new Date();
+                                    const newDate = field.value ? new Date(field.value) : new Date(); // Ensure date part is today if field.value is null
+                                    if (!field.value) { // if no date was picked yet, set newDate to today
+                                        const today = new Date();
+                                        newDate.setDate(today.getDate());
+                                        newDate.setMonth(today.getMonth());
+                                        newDate.setFullYear(today.getFullYear());
+                                    }
                                     newDate.setHours(hours);
                                     newDate.setMinutes(minutes);
-                                    if (newDate < new Date()) { 
-                                      if (new Date(newDate).setHours(0,0,0,0) === new Date().setHours(0,0,0,0) && (hours < new Date().getHours() || (hours === new Date().getHours() && minutes < new Date().getMinutes()))) {
-                                        toast({ title: "Invalid Time", description: "Cannot select a past time for today.", variant: "destructive" });
+                                    
+                                    if (newDate < new Date() && !(newDate.toDateString() === new Date().toDateString() && newDate.getTime() >= new Date().getTime())) {
+                                        toast({ title: "Invalid Time", description: "Cannot select a past time.", variant: "destructive" });
+                                        // Optionally reset time input or prevent change
                                         return;
-                                      }
                                     }
                                     field.onChange(newDate);
                                 }}
@@ -286,7 +322,7 @@ export default function CreateTournamentPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="maxParticipants">Max Participants</Label>
-                <Input id="maxParticipants" type="number" {...form.register("maxParticipants")} />
+                <Input id="maxParticipants" type="number" {...form.register("maxParticipants")} disabled={isSubmittingForm} />
                 {form.formState.errors.maxParticipants && <p className="text-destructive text-xs mt-1">{form.formState.errors.maxParticipants.message}</p>}
               </div>
               <div>
@@ -295,7 +331,7 @@ export default function CreateTournamentPage() {
                     name="bracketType"
                     control={form.control}
                     render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmittingForm}>
                         <SelectTrigger id="bracketType">
                         <SelectValue placeholder="Select bracket type..." />
                         </SelectTrigger>
@@ -313,27 +349,27 @@ export default function CreateTournamentPage() {
 
             <div>
               <Label htmlFor="prizePool">Prize Pool (Optional)</Label>
-              <Input id="prizePool" {...form.register("prizePool")} placeholder="e.g., $1000, In-game items" />
+              <Input id="prizePool" {...form.register("prizePool")} placeholder="e.g., $1000, In-game items" disabled={isSubmittingForm} />
             </div>
 
             <div>
               <Label htmlFor="rules">Rules (Optional)</Label>
-              <Textarea id="rules" {...form.register("rules")} rows={3} placeholder="Specify any custom rules for your tournament." />
+              <Textarea id="rules" {...form.register("rules")} rows={3} placeholder="Specify any custom rules for your tournament." disabled={isSubmittingForm}/>
             </div>
 
             <div>
               <Label htmlFor="registrationInstructions">Registration Instructions (Optional)</Label>
-              <Textarea id="registrationInstructions" {...form.register("registrationInstructions")} rows={3} placeholder="e.g., How to join, in-game ID requirements, Discord server link..." />
+              <Textarea id="registrationInstructions" {...form.register("registrationInstructions")} rows={3} placeholder="e.g., How to join, in-game ID requirements, Discord server link..." disabled={isSubmittingForm}/>
               {form.formState.errors.registrationInstructions && <p className="text-destructive text-xs mt-1">{form.formState.errors.registrationInstructions.message}</p>}
             </div>
 
-            <Button type="submit" size="lg" disabled={form.formState.isSubmitting || isLoadingGames} className="w-full md:w-auto">
-              {form.formState.isSubmitting || isLoadingGames ? (
+            <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading} className="w-full md:w-auto">
+              {isSubmittingForm ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <PlusCircle className="mr-2 h-4 w-4" />
               )}
-              {form.formState.isSubmitting || isLoadingGames ? "Processing..." : "Create Tournament"}
+              {isSubmittingForm ? "Creating..." : "Create Tournament"}
             </Button>
           </form>
         </CardContent>

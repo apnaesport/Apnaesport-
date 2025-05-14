@@ -3,7 +3,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Edit, Trash2, Eye } from "lucide-react";
+import { PlusCircle, Edit, Trash2, Eye, Loader2 } from "lucide-react";
 import Link from "next/link";
 import type { Tournament } from "@/lib/types";
 import {
@@ -16,43 +16,56 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { useState, useEffect } from "react"; 
+import { useState, useEffect, useCallback } from "react"; 
 import { useToast } from "@/hooks/use-toast";
-import { getTournaments, deleteTournamentFromStore, subscribe } from "@/lib/tournamentStore"; // Updated imports
+import { getTournamentsFromFirestore, deleteTournamentFromFirestore } from "@/lib/tournamentStore";
 
 export default function AdminTournamentsPage() {
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null); // Store ID of tournament being deleted
+
+  const fetchTournaments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const tournamentsFromDb = await getTournamentsFromFirestore();
+      setTournaments(tournamentsFromDb);
+    } catch (error) {
+      console.error("Error fetching tournaments:", error);
+      toast({ title: "Error", description: "Could not fetch tournaments.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  }, [toast]);
 
   useEffect(() => {
-    setIsLoading(true);
-    const tournamentsFromStore = getTournaments();
-    setTournaments(tournamentsFromStore);
-    setIsLoading(false);
-
-    const unsubscribe = subscribe(() => {
-      setTournaments(getTournaments());
-    });
-    return () => unsubscribe();
-  }, []);
+    fetchTournaments();
+  }, [fetchTournaments]);
 
 
   const handleDeleteTournament = async (tournamentId: string, tournamentName: string) => {
     if (confirm(`Are you sure you want to delete the tournament: "${tournamentName}"? This action cannot be undone.`)) {
-      setIsLoading(true); // Visually indicate loading, though action is client-side
+      setIsDeleting(tournamentId);
       try {
-        deleteTournamentFromStore(tournamentId);
+        await deleteTournamentFromFirestore(tournamentId);
         toast({ title: "Tournament Deleted", description: `"${tournamentName}" has been removed.`, variant: "destructive" });
+        await fetchTournaments(); // Re-fetch to update the list
       } catch (error) {
         console.error("Error deleting tournament:", error);
         toast({ title: "Error", description: `Could not delete "${tournamentName}".`, variant: "destructive" });
       }
-      setIsLoading(false);
+      setIsDeleting(null);
     }
   };
 
-  if (isLoading && tournaments.length === 0) return <p>Loading tournaments...</p>;
+  if (isLoading && tournaments.length === 0) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading tournaments...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -98,7 +111,6 @@ export default function AdminTournamentsPage() {
                       <Eye className="h-4 w-4" />
                     </Link>
                   </Button>
-                  {/* Edit functionality would require a dedicated edit page similar to create tournament */}
                   {/* <Button variant="outline" size="sm" asChild disabled>
                     <Link href={`/admin/tournaments/${tournament.id}/edit`} title="Edit Tournament (Coming Soon)">
                        <Edit className="h-4 w-4" />
@@ -109,16 +121,16 @@ export default function AdminTournamentsPage() {
                     size="sm" 
                     title="Delete Tournament" 
                     onClick={() => handleDeleteTournament(tournament.id, tournament.name)}
-                    disabled={isLoading} // Disable while any delete operation is in progress
+                    disabled={isDeleting === tournament.id || isLoading}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {isDeleting === tournament.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 </TableCell>
               </TableRow>
             )) : (
               <TableRow>
                 <TableCell colSpan={6} className="text-center h-24">
-                  No tournaments found.
+                  No tournaments found. Use "Create New Tournament" to add some.
                 </TableCell>
               </TableRow>
             )}

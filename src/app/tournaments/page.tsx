@@ -6,11 +6,11 @@ import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Tournament } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PlusCircle, Search, Filter } from "lucide-react"; // Added Search and Filter
+import { PlusCircle, Search, Filter, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext"; 
-import { getTournaments as fetchTournamentsFromStore, subscribe } from "@/lib/tournamentStore"; // Updated import
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input"; // Added Input
+import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { useEffect, useState, useCallback } from "react";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -18,11 +18,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"; // Added DropdownMenu components
+} from "@/components/ui/dropdown-menu";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AllTournamentsPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
   const [filteredTournaments, setFilteredTournaments] = useState<Tournament[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<Record<Tournament["status"] | "all", boolean>>({
     "all": true,
@@ -34,21 +36,28 @@ export default function AllTournamentsPage() {
   });
 
   const { user } = useAuth(); 
+  const { toast } = useToast();
+
+  const fetchTournaments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const tournamentsFromDb = await getTournamentsFromFirestore();
+      setAllTournaments(tournamentsFromDb);
+    } catch (error) {
+      console.error("Error fetching tournaments:", error);
+      toast({ title: "Error", description: "Could not fetch tournaments.", variant: "destructive" });
+      setAllTournaments([]); // Set to empty array on error
+    }
+    setIsLoading(false);
+  }, [toast]);
 
   useEffect(() => {
-    const tournamentsFromStore = fetchTournamentsFromStore();
-    setAllTournaments(tournamentsFromStore);
-    
-    const unsubscribe = subscribe(() => {
-      setAllTournaments(fetchTournamentsFromStore());
-    });
-    return () => unsubscribe();
-  }, []);
+    fetchTournaments();
+  }, [fetchTournaments]);
 
   useEffect(() => {
     let newFilteredTournaments = allTournaments;
 
-    // Apply search term filter
     if (searchTerm) {
       newFilteredTournaments = newFilteredTournaments.filter(tournament =>
         tournament.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -56,7 +65,6 @@ export default function AllTournamentsPage() {
       );
     }
 
-    // Apply status filter
     const activeStatusFilters = Object.entries(statusFilter)
       .filter(([_, isActive]) => isActive)
       .map(([status]) => status as Tournament["status"] | "all");
@@ -75,24 +83,30 @@ export default function AllTournamentsPage() {
     setStatusFilter(prev => {
       const newState = { ...prev };
       if (status === "all") {
-        // If 'all' is selected, deselect all others and select 'all'
         Object.keys(newState).forEach(key => newState[key as keyof typeof newState] = false);
-        newState.all = !prev.all; // Toggle 'all'
-        if (!newState.all && !Object.values(newState).some(val => val)) { // If 'all' is deselected and nothing else is selected, re-select 'all'
+        newState.all = !prev.all; 
+        if (!newState.all && !Object.values(newState).some(val => val)) { 
            newState.all = true;
         }
       } else {
-        // If a specific status is selected, deselect 'all' and toggle the specific status
         newState.all = false;
         newState[status] = !prev[status];
-         // If unchecking an item and no other items are checked (except 'all'), then check 'all'
-        if (!newState[status] && !Object.values(newState).some((val, key) => key !== Object.keys(newState).indexOf('all') && val)) {
+        if (!newState[status] && !Object.values(newState).filter((v, k) => Object.keys(newState)[k] !== 'all').some(val => val) ) {
           newState.all = true;
         }
       }
       return newState;
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading tournaments...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

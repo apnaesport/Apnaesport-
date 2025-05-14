@@ -8,48 +8,57 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
-import { PlusCircle, AlertTriangle } from "lucide-react"; // Added AlertTriangle
+import { PlusCircle, AlertTriangle, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext"; 
-import { getGameDetails as fetchGameDetails, getTournamentsForGame as fetchTournamentsForGame, subscribe } from "@/lib/tournamentStore"; // Updated imports
-import { useEffect, useState, use } from "react"; // Added 'use'
+import { getGameDetails, getTournamentsForGame } from "@/lib/tournamentStore";
+import { useEffect, useState, use, useCallback } from "react"; 
+import { useToast } from "@/hooks/use-toast";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
 }
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
-  const resolvedParams = use(params); // Use React.use() to unwrap params
+  const resolvedParams = use(params); 
   const { gameId } = resolvedParams;
 
   const { user } = useAuth(); 
   const [game, setGame] = useState<Game | undefined>(undefined);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const gameDetails = fetchGameDetails(gameId);
-    setGame(gameDetails);
-    if (gameDetails) {
-      setTournaments(fetchTournamentsForGame(gameId));
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const gameDetails = await getGameDetails(gameId);
+      setGame(gameDetails);
+      if (gameDetails) {
+        const gameTournaments = await getTournamentsForGame(gameId);
+        setTournaments(gameTournaments);
+      } else {
+        setTournaments([]); // No game, no tournaments
+        toast({ title: "Not Found", description: "Game not found.", variant: "destructive" });
+      }
+    } catch (error) {
+      console.error("Error fetching game/tournament data:", error);
+      toast({ title: "Error", description: "Could not fetch data.", variant: "destructive" });
+      setGame(undefined);
+      setTournaments([]);
     }
     setIsLoading(false);
+  }, [gameId, toast]);
 
-    const unsubscribe = subscribe(() => {
-      const updatedGameDetails = fetchGameDetails(gameId);
-      setGame(updatedGameDetails);
-      if (updatedGameDetails) {
-        setTournaments(fetchTournamentsForGame(gameId));
-      }
-    });
-    return () => unsubscribe();
-  }, [gameId]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
 
   if (isLoading) {
     return (
-      <div className="text-center py-10">
-        <PageTitle title="Loading Game Tournaments..." />
-        {/* Add Skeleton loaders here if desired */}
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <PageTitle title="Loading Game Tournaments..." className="mt-4 !mb-0" />
       </div>
     );
   }
@@ -79,9 +88,9 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
           src={game.bannerUrl || `https://placehold.co/1200x300.png`} 
           alt={`${game.name} banner`} 
           layout="fill" 
-          objectFit="cover"
-          className="transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="game background art"
+          unoptimized={game.bannerUrl?.startsWith('data:image')}
           onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x300.png?text=${encodeURIComponent(game.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
@@ -91,8 +100,9 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
               src={game.iconUrl} 
               alt={game.name} 
               width={64} height={64} 
-              className="rounded-lg mr-4 border-2 border-background shadow-md" 
+              className="rounded-lg mr-4 border-2 border-background shadow-md object-cover" 
               data-ai-hint="game logo large"
+              unoptimized={game.iconUrl?.startsWith('data:image')}
               onError={(e) => (e.currentTarget.src = `https://placehold.co/64x64.png?text=${game.name.substring(0,2)}`)}
             />
             <PageTitle title={`${game.name} Tournaments`} className="mb-0" />
@@ -122,21 +132,21 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {upcomingTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
             </div>
-          ) : <p className="text-muted-foreground py-4">No upcoming tournaments for {game.name} right now.</p>}
+          ) : <p className="text-muted-foreground py-4 text-center">No upcoming tournaments for {game.name} right now.</p>}
         </TabsContent>
         <TabsContent value="live" className="mt-6">
           {liveTournaments.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {liveTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
             </div>
-          ) : <p className="text-muted-foreground py-4">No live tournaments for {game.name} at the moment.</p>}
+          ) : <p className="text-muted-foreground py-4 text-center">No live tournaments for {game.name} at the moment.</p>}
         </TabsContent>
         <TabsContent value="completed" className="mt-6">
           {completedTournaments.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {completedTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
             </div>
-          ) : <p className="text-muted-foreground py-4">No completed tournaments for {game.name} yet.</p>}
+          ) : <p className="text-muted-foreground py-4 text-center">No completed tournaments for {game.name} yet.</p>}
         </TabsContent>
       </Tabs>
     </div>

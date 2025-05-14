@@ -7,8 +7,10 @@ import type { StatItem, Tournament } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts";
-import { useEffect, useState } from "react";
-import { getTournaments, subscribe } from "@/lib/tournamentStore";
+import { useEffect, useState, useCallback } from "react";
+import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 // Placeholder data for charts - making these dynamic from store would be complex for now
 const userGrowthData = [
@@ -35,43 +37,48 @@ const chartConfigTournamentActivity = {
 
 
 export default function AdminAnalyticsPage() {
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [platformAnalytics, setPlatformAnalytics] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const loadData = () => {
-      setIsLoading(true);
-      const currentTournaments = getTournaments();
-      setTournaments(currentTournaments);
-
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const currentTournaments = await getTournamentsFromFirestore();
       const totalMatchesPlayed = currentTournaments.reduce((acc, t) => acc + (t.matches?.length || 0), 0);
       
-      // Note: "Total Registered Users" and "Daily Active Users" are placeholders without a backend.
-      const placeholderTotalUsers = "1,250"; // This would come from a user service
-      const placeholderDailyActive = 230; // This would come from analytics service
+      const placeholderTotalUsers = "1,250"; 
+      const placeholderDailyActive = 230; 
 
       setPlatformAnalytics([
-        { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, // Placeholder
-        { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, // Dynamic
-        { title: "Total Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" }, // Dynamic (based on current matches in store)
-        { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, // Placeholder
+        { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, 
+        { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, 
+        { title: "Total Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" }, 
+        { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, 
       ]);
-      setIsLoading(false);
-    };
+    } catch (error) {
+      console.error("Error loading analytics data:", error);
+      toast({ title: "Error", description: "Could not load analytics data.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  }, [toast]);
 
+  useEffect(() => {
     loadData();
-    const unsubscribe = subscribe(loadData);
-    return () => unsubscribe();
-  }, []);
+  }, [loadData]);
 
   if (isLoading) {
-    return <p>Loading analytics...</p>;
+     return (
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading analytics...</p>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-8">
-      <PageTitle title="Platform Analytics" subtitle="Key metrics and insights for TournamentHub." />
+      <PageTitle title="Platform Analytics" subtitle="Key metrics and insights for Apna Esport." />
 
       <section>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

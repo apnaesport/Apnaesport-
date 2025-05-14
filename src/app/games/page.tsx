@@ -4,11 +4,12 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { GameCard } from "@/components/games/GameCard";
 import type { Game } from "@/lib/types";
-import { getGames, subscribe } from "@/lib/tournamentStore";
-import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { getGamesFromFirestore } from "@/lib/tournamentStore";
+import { useEffect, useState, useCallback } from "react";
+import { Skeleton } from "@/components/ui/skeleton"; 
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function GamesPage() {
@@ -16,19 +17,26 @@ export default function GamesPage() {
   const [filteredGames, setFilteredGames] = useState<Game[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const { toast } = useToast();
+
+  const fetchGames = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const gamesFromDb = await getGamesFromFirestore();
+      setAllGames(gamesFromDb);
+      setFilteredGames(gamesFromDb); // Initialize filtered games
+    } catch (error) {
+      console.error("Error fetching games:", error);
+      toast({ title: "Error", description: "Could not fetch games.", variant: "destructive" });
+      setAllGames([]);
+      setFilteredGames([]);
+    }
+    setIsLoading(false);
+  }, [toast]);
 
   useEffect(() => {
-    const gamesFromStore = getGames();
-    setAllGames(gamesFromStore);
-    setFilteredGames(gamesFromStore);
-    setIsLoading(false);
-
-    const unsubscribe = subscribe(() => {
-      const updatedGames = getGames();
-      setAllGames(updatedGames);
-    });
-    return () => unsubscribe();
-  }, []);
+    fetchGames();
+  }, [fetchGames]);
 
   useEffect(() => {
     if (searchTerm === "") {
@@ -55,14 +63,14 @@ export default function GamesPage() {
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            disabled={isLoading}
           />
         </div>
       
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {[...Array(8)].map((_, i) => (
-            <CardSkeleton key={i} />
-          ))}
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-20rem)]">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+            <p className="text-muted-foreground">Loading games...</p>
         </div>
       ) : filteredGames.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -72,18 +80,19 @@ export default function GamesPage() {
         </div>
       ) : (
         <p className="text-muted-foreground text-center py-10">
-          No games match your search or none are available.
+          No games match your search or none are available. Admins can add games via the admin panel.
         </p>
       )}
     </div>
   );
 }
 
-const CardSkeleton = () => (
-  <div className="space-y-3">
-    <Skeleton className="h-60 w-full" />
-    <Skeleton className="h-8 w-3/4" />
-    <Skeleton className="h-6 w-1/2" />
-    <Skeleton className="h-10 w-full" />
-  </div>
-);
+// CardSkeleton is not used if a full page loader is preferred
+// const CardSkeleton = () => (
+//   <div className="space-y-3">
+//     <Skeleton className="h-60 w-full" />
+//     <Skeleton className="h-8 w-3/4" />
+//     <Skeleton className="h-6 w-1/2" />
+//     <Skeleton className="h-10 w-full" />
+//   </div>
+// );

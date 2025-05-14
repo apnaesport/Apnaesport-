@@ -8,14 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info } from "lucide-react"; 
-import { format, formatDistanceToNowStrict } from "date-fns";
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info, Loader2 } from "lucide-react"; 
+import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useEffect } from "react"; 
+import { useState, useEffect, useCallback } // Added useCallback
+from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentDetails as fetchTournamentDetails, subscribe, addTournament as upsertTournamentInStore, deleteTournamentFromStore } from "@/lib/tournamentStore"; 
+import { getTournamentByIdFromFirestore, addParticipantToTournament, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -38,80 +39,102 @@ interface TournamentPageProps {
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
   const [tournament, setTournament] = useState<Tournament | undefined>(undefined);
-  const { user, isAdmin } = useAuth(); 
+  const { user, isAdmin, loading: authLoading } = useAuth(); 
   const router = useRouter(); 
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [formattedStartDate, setFormattedStartDate] = useState<string | null>(null);
 
-  useEffect(() => {
-    const loadTournament = () => {
-      setIsLoading(true);
-      const fetchedTournament = fetchTournamentDetails(tournamentId);
+  const fetchTournament = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const fetchedTournament = await getTournamentByIdFromFirestore(tournamentId);
       setTournament(fetchedTournament);
       if (fetchedTournament) {
-        setFormattedStartDate(format(new Date(fetchedTournament.startDate), "PPPPp"))
+        setFormattedStartDate(format(new Date(fetchedTournament.startDate), "PPPPp"));
         if (user) {
           setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
         }
+      } else {
+        toast({ title: "Not Found", description: "Tournament not found.", variant: "destructive" });
       }
-      setIsLoading(false);
-    };
+    } catch (error) {
+      console.error("Error fetching tournament:", error);
+      toast({ title: "Error", description: "Could not fetch tournament details.", variant: "destructive" });
+    }
+    setIsLoading(false);
+  }, [tournamentId, user, toast]);
 
-    loadTournament();
-    const unsubscribe = subscribe(loadTournament); 
-    return () => unsubscribe();
-  }, [tournamentId, user]); 
+  useEffect(() => {
+    fetchTournament();
+  }, [fetchTournament]); 
 
-  const handleJoinTournament = () => {
+  const handleJoinTournament = async () => {
     if (!user) {
       router.push(`/auth/login?redirect=/tournaments/${tournamentId}`);
       return;
     }
-    if (tournament && !isRegistered && tournament.participants.length < tournament.maxParticipants && (tournament.status === "Upcoming" || tournament.status === "Live")) {
+    if (!tournament) return;
+
+    if (isRegistered) {
+      toast({ title: "Already Registered", description: "You are already registered for this tournament." });
+      return;
+    }
+
+    if (tournament.participants.length >= tournament.maxParticipants && (tournament.status === "Upcoming" || tournament.status === "Live")) {
+      toast({ title: "Registration Full", description: "This tournament has reached its maximum number of participants.", variant: "destructive" });
+      return;
+    }
+    
+    if (tournament.status !== "Upcoming" && tournament.status !== "Live") {
+        toast({ title: "Registration Closed", description: "This tournament is not currently open for registration.", variant: "destructive" });
+        return;
+    }
+
+    setIsJoining(true);
+    try {
       const newParticipant: Participant = { 
         id: user.uid, 
         name: user.displayName || "Anonymous Player", 
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
       };
-      const updatedParticipants = [...tournament.participants, newParticipant];
-      const updatedTournament: Tournament = { ...tournament, participants: updatedParticipants };
-      
-      upsertTournamentInStore(updatedTournament); 
-
+      await addParticipantToTournament(tournament.id, newParticipant);
       toast({
         title: "Successfully Registered!",
         description: `You have joined ${tournament.name}.`,
       });
-    } else if (tournament && tournament.participants.length >= tournament.maxParticipants) {
-       toast({
-        title: "Registration Full",
-        description: "This tournament has reached its maximum number of participants.",
-        variant: "destructive",
-      });
-    } else if (tournament && (tournament.status !== "Upcoming" && tournament.status !== "Live")) {
-        toast({
-            title: "Registration Closed",
-            description: "This tournament is not currently open for registration.",
-            variant: "destructive",
-        });
+      await fetchTournament(); // Re-fetch to update participant list and status
+    } catch (error: any) {
+      console.error("Error joining tournament:", error);
+      toast({ title: "Join Failed", description: error.message || "Could not join tournament.", variant: "destructive" });
+    } finally {
+      setIsJoining(false);
     }
   };
 
-  const handleDeleteTournament = () => {
+  const handleDeleteTournament = async () => {
     if (!tournament) return;
-    deleteTournamentFromStore(tournament.id);
-    toast({
-      title: "Tournament Deleted",
-      description: `"${tournament.name}" has been removed.`,
-      variant: "destructive",
-    });
-    router.push("/tournaments");
+    setIsDeleting(true);
+    try {
+      await deleteTournamentAction(tournament.id);
+      toast({
+        title: "Tournament Deleted",
+        description: `"${tournament.name}" has been removed.`,
+        variant: "destructive",
+      });
+      router.push("/tournaments");
+    } catch (error) {
+      console.error("Error deleting tournament:", error);
+      toast({ title: "Delete Failed", description: "Could not delete tournament.", variant: "destructive"});
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
-
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="space-y-8">
         <Skeleton className="h-64 md:h-80 w-full rounded-lg" />
@@ -143,7 +166,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       </div>
     );
   }
-
+  
   const canJoinOrRegister = user && (tournament.status === "Upcoming" || tournament.status === "Live");
   const isTournamentCreator = user && tournament.organizerId === user.uid;
 
@@ -157,9 +180,9 @@ export default function TournamentPage({ params }: TournamentPageProps) {
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
           priority
-          objectFit="cover"
-          className="transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports event stage"
+          unoptimized={tournament.bannerImageUrl.startsWith('data:image')}
           onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournament.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
@@ -171,8 +194,9 @@ export default function TournamentPage({ params }: TournamentPageProps) {
               src={tournament.gameIconUrl} 
               alt={tournament.gameName} 
               width={24} height={24} 
-              className="rounded-sm mr-2" 
+              className="rounded-sm mr-2 object-cover" 
               data-ai-hint="game icon mini"
+              unoptimized={tournament.gameIconUrl.startsWith('data:image')}
               onError={(e) => (e.currentTarget.src = `https://placehold.co/24x24.png?text=${tournament.gameName.substring(0,2)}`)}
             />
             <span>{tournament.gameName}</span>
@@ -257,8 +281,9 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                                   src={p.avatarUrl || `https://placehold.co/40x40.png`} 
                                   alt={p.name} 
                                   width={32} height={32} 
-                                  className="rounded-full" 
+                                  className="rounded-full object-cover" 
                                   data-ai-hint="player avatar"
+                                  unoptimized={p.avatarUrl?.startsWith('data:image')}
                                   onError={(e) => (e.currentTarget.src = `https://placehold.co/32x32.png?text=${p.name.substring(0,2)}`)}
                                 />
                                 <span>{p.name}</span>
@@ -312,9 +337,11 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                    size="lg" 
                    className="w-full bg-background text-foreground hover:bg-background/90"
                    onClick={handleJoinTournament}
-                   disabled={!user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
+                   disabled={!user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live") || isJoining}
                  >
-                   {isRegistered ? "You are Registered" : 
+                   {isJoining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                   {isJoining ? "Processing..." :
+                    isRegistered ? "You are Registered" : 
                     (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
                     tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
                  </Button>
@@ -340,7 +367,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                   src={`https://placehold.co/50x50.png`} 
                   alt={tournament.organizer || "Organizer"} 
                   width={40} height={40} 
-                  className="rounded-full" 
+                  className="rounded-full object-cover" 
                   data-ai-hint="company logo"
                   onError={(e) => (e.currentTarget.src = "https://placehold.co/50x50.png?text=OG")}
                 />
@@ -356,7 +383,10 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                     {/* <Button variant="outline" className="w-full" disabled>Edit Tournament (Coming Soon)</Button> */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
-                            <Button variant="destructive" className="w-full">Delete Tournament</Button>
+                            <Button variant="destructive" className="w-full" disabled={isDeleting}>
+                              {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                              {isDeleting ? "Deleting..." : "Delete Tournament"}
+                            </Button>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                             <AlertDialogHeader>
@@ -367,8 +397,11 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                             </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDeleteTournament}>Delete</AlertDialogAction>
+                            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteTournament} disabled={isDeleting}>
+                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                Delete
+                            </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>

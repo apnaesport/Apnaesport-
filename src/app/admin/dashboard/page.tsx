@@ -4,12 +4,13 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import type { StatItem, Game, Tournament } from "@/lib/types";
-import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react";
+import { Users, Swords, Gamepad2, Bell, PlusCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { getGames, getTournaments, subscribe } from "@/lib/tournamentStore";
+import { useEffect, useState, useCallback } from "react";
+import { getGamesFromFirestore, getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { useToast } from "@/hooks/use-toast";
 
 const quickActions = [
     {label: "Create Tournament", href: "/tournaments/new", icon: PlusCircle},
@@ -19,43 +20,48 @@ const quickActions = [
 ];
 
 export default function AdminDashboardPage() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [adminStats, setAdminStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const loadData = () => {
-      setIsLoading(true);
-      const currentGames = getGames();
-      const currentTournaments = getTournaments();
-      setGames(currentGames);
-      setTournaments(currentTournaments);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [currentGames, currentTournaments] = await Promise.all([
+        getGamesFromFirestore(),
+        getTournamentsFromFirestore()
+      ]);
 
       const activeTournaments = currentTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
       
-      // Note: "Total Users" and "Pending Approvals" are placeholders without a backend for users.
-      const placeholderTotalUsers = "1,250"; // This would come from a user service
-      const placeholderPendingApprovals = 3; // This would come from an approval system
+      const placeholderTotalUsers = "1,250"; 
+      const placeholderPendingApprovals = 3; 
 
       setAdminStats([
-        { title: "Total Users", value: placeholderTotalUsers, icon: "Users", change: "+0 this week" }, // Placeholder
-        { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: "" }, // Dynamic
-        { title: "Supported Games", value: currentGames.length, icon: "Gamepad2" }, // Dynamic
-        { title: "Pending Approvals", value: placeholderPendingApprovals, icon: "Bell", change: "Action needed" }, // Placeholder
+        { title: "Total Users", value: placeholderTotalUsers, icon: "Users", change: "+0 this week" }, 
+        { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: "" }, 
+        { title: "Supported Games", value: currentGames.length, icon: "Gamepad2" }, 
+        { title: "Pending Approvals", value: placeholderPendingApprovals, icon: "Bell", change: "Action needed" }, 
       ]);
-      setIsLoading(false);
-    };
-    
+    } catch (error) {
+      console.error("Error loading admin dashboard data:", error);
+      toast({title: "Error", description: "Could not load admin dashboard data.", variant: "destructive"})
+    }
+    setIsLoading(false);
+  }, [toast]);
+  
+  useEffect(() => {
     loadData();
-    const unsubscribe = subscribe(loadData);
-    return () => unsubscribe();
-  }, []);
+  }, [loadData]);
 
 
   if (isLoading) {
-    // Basic loading state, can be enhanced with skeletons
-    return <p>Loading admin dashboard...</p>;
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <p className="mt-4 text-lg text-muted-foreground">Loading admin dashboard...</p>
+        </div>
+    );
   }
 
   return (
@@ -95,8 +101,7 @@ export default function AdminDashboardPage() {
             <CardDescription>Overview of recent user registrations, tournament creations, etc.</CardDescription>
           </CardHeader>
           <CardContent>
-            {/* Placeholder for recent activity feed */}
-            <p className="text-muted-foreground">Recent activity feed will be displayed here.</p>
+            <p className="text-muted-foreground">Recent activity feed will be displayed here. (Placeholder)</p>
             <ul className="mt-4 space-y-2">
                 <li className="text-sm p-2 border-b">New user 'PlayerX' registered.</li>
                 <li className="text-sm p-2 border-b">Tournament 'Summer Showdown' created.</li>

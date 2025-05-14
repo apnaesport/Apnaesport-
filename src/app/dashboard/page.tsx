@@ -7,9 +7,11 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
-import { getTournaments, getGames, subscribe } from "@/lib/tournamentStore"; 
-import { useEffect, useState } from "react"; 
+import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
+import { useEffect, useState, useCallback } from "react"; 
 import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 
 export default function DashboardPage() {
@@ -18,70 +20,67 @@ export default function DashboardPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [stats, setStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const loadData = () => {
-      setIsLoading(true);
-      const allTournaments = getTournaments();
-      const allGames = getGames();
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [allTournaments, allGames] = await Promise.all([
+        getTournamentsFromFirestore(),
+        getGamesFromFirestore()
+      ]);
 
       const ft = allTournaments.find(t => t.featured && t.status === "Upcoming") || 
                    allTournaments.find(t => t.status === "Upcoming") || 
-                   allTournaments[0]; 
+                   allTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0]; 
       setFeaturedTournament(ft);
 
       setLiveTournaments(allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing"));
       setGames(allGames);
       
       const activeTournamentCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
-      // Note: Other stats are placeholders as they need specific user data or more complex calculations
+      
       const placeholderStats: StatItem[] = [
-        { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" }, // Dynamic
+        { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" },
         { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, // Static placeholder
         { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, // Static placeholder
         { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, // Static placeholder
       ];
       setStats(placeholderStats);
 
-      setIsLoading(false);
-    };
+    } catch (error) {
+        console.error("Error loading dashboard data:", error);
+        toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive"});
+    }
+    setIsLoading(false);
+  }, [toast]);
 
+  useEffect(() => {
     loadData(); 
-    const unsubscribe = subscribe(loadData); 
-
-    return () => unsubscribe(); 
-  }, []);
+  }, [loadData]);
 
 
   if (isLoading) {
     return (
-      <div className="space-y-8">
-        <PageTitle title="Dashboard" subtitle="Welcome back to TournamentHub!" />
-        <Skeleton className="h-80 w-full rounded-lg" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Skeleton className="h-40 w-full rounded-lg" />
-            <Skeleton className="h-40 w-full rounded-lg" />
-            <Skeleton className="h-40 w-full rounded-lg" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Skeleton className="h-28 w-full rounded-lg" />
-            <Skeleton className="h-28 w-full rounded-lg" />
-            <Skeleton className="h-28 w-full rounded-lg" />
-            <Skeleton className="h-28 w-full rounded-lg" />
-        </div>
-        <Skeleton className="h-48 w-full rounded-lg" />
+      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="mt-4 text-lg text-muted-foreground">Loading dashboard...</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      <PageTitle title="Dashboard" subtitle="Welcome back to TournamentHub!" />
+      <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
 
-      {featuredTournament && (
+      {featuredTournament ? (
         <section>
           <FeaturedTournamentCard tournament={featuredTournament} />
         </section>
+      ) : (
+        <div className="bg-card p-8 rounded-lg shadow-md text-center">
+          <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
+        </div>
       )}
 
       <section>
