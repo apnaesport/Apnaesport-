@@ -12,6 +12,9 @@ export interface UserProfile extends FirebaseUser {
   uid: string;
   isAdmin?: boolean;
   createdAt?: Timestamp; // Added for user creation date
+  bio?: string; // New: User's biography
+  favoriteGames?: string; // New: Comma-separated list or similar
+  streamingChannelUrl?: string; // New: URL to their streaming channel
 }
 
 export type Game = {
@@ -60,7 +63,7 @@ export type Tournament = {
   registrationInstructions?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   matches?: Match[];
-  featured?: boolean; // New field for featured tournaments
+  featured?: boolean;
   organizer?: string; // User display name
   organizerId?: string; // UID of the user who created it
   createdAt?: Timestamp;
@@ -79,7 +82,7 @@ export type TournamentFormDataUI = {
   registrationInstructions?: string;
   bannerImageFile?: FileList;
   bannerImageDataUri?: string;
-  featured?: boolean; // New field
+  featured?: boolean;
 };
 
 
@@ -120,3 +123,4 @@ export interface NotificationFormData {
   type: NotificationType;
   target: NotificationTarget;
 }
+

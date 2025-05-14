@@ -9,31 +9,130 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Edit3, LogIn } from "lucide-react";
+import { Shield, Edit3, LogIn, Save, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { useEffect, useState, useCallback } from "react";
+import type { UserProfile } from "@/lib/types";
+import { updateUserProfileInFirestore, getUserProfileFromFirestore } from "@/lib/tournamentStore";
+import { updateProfile as updateFirebaseProfile } from "firebase/auth"; // For Firebase Auth display name
+import { auth } from "@/lib/firebase";
+
+
+const profileSchema = z.object({
+  displayName: z.string().min(2, "Display name must be at least 2 characters."),
+  bio: z.string().max(500, "Bio can be max 500 characters.").optional(),
+  favoriteGames: z.string().max(200, "Favorite games list too long.").optional(),
+  streamingChannelUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  // photoURL is handled separately for now
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading, setUser: setAuthContextUser } = useAuth(); // Get setUser to update context
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
+
+  const form = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      displayName: "",
+      bio: "",
+      favoriteGames: "",
+      streamingChannelUrl: "",
+    },
+  });
+
+  const fetchUserProfile = useCallback(async (uid: string) => {
+    setPageLoading(true);
+    try {
+      const userProfile = await getUserProfileFromFirestore(uid);
+      if (userProfile) {
+        form.reset({
+          displayName: userProfile.displayName || "",
+          bio: userProfile.bio || "",
+          favoriteGames: userProfile.favoriteGames || "",
+          streamingChannelUrl: userProfile.streamingChannelUrl || "",
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      toast({ title: "Error", description: "Could not load your profile data.", variant: "destructive" });
+    }
+    setPageLoading(false);
+  }, [form, toast]);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchUserProfile(user.uid);
+    } else if (!authLoading && !user) {
+      setPageLoading(false); // Not logged in, stop loading
+    }
+  }, [user, authLoading, fetchUserProfile]);
+
 
   const getInitials = (name: string | null | undefined) => {
-    if (!name) return "AE"; // Apna Esport
+    if (!name) return "AE"; 
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
   };
 
-  if (loading) {
+  const onSubmit: SubmitHandler<ProfileFormData> = async (data) => {
+    if (!user) {
+      toast({ title: "Error", description: "You must be logged in to update your profile.", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      // Update Firestore document
+      await updateUserProfileInFirestore(user.uid, {
+        displayName: data.displayName,
+        bio: data.bio,
+        favoriteGames: data.favoriteGames,
+        streamingChannelUrl: data.streamingChannelUrl,
+      });
+
+      // Update Firebase Auth display name if it changed
+      if (auth.currentUser && auth.currentUser.displayName !== data.displayName) {
+        await updateFirebaseProfile(auth.currentUser, { displayName: data.displayName });
+      }
+      
+      // Update AuthContext state
+      const updatedUserProfile = await getUserProfileFromFirestore(user.uid);
+      if (updatedUserProfile) {
+        setAuthContextUser(updatedUserProfile); // This updates the user object in AuthContext
+      }
+
+
+      toast({ title: "Profile Updated", description: "Your profile information has been saved." });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({ title: "Update Failed", description: "Could not update your profile.", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (authLoading || pageLoading) {
     return (
       <MainLayout>
         <PageTitle title="My Profile" />
         <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-32 mb-2 mx-auto md:mx-0" />
-            <Skeleton className="h-32 w-32 rounded-full mx-auto" />
-            <Skeleton className="h-6 w-48 mx-auto md:mx-0 mt-2" />
-            <Skeleton className="h-4 w-56 mx-auto md:mx-0 mt-1" />
+          <CardHeader className="items-center md:items-start">
+            <Skeleton className="h-32 w-32 rounded-full mb-4" />
+            <Skeleton className="h-8 w-48 mb-2" />
+            <Skeleton className="h-6 w-56" />
           </CardHeader>
           <CardContent className="space-y-4">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-20 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-32" />
@@ -79,7 +178,7 @@ export default function ProfilePage() {
               )}
             </CardHeader>
             <CardContent>
-              <Button variant="outline">
+              <Button variant="outline" disabled> {/* Photo upload not implemented in this iteration */}
                 <Edit3 className="mr-2 h-4 w-4" /> Change Profile Picture
               </Button>
             </CardContent>
@@ -87,37 +186,48 @@ export default function ProfilePage() {
         </div>
 
         <div className="md:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Account Information</CardTitle>
-              <CardDescription>Update your personal information.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input id="displayName" defaultValue={user.displayName || ""} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue={user.email || ""} disabled />
-              </div>
-              <Separator />
-              <h3 className="text-lg font-medium">Change Password</h3>
-              <div className="space-y-2">
-                <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" />
-              </div>
-              <Button>Update Profile</Button>
-            </CardContent>
-          </Card>
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Information</CardTitle>
+                <CardDescription>Update your personal information.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <Label htmlFor="displayName">Display Name</Label>
+                  <Input id="displayName" {...form.register("displayName")} disabled={isSubmitting} />
+                  {form.formState.errors.displayName && <p className="text-destructive text-xs mt-1">{form.formState.errors.displayName.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input id="email" type="email" defaultValue={user.email || ""} disabled />
+                </div>
+                 <div>
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea id="bio" {...form.register("bio")} placeholder="Tell us a bit about yourself..." disabled={isSubmitting} rows={3}/>
+                  {form.formState.errors.bio && <p className="text-destructive text-xs mt-1">{form.formState.errors.bio.message}</p>}
+                </div>
+                 <div>
+                  <Label htmlFor="favoriteGames">Favorite Games</Label>
+                  <Input id="favoriteGames" {...form.register("favoriteGames")} placeholder="e.g., Valorant, CS:GO, LoL" disabled={isSubmitting}/>
+                  {form.formState.errors.favoriteGames && <p className="text-destructive text-xs mt-1">{form.formState.errors.favoriteGames.message}</p>}
+                </div>
+                 <div>
+                  <Label htmlFor="streamingChannelUrl">Streaming Channel URL</Label>
+                  <Input id="streamingChannelUrl" {...form.register("streamingChannelUrl")} placeholder="https://twitch.tv/yourchannel" disabled={isSubmitting}/>
+                  {form.formState.errors.streamingChannelUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.streamingChannelUrl.message}</p>}
+                </div>
+                <Separator />
+                <h3 className="text-lg font-medium">Change Password (Not Implemented)</h3>
+                <p className="text-sm text-muted-foreground">Password change functionality is not available in this prototype.</p>
+                
+                <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    {isSubmitting ? "Saving..." : "Update Profile"}
+                </Button>
+              </CardContent>
+            </Card>
+          </form>
         </div>
       </div>
     </MainLayout>

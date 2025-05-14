@@ -2,8 +2,8 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { doc, setDoc } from "firebase/firestore";
+import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -50,7 +50,7 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
       
-      await updateProfile(user, { displayName: values.name });
+      await updateFirebaseProfile(user, { displayName: values.name });
 
       // Store additional user info in Firestore
       const userIsAdmin = values.email === ADMIN_EMAIL;
@@ -58,9 +58,13 @@ export function RegisterForm() {
         uid: user.uid,
         displayName: values.name,
         email: values.email,
-        photoURL: null, // Default photo URL or generate one
+        photoURL: null, 
         isAdmin: userIsAdmin,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        bio: "",
+        favoriteGames: "",
+        streamingChannelUrl: "",
       });
 
       toast({
@@ -93,7 +97,7 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Full Name</FormLabel>
               <FormControl>
-                <Input placeholder="John Doe" {...field} />
+                <Input placeholder="John Doe" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -106,7 +110,7 @@ export function RegisterForm() {
             <FormItem>
               <FormLabel>Email</FormLabel>
               <FormControl>
-                <Input placeholder="yourname@example.com" {...field} />
+                <Input placeholder="yourname@example.com" {...field} disabled={isLoading} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -120,13 +124,14 @@ export function RegisterForm() {
               <FormLabel>Password</FormLabel>
               <FormControl>
                  <div className="relative">
-                  <Input type={showPassword ? "text" : "password"} placeholder="••••••••" {...field} />
+                  <Input type={showPassword ? "text" : "password"} placeholder="••••••••" {...field} disabled={isLoading}/>
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
