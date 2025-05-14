@@ -35,7 +35,7 @@ export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt'
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  const newGameSnapshot = await getDoc(docRef); // Fetch to get server timestamp
+  const newGameSnapshot = await getDoc(docRef); 
   const newGameData = newGameSnapshot.data();
   return { 
     id: docRef.id, 
@@ -105,7 +105,7 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     id: docRef.id,
     createdAt: newTournamentData?.createdAt as Timestamp,
     updatedAt: newTournamentData?.updatedAt as Timestamp,
-    startDate: Timestamp.fromDate(startDate), // Ensure it's a Timestamp for consistency
+    startDate: Timestamp.fromDate(startDate), 
   };
 };
 
@@ -116,22 +116,23 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("status", "==", queryParams.status));
   }
   if (queryParams?.gameId) {
+    // IMPORTANT: Querying by gameId AND ordering by startDate may require a composite index in Firestore.
+    // Example: Collection: tournaments, Fields: gameId (ASC), startDate (DESC or ASC depending on Firestore's suggestion).
+    // Firebase error messages will typically provide a link to create this index.
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
   if (queryParams?.participantId) {
-    qConstraints.push(where("participants", "array-contains", queryParams.participantId)); // This is a simplified way to check participation. For actual participant objects, you'd check for objects containing the id. See note below.
+    // This queries if the participantId string is present in the 'participants' array (if it's an array of UIDs).
+    // If 'participants' is an array of objects, you'd query a specific field in those objects,
+    // e.g., where("participantIds", "array-contains", queryParams.participantId) if you had a denormalized array of IDs.
+    // For complex objects, you might need to adjust your data structure or use array-contains-any with up to 10 UIDs.
+    // A common approach is to filter client-side for broader participation checks or structure data for easier querying.
+    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId })); // Assuming participants is an array of objects with an id field
   }
   if (queryParams?.count) {
     qConstraints.push(limit(queryParams.count));
   }
-  // Note: Firestore's array-contains query works for primitive values in an array.
-  // If participants is an array of objects, you'd query `where("participants.id", "==", participantId)` if `participants` field was an array of maps, 
-  // but for `array-contains` to work on an array of objects, the entire object must match.
-  // A common workaround is to store an array of participant IDs alongside the array of participant objects, or restructure.
-  // For now, the participantId filter will assume `participants` field contains an array of UIDs if that's how it's queried.
-  // Given Participant is {id, name, avatarUrl}, a more robust query for "user participated in" would be harder without denormalizing participant IDs into a separate array field.
-  // Let's assume for the stats page, we fetch all tournaments and filter client-side for participation for now.
-
+  
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
   const tournamentsSnapshot = await getDocs(q);
   
@@ -207,9 +208,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournamentData = tournamentSnap.data() as Tournament;
-    // Convert Firestore Timestamps back to Date objects for comparison if necessary, or ensure types are consistent
-    // For this logic, we primarily care about participant list and maxParticipants
+    const tournamentData = tournamentSnap.data() as Tournament; // Type assertion
     const currentParticipants = tournamentData.participants || [];
 
     if (currentParticipants.find(p => p.id === participant.id)) {
@@ -252,8 +251,8 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   }
   
   // IMPORTANT: This query might require a composite index in Firestore if 'target' is used.
-  // The index would be: collection 'notifications', fields 'target' (ASC), 'createdAt' (DESC).
-  // Firestore usually provides a link in the console error (like the one you received) to create this index.
+  // Example: Collection: notifications, Fields: target (ASC), createdAt (DESC).
+  // Firebase error messages will typically provide a link to create this index.
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
   
@@ -273,25 +272,24 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
   return usersSnapshot.docs.map(doc => {
     const data = doc.data();
     return {
-      // Ensure all fields from UserProfile are mapped, falling back if necessary
       uid: doc.id,
       displayName: data.displayName || null,
       email: data.email || null,
       photoURL: data.photoURL || null,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp,
-      // FirebaseUser specific fields (less relevant for display, but good for type)
+      createdAt: data.createdAt as Timestamp, // Assuming createdAt is stored
+      // FirebaseUser specific fields (fill with defaults or ensure they exist)
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
       metadata: data.metadata || {},
       providerData: data.providerData || [],
       refreshToken: data.refreshToken || '',
       tenantId: data.tenantId || null,
-      delete: async () => {}, // Placeholder, not directly callable from client
-      getIdToken: async () => '', // Placeholder
-      getIdTokenResult: async () => ({} as any), // Placeholder
-      reload: async () => {}, // Placeholder
-      toJSON: () => ({}), // Placeholder
+      delete: async () => { console.warn("Delete not implemented on client-side UserProfile"); },
+      getIdToken: async () => { console.warn("getIdToken not implemented on client-side UserProfile"); return ""; },
+      getIdTokenResult: async () => { console.warn("getIdTokenResult not implemented on client-side UserProfile"); return ({} as any); },
+      reload: async () => { console.warn("reload not implemented on client-side UserProfile"); },
+      toJSON: () => ({ uid: doc.id, email: data.email, displayName: data.displayName }),
       phoneNumber: data.phoneNumber || null,
       providerId: data.providerId || '',
     } as UserProfile;
@@ -316,27 +314,24 @@ export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | nul
         updatedAt: data.updatedAt as Timestamp,
     } as SiteSettings;
   }
-  return null; // No settings found
+  return null; 
 };
 
 export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSettings, 'id' | 'updatedAt'>): Promise<void> => {
   const docRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
-  await setDoc(docRef, { // Use setDoc to create or overwrite
+  await setDoc(docRef, { 
     ...settingsData,
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true }); // Use merge: true to create or update
 };
 
 
-// Aliases for easier use (some might be deprecated if replaced by direct Firestore calls in components)
+// Aliases for easier use 
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-export const addTournament = addTournamentToFirestore; // Kept for potential direct use
-export const addGame = addGameToFirestore; // Kept
-export const updateGameInStore = updateGameInFirestore; // Renamed for clarity vs Firestore
-export const deleteGameFromStore = deleteGameFromFirestore; // Renamed
-export const deleteTournamentFromStore = deleteTournamentFromFirestore; // Renamed
-export const getTournaments = () => getTournamentsFromFirestore(); // Kept
-export const getGames = getGamesFromFirestore; // Kept
+// addTournament and addGame are already clear as addTournamentToFirestore and addGameToFirestore
+// updateGameInStore, deleteGameFromStore, deleteTournamentFromStore are good as updateGameInFirestore, etc.
+// getTournaments and getGames are clear
 
+    
