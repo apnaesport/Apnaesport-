@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
@@ -29,14 +29,16 @@ const tournamentSchema = z.object({
   name: z.string().min(5, "Tournament name must be at least 5 characters."),
   gameId: z.string().min(1, "Please select a game."),
   description: z.string().min(20, "Description must be at least 20 characters.").max(500, "Description must be 500 characters or less."),
-  startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), // Prevent past dates
+  startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
   prizePool: z.string().optional(),
   bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
   rules: z.string().optional(),
   registrationInstructions: z.string().optional(),
   bannerImageFile: z.custom<FileList>().optional(), 
-  bannerImageDataUri: z.string().optional(), 
+  bannerImageDataUri: z.string().optional(),
+  entryFee: z.coerce.number().min(0, "Entry fee cannot be negative.").optional(),
+  currency: z.string().optional(),
 });
 
 
@@ -49,6 +51,8 @@ export default function CreateTournamentPage() {
   const [isLoadingGames, setIsLoadingGames] = useState(true);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
+
+  const defaultCurrency = "USD"; // You can make this configurable later
 
   const form = useForm<TournamentFormDataUI>({
     resolver: zodResolver(tournamentSchema),
@@ -63,6 +67,9 @@ export default function CreateTournamentPage() {
       rules: "",
       registrationInstructions: "",
       bannerImageDataUri: "",
+      entryFee: 0,
+      currency: defaultCurrency,
+      featured: false,
     },
   });
 
@@ -83,7 +90,7 @@ export default function CreateTournamentPage() {
   }, [searchParams, form, toast]);
 
   useEffect(() => {
-    if (user) { // Fetch games only if user is logged in
+    if (user) { 
         fetchGames();
     }
   }, [user, fetchGames]);
@@ -119,17 +126,16 @@ export default function CreateTournamentPage() {
       return;
     }
 
-    // Ensure startDate has time component if not set by time input explicitly
+    
     let finalStartDate = data.startDate;
     if (finalStartDate && finalStartDate.getHours() === 0 && finalStartDate.getMinutes() === 0 && finalStartDate.getSeconds() === 0) {
         const now = new Date();
         finalStartDate.setHours(now.getHours(), now.getMinutes());
-        if (finalStartDate < new Date()) { // If setting time makes it past for today, adjust
-            finalStartDate = new Date(data.startDate); // reset to original date part
-            finalStartDate.setHours(23, 59); // default to end of day
+        if (finalStartDate < new Date()) { 
+            finalStartDate = new Date(data.startDate); 
+            finalStartDate.setHours(23, 59); 
         }
     }
-
 
     const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date } = {
       name: data.name,
@@ -137,7 +143,7 @@ export default function CreateTournamentPage() {
       gameName: selectedGame.name,
       gameIconUrl: selectedGame.iconUrl,
       description: data.description,
-      startDate: finalStartDate, // Already a Date object from the form
+      startDate: finalStartDate, 
       maxParticipants: data.maxParticipants,
       prizePool: data.prizePool,
       bracketType: data.bracketType,
@@ -149,17 +155,18 @@ export default function CreateTournamentPage() {
       participants: [], 
       status: "Upcoming" as TournamentStatus,
       matches: [], 
+      featured: data.featured || false,
+      entryFee: data.entryFee || 0,
+      currency: data.entryFee && data.entryFee > 0 ? data.currency || defaultCurrency : undefined,
     };
     
-    console.log("Submitting new tournament to Firestore:", newTournamentData);
-
     try {
-      const createdTournament = await addTournamentToFirestore(newTournamentData); 
+      const createdTournamentId = await addTournamentToFirestore(newTournamentData); 
       toast({
         title: "Tournament Created!",
         description: `"${data.name}" has been successfully created.`,
       });
-      router.push(`/tournaments/${createdTournament.id}`); 
+      router.push(`/tournaments/${createdTournamentId}`); 
     } catch (error) {
       console.error("Error creating tournament:", error);
       toast({ title: "Creation Failed", description: "Could not create tournament. Please try again.", variant: "destructive" });
@@ -168,7 +175,7 @@ export default function CreateTournamentPage() {
     }
   };
 
-  if (authLoading || (user && isLoadingGames)) { // Show loader if auth is loading OR user is logged in and games are loading
+  if (authLoading || (user && isLoadingGames)) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -293,8 +300,8 @@ export default function CreateTournamentPage() {
                                 disabled={isSubmittingForm}
                                 onChange={(e) => {
                                     const [hours, minutes] = e.target.value.split(':').map(Number);
-                                    const newDate = field.value ? new Date(field.value) : new Date(); // Ensure date part is today if field.value is null
-                                    if (!field.value) { // if no date was picked yet, set newDate to today
+                                    const newDate = field.value ? new Date(field.value) : new Date(); 
+                                    if (!field.value) { 
                                         const today = new Date();
                                         newDate.setDate(today.getDate());
                                         newDate.setMonth(today.getMonth());
@@ -305,7 +312,7 @@ export default function CreateTournamentPage() {
                                     
                                     if (newDate < new Date() && !(newDate.toDateString() === new Date().toDateString() && newDate.getTime() >= new Date().getTime())) {
                                         toast({ title: "Invalid Time", description: "Cannot select a past time.", variant: "destructive" });
-                                        // Optionally reset time input or prevent change
+                                        
                                         return;
                                     }
                                     field.onChange(newDate);
@@ -347,6 +354,40 @@ export default function CreateTournamentPage() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               <div>
+                <Label htmlFor="entryFee">Entry Fee (0 for free)</Label>
+                <div className="relative">
+                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input id="entryFee" type="number" step="0.01" {...form.register("entryFee")} className="pl-8" disabled={isSubmittingForm}/>
+                </div>
+                {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="currency">Currency</Label>
+                <Controller
+                    name="currency"
+                    control={form.control}
+                    render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || (form.watch("entryFee") || 0) === 0}>
+                            <SelectTrigger id="currency">
+                                <SelectValue placeholder="Select currency..."/>
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="USD">USD ($)</SelectItem>
+                                <SelectItem value="EUR">EUR (€)</SelectItem>
+                                <SelectItem value="GBP">GBP (£)</SelectItem>
+                                <SelectItem value="INR">INR (₹)</SelectItem>
+                                {/* Add more currencies as needed */}
+                            </SelectContent>
+                        </Select>
+                    )}
+                />
+                {form.formState.errors.currency && <p className="text-destructive text-xs mt-1">{form.formState.errors.currency.message}</p>}
+              </div>
+            </div>
+
+
             <div>
               <Label htmlFor="prizePool">Prize Pool (Optional)</Label>
               <Input id="prizePool" {...form.register("prizePool")} placeholder="e.g., $1000, In-game items" disabled={isSubmittingForm} />
@@ -362,6 +403,29 @@ export default function CreateTournamentPage() {
               <Textarea id="registrationInstructions" {...form.register("registrationInstructions")} rows={3} placeholder="e.g., How to join, in-game ID requirements, Discord server link..." disabled={isSubmittingForm}/>
               {form.formState.errors.registrationInstructions && <p className="text-destructive text-xs mt-1">{form.formState.errors.registrationInstructions.message}</p>}
             </div>
+            
+            <div>
+                <div className="flex items-center space-x-2">
+                    <Controller
+                        name="featured"
+                        control={form.control}
+                        render={({ field }) => (
+                            <Input
+                                type="checkbox"
+                                id="featured"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                className="h-4 w-4 accent-primary"
+                                disabled={isSubmittingForm}
+                            />
+                        )}
+                    />
+                    <Label htmlFor="featured" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Feature this tournament? (Visible to admins)
+                    </Label>
+                </div>
+            </div>
+
 
             <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading} className="w-full md:w-auto">
               {isSubmittingForm ? (
@@ -377,3 +441,4 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+

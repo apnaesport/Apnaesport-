@@ -29,7 +29,7 @@ const GLOBAL_SETTINGS_ID = "global";
 
 // --- Game Functions ---
 
-export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt' | 'updatedAt'>): Promise<Game> => {
+export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   const docRef = await addDoc(collection(db, GAMES_COLLECTION), {
     ...gameData,
     iconUrl: gameData.iconUrl || `https://placehold.co/40x40.png?text=${(gameData.name || "G").substring(0,2)}`,
@@ -38,17 +38,7 @@ export const addGameToFirestore = async (gameData: Omit<Game, 'id' | 'createdAt'
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
-  const newGameSnapshot = await getDoc(docRef);
-  const newGameData = newGameSnapshot.data();
-  return {
-    id: docRef.id,
-    ...gameData,
-    iconUrl: newGameData?.iconUrl,
-    bannerUrl: newGameData?.bannerUrl,
-    dataAiHint: newGameData?.dataAiHint,
-    createdAt: newGameData?.createdAt as Timestamp,
-    updatedAt: newGameData?.updatedAt as Timestamp
-  };
+  return docRef.id;
 };
 
 export const getGamesFromFirestore = async (): Promise<Game[]> => {
@@ -98,7 +88,7 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 
 // --- Tournament Functions ---
 
-export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date }): Promise<Tournament> => {
+export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date }): Promise<string> => {
   const { startDate, ...restData } = tournamentData;
   const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
     ...restData,
@@ -107,20 +97,11 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
     updatedAt: serverTimestamp(),
     matches: tournamentData.matches || [],
     featured: tournamentData.featured || false,
+    entryFee: tournamentData.entryFee || 0,
+    currency: tournamentData.entryFee && tournamentData.entryFee > 0 ? tournamentData.currency || 'USD' : null,
     bannerImageUrl: tournamentData.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
   });
-  const newTournamentSnapshot = await getDoc(docRef);
-  const newTournamentData = newTournamentSnapshot.data();
-
-  return {
-    ...tournamentData,
-    id: docRef.id,
-    createdAt: newTournamentData?.createdAt as Timestamp,
-    updatedAt: newTournamentData?.updatedAt as Timestamp,
-    startDate: Timestamp.fromDate(startDate),
-    featured: newTournamentData?.featured,
-    bannerImageUrl: newTournamentData?.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
-  };
+ return docRef.id;
 };
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
@@ -133,6 +114,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     // IMPORTANT: Querying by gameId AND ordering by startDate may require a composite index in Firestore.
     // Example: Collection: tournaments, Fields: gameId (ASC), startDate (DESC).
     // Firebase error messages will typically provide a link to create this index: gameId ASC, startDate DESC
+    // Link for this query if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
     qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
    if (queryParams?.featured !== undefined) {
@@ -159,6 +141,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
+      entryFee: data.entryFee || 0,
+      currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
     } as Tournament;
   });
 };
@@ -177,7 +161,7 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
         const numMatches = Math.floor(data.participants.length / 2);
         for(let i = 0; i < numMatches; i++) {
             matches.push({
-                id: `m-auto-${tournamentId}-${i+1}`, // Generate a pseudo-ID
+                id: `m-auto-${tournamentId}-${i+1}`, 
                 round: 1,
                 participants: [data.participants[i*2] || null, data.participants[i*2+1] || null],
                 status: 'Pending'
@@ -194,7 +178,9 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
-      matches: matches, // Include potentially generated matches
+      matches: matches, 
+      entryFee: data.entryFee || 0,
+      currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
     } as Tournament;
   }
   return undefined;
@@ -213,9 +199,9 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   }
 
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-  // Ensure participants array is not overwritten with undefined if not provided
+  
   if (tournamentData.participants === undefined && Object.keys(restData).includes('participants')) {
-    delete updateData.participants; // Avoid accidentally wiping participants if not in partial update
+    delete updateData.participants; 
   }
   await updateDoc(docRef, updateData);
 };
@@ -229,7 +215,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   const tournamentSnap = await getDoc(tournamentRef);
 
   if (tournamentSnap.exists()) {
-    const tournamentData = tournamentSnap.data() as Tournament; // Cast to Tournament
+    const tournamentData = tournamentSnap.data() as Tournament; 
     const currentParticipants = tournamentData.participants || [];
 
     if (currentParticipants.find(p => p.id === participant.id)) {
@@ -250,18 +236,12 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
 
 // --- Notification Functions ---
 
-export const sendNotificationToFirestore = async (notificationData: NotificationFormData): Promise<NotificationMessage> => {
+export const sendNotificationToFirestore = async (notificationData: NotificationFormData): Promise<string> => {
   const docRef = await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
     ...notificationData,
     createdAt: serverTimestamp(),
   });
-  const newNotificationSnapshot = await getDoc(docRef);
-  const newNotificationData = newNotificationSnapshot.data();
-  return {
-    id: docRef.id,
-    ...notificationData,
-    createdAt: newNotificationData?.createdAt as Timestamp,
-  };
+  return docRef.id;
 };
 
 export const getNotificationsFromFirestore = async (target?: NotificationTarget): Promise<NotificationMessage[]> => {
@@ -271,7 +251,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     qConstraints.push(where("target", "==", target));
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // https://console.firebase.google.com/project/_/firestore/indexes?create_composite=...?
+  // Link for this query if error: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -297,7 +277,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp,
+      createdAt: data.createdAt as Timestamp, // Assuming createdAt is a Firestore Timestamp
       bio: data.bio || "",
       favoriteGames: data.favoriteGames || "",
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -331,7 +311,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
-      createdAt: data.createdAt as Timestamp,
+      createdAt: data.createdAt as Timestamp, // Assuming createdAt is a Firestore Timestamp
       bio: data.bio || "",
       favoriteGames: data.favoriteGames || "",
       streamingChannelUrl: data.streamingChannelUrl || "",

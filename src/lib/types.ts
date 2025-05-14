@@ -11,18 +11,18 @@ export interface UserProfile extends FirebaseUser {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
-  createdAt?: Timestamp; // Added for user creation date
-  bio?: string; // New: User's biography
-  favoriteGames?: string; // New: Comma-separated list or similar
-  streamingChannelUrl?: string; // New: URL to their streaming channel
+  createdAt?: Timestamp; 
+  bio?: string; 
+  favoriteGames?: string; 
+  streamingChannelUrl?: string; 
 }
 
 export type Game = {
-  id: string; // Firestore document ID
+  id: string; 
   name: string;
-  iconUrl: string; // URL to game icon/logo or Data URL
-  bannerUrl?: string; // Optional banner for game page or Data URL
-  dataAiHint?: string; // For AI image generation hints
+  iconUrl: string; 
+  bannerUrl?: string; 
+  dataAiHint?: string; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
@@ -30,7 +30,7 @@ export type Game = {
 export type TournamentStatus = "Upcoming" | "Live" | "Ongoing" | "Completed" | "Cancelled";
 
 export type Participant = {
-  id: string; // User UID
+  id: string; 
   name: string;
   avatarUrl?: string;
 };
@@ -38,23 +38,23 @@ export type Participant = {
 export type Match = {
   id: string;
   round: number;
-  participants: [Participant | null, Participant | null]; // Can be null if BYE
-  winner?: Participant | null; // Winner of the match
-  score?: string; // e.g., "2-1"
-  startTime?: Date | Timestamp; // Allow both for easier handling
+  participants: [Participant | null, Participant | null]; 
+  winner?: Participant | null; 
+  score?: string; 
+  startTime?: Date | Timestamp; 
   status: "Pending" | "Live" | "Completed";
 };
 
 export type Tournament = {
-  id: string; // Firestore document ID
+  id: string; 
   name: string;
-  gameId: string; // Reference to Game ID in Firestore
-  gameName: string; // Denormalized for easy display
-  gameIconUrl: string; // Denormalized
-  bannerImageUrl: string; // URL or Data URL
+  gameId: string; 
+  gameName: string; 
+  gameIconUrl: string; 
+  bannerImageUrl: string; 
   description: string;
   status: TournamentStatus;
-  startDate: Date | Timestamp; // Store as Timestamp in Firestore, use Date in app
+  startDate: Date | Timestamp; 
   endDate?: Date | Timestamp;
   participants: Participant[];
   maxParticipants: number;
@@ -64,10 +64,12 @@ export type Tournament = {
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   matches?: Match[];
   featured?: boolean;
-  organizer?: string; // User display name
-  organizerId?: string; // UID of the user who created it
+  organizer?: string; 
+  organizerId?: string; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  entryFee?: number; // New: Entry fee for the tournament
+  currency?: string; // New: Currency for the entry fee (e.g., "USD", "INR")
 };
 
 export type TournamentFormDataUI = {
@@ -83,6 +85,8 @@ export type TournamentFormDataUI = {
   bannerImageFile?: FileList;
   bannerImageDataUri?: string;
   featured?: boolean;
+  entryFee?: number; // New
+  currency?: string; // New
 };
 
 
@@ -94,7 +98,7 @@ export type StatItem = {
 };
 
 export interface SiteSettings {
-  id?: string; // Typically "global" or a fixed ID
+  id?: string; 
   siteName: string;
   siteDescription: string;
   maintenanceMode: boolean;

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, Gamepad2, Eye } from "lucide-react";
+import { CalendarDays, Users, Gamepad2, Eye, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -21,7 +21,18 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
 
   useEffect(() => {
     if (tournament.startDate) {
-      setFormattedStartDate(format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p"));
+      try {
+        // Ensure tournament.startDate is a Date object or can be converted
+        const dateToFormat = tournament.startDate instanceof Date 
+          ? tournament.startDate 
+          : (tournament.startDate as any)?.toDate 
+            ? (tournament.startDate as any).toDate() 
+            : new Date(tournament.startDate as any);
+        setFormattedStartDate(format(dateToFormat, "MMM dd, yyyy 'at' p"));
+      } catch (error) {
+        console.error("Error formatting date in TournamentCard:", error);
+        setFormattedStartDate("Invalid date");
+      }
     }
   }, [tournament.startDate]);
 
@@ -39,6 +50,8 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
     }
   };
   
+  const isPremium = tournament.entryFee && tournament.entryFee > 0;
+
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
       <CardHeader className="relative p-0 h-48">
@@ -49,15 +62,23 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           objectFit="cover"
           className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="tournament banner small"
-          onError={(e) => e.currentTarget.src = `https://placehold.co/400x200.png`}
+          unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
+          onError={(e) => (e.currentTarget.src = `https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-        <Badge 
-          variant={getStatusBadgeVariant(tournament.status)} 
-          className="absolute top-3 right-3 uppercase tracking-wider"
-        >
-          {tournament.status}
-        </Badge>
+        <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+            <Badge 
+            variant={getStatusBadgeVariant(tournament.status)} 
+            className="uppercase tracking-wider"
+            >
+            {tournament.status}
+            </Badge>
+            {isPremium && (
+                <Badge variant="outline" className="bg-primary/80 text-primary-foreground border-primary-foreground/50">
+                    <DollarSign className="h-3 w-3 mr-1" /> Premium
+                </Badge>
+            )}
+        </div>
         <div className="absolute bottom-0 left-0 p-4">
           <CardTitle className="text-xl font-semibold text-white drop-shadow-md line-clamp-2">
             {tournament.name}
@@ -81,6 +102,12 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             <Users className="h-4 w-4 mr-2 text-primary" />
             <span>{tournament.participants.length} / {tournament.maxParticipants} Participants</span>
           </div>
+           <div className="flex items-center text-muted-foreground">
+            <DollarSign className="h-4 w-4 mr-2 text-primary" />
+            <span>
+                {isPremium ? `${tournament.entryFee} ${tournament.currency || 'USD'} Entry` : "Free Entry"}
+            </span>
+          </div>
         </div>
       </CardContent>
       <CardFooter className="p-4 border-t">
@@ -93,4 +120,3 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
     </Card>
   );
 }
-

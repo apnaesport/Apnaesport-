@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info, Loader2 } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, Info, Loader2, DollarSign } from "lucide-react"; 
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { useState, useEffect, useCallback }
 from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentByIdFromFirestore, addParticipantToTournament, deleteTournamentFromFirestore as deleteTournamentAction, updateTournamentInFirestore } from "@/lib/tournamentStore"; 
+import { getTournamentByIdFromFirestore, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -55,7 +55,12 @@ export default function TournamentPage({ params }: TournamentPageProps) {
       const fetchedTournament = await getTournamentByIdFromFirestore(tournamentId);
       setTournament(fetchedTournament);
       if (fetchedTournament) {
-        setFormattedStartDate(format(new Date(fetchedTournament.startDate), "PPPPp"));
+         const dateToFormat = fetchedTournament.startDate instanceof Date 
+          ? fetchedTournament.startDate 
+          : (fetchedTournament.startDate as any)?.toDate 
+            ? (fetchedTournament.startDate as any).toDate() 
+            : new Date(fetchedTournament.startDate as any);
+        setFormattedStartDate(format(dateToFormat, "PPPPp"));
         if (user) {
           setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
         }
@@ -95,6 +100,17 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         return;
     }
 
+    if (tournament.entryFee && tournament.entryFee > 0) {
+        toast({
+            title: "Premium Tournament",
+            description: `Entry Fee: ${tournament.entryFee} ${tournament.currency || 'USD'}. Payment system not implemented in prototype. Joining for free for now.`,
+            duration: 5000,
+        });
+        // In a real app, you would redirect to a payment flow here.
+        // For prototype, we proceed to join.
+    }
+
+
     setIsJoining(true);
     try {
       const newParticipant: Participant = { 
@@ -102,8 +118,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         name: user.displayName || "Anonymous Player", 
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
       };
-      // Instead of addParticipantToTournament, we directly update the tournament
-      // to ensure Firestore upsert logic (if defined there) is used.
+      
       const updatedParticipants = [...tournament.participants, newParticipant];
       await updateTournamentInFirestore(tournament.id, { participants: updatedParticipants });
       
@@ -142,7 +157,7 @@ export default function TournamentPage({ params }: TournamentPageProps) {
   if (isLoading || authLoading) {
     return (
       <div className="space-y-8">
-        <Skeleton className="h-64 md:h-80 w-full rounded-lg" />
+        <Skeleton className="h-48 sm:h-64 md:h-80 w-full rounded-lg" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-4">
             <Skeleton className="h-12 w-1/3" />
@@ -172,8 +187,8 @@ export default function TournamentPage({ params }: TournamentPageProps) {
     );
   }
   
-  const canJoinOrRegister = user && (tournament.status === "Upcoming" || tournament.status === "Live");
   const isTournamentCreator = user && tournament.organizerId === user.uid;
+  const isPremium = tournament.entryFee && tournament.entryFee > 0;
 
 
   return (
@@ -192,7 +207,14 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
-          <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="mb-2 text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
+             {isPremium && (
+                <Badge variant="outline" className="bg-primary/90 text-primary-foreground border-primary-foreground/50 text-xs sm:text-sm px-2 sm:px-3 py-1">
+                    <DollarSign className="h-3 w-3 mr-1" /> Premium
+                </Badge>
+            )}
+          </div>
           <PageTitle title={tournament.name} className="mb-0 text-shadow !text-xl sm:!text-2xl md:!text-3xl text-white" /> 
           <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm text-slate-200 drop-shadow-sm">
             <Image 
@@ -271,6 +293,15 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                             <p className="text-muted-foreground">{tournament.bracketType}</p>
                         </div>
                     </div>
+                    {isPremium && (
+                        <div className="flex items-start space-x-3">
+                            <DollarSign className="h-6 w-6 text-primary mt-1 shrink-0" />
+                            <div>
+                                <p className="font-medium">Entry Fee</p>
+                                <p className="text-muted-foreground">{tournament.entryFee} {tournament.currency}</p>
+                            </div>
+                        </div>
+                    )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -332,6 +363,11 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                 {tournament.status === "Completed" && "Tournament Ended"}
                 {tournament.status === "Cancelled" && "Tournament Cancelled"}
               </CardTitle>
+              {isPremium && (
+                <CardDescription className="text-primary-foreground/90">
+                    Entry: {tournament.entryFee} {tournament.currency}
+                </CardDescription>
+              )}
             </CardHeader>
             <CardContent>
               <p className="mb-4 text-sm sm:text-base">
@@ -388,7 +424,6 @@ export default function TournamentPage({ params }: TournamentPageProps) {
             <Card>
                 <CardHeader><CardTitle>Admin Actions</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                    {/* <Button variant="outline" className="w-full" disabled>Edit Tournament (Coming Soon)</Button> */}
                     <AlertDialog>
                         <AlertDialogTrigger asChild>
                             <Button variant="destructive" className="w-full" disabled={isDeleting}>
