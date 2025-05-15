@@ -1,18 +1,18 @@
-
 import Link from "next/link";
-import { Gamepad2 } from "lucide-react"; // Changed to Gamepad2 for a more generic esport feel
+import { ApnaEsportLogo } from "./ApnaEsportLogo"; // Import the new SVG logo
 
 export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const sizeClasses = {
-    sm: "text-xl",
-    md: "text-2xl",
-    lg: "text-3xl",
+    sm: { width: 120, height: 46 }, // Approx 2/3 of md
+    md: { width: 180, height: 70 },
+    lg: { width: 240, height: 93 }, // Approx 4/3 of md
   };
 
+  const currentSize = sizeClasses[size] || sizeClasses.md;
+
   return (
-    <Link href="/" className={`flex items-center gap-2 font-bold text-primary hover:text-accent transition-colors ${sizeClasses[size]} ${className}`}>
-      <Gamepad2 className={`h-auto ${size === 'sm' ? 'w-5' : size === 'md' ? 'w-6' : 'w-7'}`} />
-      <span>Apna Esport</span>
+    <Link href="/" className={`flex items-center gap-2 font-bold text-primary hover:text-accent transition-colors ${className}`}>
+      <ApnaEsportLogo width={currentSize.width} height={currentSize.height} />
     </Link>
   );
 }

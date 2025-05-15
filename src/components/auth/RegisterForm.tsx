@@ -22,11 +22,16 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
+import { Label } from "@/components/ui/label"; // Added Label for Checkbox
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  termsAccepted: z.boolean().refine(val => val === true, {
+    message: "You must accept the terms and conditions.",
+  }),
 });
 
 export function RegisterForm() {
@@ -41,6 +46,7 @@ export function RegisterForm() {
       name: "",
       email: "",
       password: "",
+      termsAccepted: false,
     },
   });
 
@@ -67,7 +73,7 @@ export function RegisterForm() {
         streamingChannelUrl: "",
         friendUids: [],
         teamId: null,
-        points: 0, // Initialize points
+        points: 0, 
       });
 
       toast({
@@ -89,6 +95,8 @@ export function RegisterForm() {
       setIsLoading(false);
     }
   }
+
+  const termsAccepted = form.watch("termsAccepted");
 
   return (
     <Form {...form}>
@@ -144,7 +152,36 @@ export function RegisterForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <FormField
+          control={form.control}
+          name="termsAccepted"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow-sm">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                  disabled={isLoading}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <Label htmlFor="termsAccepted" className="text-sm">
+                  I agree to the{' '}
+                  <Link href="/terms" target="_blank" className="font-medium text-primary hover:underline">
+                    Terms & Conditions
+                  </Link>{' '}
+                  and{' '}
+                  <Link href="/privacy" target="_blank" className="font-medium text-primary hover:underline">
+                    Privacy Policy
+                  </Link>
+                  .
+                </Label>
+                <FormMessage />
+              </div>
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={isLoading || !termsAccepted}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Create Account
         </Button>

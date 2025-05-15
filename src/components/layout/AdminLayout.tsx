@@ -17,6 +17,7 @@ import {
   SidebarFooter,
   SidebarInset,
 } from "@/components/ui/sidebar";
+import Link from "next/link"; // Added Link for footer
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -31,13 +32,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       if (!user) {
         router.push("/auth/login?redirect=/admin/dashboard");
       } else if (!isAdmin) {
-        router.push("/dashboard"); // Or an unauthorized page
+        router.push("/dashboard"); 
       }
     }
   }, [user, isAdmin, loading, router]);
 
   if (loading || !user || !isAdmin) {
-    // Show loading spinner, or a more specific "Access Denied" message if !isAdmin after loading
     return <LoadingSpinner fullPage text={loading ? "Verifying access..." : "Access Denied"} />;
   }
 
@@ -51,8 +51,13 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         <SidebarContent className="p-2">
           <AdminSidebarNav />
         </SidebarContent>
-         <SidebarFooter className="p-2 text-xs text-muted-foreground/50">
-          TournamentHub Admin
+         <SidebarFooter className="p-2 text-xs text-muted-foreground/80 flex flex-col items-center gap-1">
+          <div>Apna Esport Admin Panel</div>
+           <div className="flex gap-2 text-xs">
+            <Link href="/terms" className="hover:text-primary" target="_blank">Terms</Link>
+            <span className="text-muted-foreground/50">|</span>
+            <Link href="/privacy" className="hover:text-primary" target="_blank">Privacy</Link>
+          </div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>

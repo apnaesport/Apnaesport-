@@ -13,7 +13,7 @@ import {
   SidebarFooter,
   SidebarInset,
 } from "@/components/ui/sidebar";
-
+import Link from "next/link"; // Added Link for footer
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -29,8 +29,17 @@ export function MainLayout({ children }: MainLayoutProps) {
         <SidebarContent className="p-2">
           <SidebarNav />
         </SidebarContent>
-        <SidebarFooter className="p-2 text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} Apna Esport
+        <SidebarFooter className="p-2 text-xs text-muted-foreground/80 flex flex-col items-center gap-1">
+          <div>&copy; {new Date().getFullYear()} Apna Esport</div>
+          <div className="flex gap-2 text-xs">
+            <Link href="/about" className="hover:text-primary">About</Link>
+            <span className="text-muted-foreground/50">|</span>
+            <Link href="/contact" className="hover:text-primary">Contact</Link>
+            <span className="text-muted-foreground/50">|</span>
+            <Link href="/terms" className="hover:text-primary">Terms</Link>
+            <span className="text-muted-foreground/50">|</span>
+            <Link href="/privacy" className="hover:text-primary">Privacy</Link>
+          </div>
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
