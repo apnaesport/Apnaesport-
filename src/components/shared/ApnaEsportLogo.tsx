@@ -2,11 +2,13 @@
 import type { SVGProps } from 'react';
 
 export function ApnaEsportLogo(props: SVGProps<SVGSVGElement>) {
+  // Adjusted viewBox and text positioning for a cleaner "Apna Esport" text logo
+  // Removed the angular border path
   return (
     <svg
-      width="180"
-      height="70"
-      viewBox="0 0 180 70"
+      width="180" // Default width, can be scaled by parent
+      height="70" // Default height, can be scaled by parent
+      viewBox="0 0 180 50" // Adjusted viewBox for potentially tighter text
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-labelledby="apnaEsportLogoTitle"
@@ -14,40 +16,19 @@ export function ApnaEsportLogo(props: SVGProps<SVGSVGElement>) {
       {...props}
     >
       <title id="apnaEsportLogoTitle">Apna Esport Logo</title>
-      {/* Angular Border */}
-      <path
-        d="M5 20 L15 5 L165 5 L175 20 L175 50 L165 65 L15 65 L5 50 Z"
-        stroke="hsl(var(--primary))" // Using primary color from theme
-        strokeWidth="3"
-        fill="transparent"
-      />
-      {/* Text: APNA */}
+      {/* Text: Apna Esport */}
       <text
         x="50%"
-        y="32" // Adjusted y for APNA
+        y="50%" // Centered vertically
         dominantBaseline="middle"
         textAnchor="middle"
-        fontSize="24"
+        fontSize="22" // Slightly adjusted font size
         fontWeight="bold"
         fill="hsl(var(--foreground))" // Using foreground color from theme
         fontFamily="Arial, sans-serif" // A common bold font
         letterSpacing="1"
       >
-        APNA
-      </text>
-      {/* Text: ESPORT */}
-      <text
-        x="50%"
-        y="55" // Adjusted y for ESPORT
-        dominantBaseline="middle"
-        textAnchor="middle"
-        fontSize="24"
-        fontWeight="bold"
-        fill="hsl(var(--foreground))" // Using foreground color from theme
-        fontFamily="Arial, sans-serif" // A common bold font
-        letterSpacing="1"
-      >
-        ESPORT
+        APNA ESPORT
       </text>
     </svg>
   );
