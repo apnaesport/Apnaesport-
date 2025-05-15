@@ -1,65 +1,57 @@
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Gamepad2, Trophy } from "lucide-react";
+import { Users, Gamepad2, Trophy, Target, Eye, Briefcase } from "lucide-react"; // Added icons
 
 export default function AboutUsPage() {
   return (
     <div className="space-y-8">
-      <PageTitle title="About Apna Esport" subtitle="Your Ultimate Gaming Tournament Platform." />
+      <PageTitle title="About Apna Esport" subtitle="India’s upcoming online esports platform, crafted for passionate gamers and students looking to compete, learn, and rise as champions." />
       
       <Card>
         <CardHeader>
-          <CardTitle>Our Mission</CardTitle>
+          <CardTitle className="flex items-center"><Target className="mr-2 h-6 w-6 text-primary"/>Our Vision</CardTitle>
         </CardHeader>
         <CardContent className="prose dark:prose-invert max-w-none">
           <p>
-            Apna Esport is dedicated to providing a seamless and engaging platform for gamers of all levels to compete, connect,
-            and showcase their skills. We believe in the power of esports to build communities and foster friendly competition.
-            Our goal is to be the premier destination for online gaming tournaments.
+            We aim to build the most engaging esports platform in India—where every gamer, regardless of age or location, has the chance to shine and grow.
           </p>
-          <p>Content for this section will be expanded soon.</p>
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center"><Gamepad2 className="mr-2 h-6 w-6 text-primary"/>What We Offer</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
+                <li>Open and student-based tournaments</li>
+                <li>Problem Leagues with redeemable rewards</li>
+                <li>Chance to host your own tournaments with custom codes</li>
+                <li>A Champions Board highlighting top performers</li>
+            </ul>
+        </CardContent>
+      </Card>
+
+
+      <div className="grid md:grid-cols-1 gap-6">
         <Card>
           <CardHeader className="items-center text-center">
-            <Users className="h-12 w-12 text-primary mb-2" />
-            <CardTitle>For Players</CardTitle>
+            <Eye className="h-12 w-12 text-primary mb-2" />
+            <CardTitle>Why Choose Us?</CardTitle>
           </CardHeader>
-          <CardContent className="text-center text-sm text-muted-foreground">
-            Discover tournaments, track your stats, join teams, and climb the leaderboards. Apna Esport is your arena.
-            (More details coming soon)
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="items-center text-center">
-            <Gamepad2 className="h-12 w-12 text-primary mb-2" />
-            <CardTitle>For Organizers</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center text-sm text-muted-foreground">
-            Easily create and manage tournaments with our intuitive tools. Reach a wide audience of passionate gamers.
-            (More details coming soon)
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="items-center text-center">
-            <Trophy className="h-12 w-12 text-primary mb-2" />
-            <CardTitle>For Communities</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center text-sm text-muted-foreground">
-            Build your esports community, host events, and engage with players in a dedicated environment.
-            (More details coming soon)
+          <CardContent className="text-center text-sm text-muted-foreground max-w-xl mx-auto">
+            Apna Esport focuses on both competitive play and personal development—combining gaming with growth, education, and opportunity.
           </CardContent>
         </Card>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Our Story</CardTitle>
+          <CardTitle className="flex items-center"><Briefcase className="mr-2 h-6 w-6 text-primary"/>Contact & Collaboration</CardTitle>
         </CardHeader>
         <CardContent className="prose dark:prose-invert max-w-none">
-          <p>Content coming soon. This section will detail the history and vision behind Apna Esport.</p>
+          <p>We’re open to sponsorships, collaborations, and school-based gaming events. Reach out to us at <a href="mailto:Apnaesportservice@gmail.com" className="text-primary hover:underline">Apnaesportservice@gmail.com</a>.</p>
         </CardContent>
       </Card>
     </div>
