@@ -90,7 +90,7 @@ export default function SocialPage() {
   
   const [isLoadingTeam, setIsLoadingTeam] = useState(true);
   const [isProcessingTeamAction, setIsProcessingTeamAction] = useState(false);
-  const [memberSearchTermState, setMemberSearchTermState] = useState(""); // Renamed to avoid conflict with form
+  const [memberSearchTermState, setMemberSearchTermState] = useState(""); 
   const [memberSearchResults, setMemberSearchResults] = useState<UserProfile[]>([]);
   const [isLoadingMemberSearch, setIsLoadingMemberSearch] = useState(false);
 
@@ -101,6 +101,11 @@ export default function SocialPage() {
   const [chatInput, setChatInput] = useState("");
   const [isSendingMessage, setIsSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // State for unread message indicators
+  const [unreadFriendMessageSenders, setUnreadFriendMessageSenders] = useState<Set<string>>(new Set());
+  const friendChatUnsubscribersRef = useRef<Record<string, () => void>>({});
+
 
   const teamForm = useForm<TeamFormData>({
     resolver: zodResolver(teamFormSchema),
@@ -163,8 +168,6 @@ export default function SocialPage() {
         const ledTeams = await getTeamsByUserIdFromFirestore(user.uid, true);
         if (ledTeams.length > 0) {
             setCurrentTeam(ledTeams[0]);
-            // This update should ideally happen when team is created or joined
-            // await updateUserTeamInFirestore(user.uid, ledTeams[0].id); 
              const memberProfiles = await Promise.all(
                 ledTeams[0].memberUids.map(uid => getUserProfileFromFirestore(uid).then(p => p || {uid, displayName: 'Unknown User'} as UserProfile))
             );
@@ -189,15 +192,63 @@ export default function SocialPage() {
     }
   }, [user, fetchSocialData, fetchUserTeam]);
 
+  // Effect for listening to friend chats for unread messages
+  useEffect(() => {
+    if (!user || friends.length === 0) {
+      // Clear all existing listeners if user logs out or has no friends
+      Object.values(friendChatUnsubscribersRef.current).forEach(unsub => unsub());
+      friendChatUnsubscribersRef.current = {};
+      return;
+    }
+
+    const newUnsubscribers: Record<string, () => void> = {};
+
+    friends.forEach(friend => {
+      const chatId = getChatId(user.uid, friend.uid);
+      if (friendChatUnsubscribersRef.current[chatId]) { // If listener already exists, reuse it
+        newUnsubscribers[chatId] = friendChatUnsubscribersRef.current[chatId];
+        delete friendChatUnsubscribersRef.current[chatId]; // Remove from old list to avoid double unsubscribing
+        return;
+      }
+
+      newUnsubscribers[chatId] = getMessagesForChat(chatId, (messages) => {
+        if (messages.length > 0) {
+          const latestMessage = messages[messages.length - 1];
+          if (latestMessage.senderId === friend.uid && activeChatContext?.targetEntity.uid !== friend.uid) {
+            setUnreadFriendMessageSenders(prev => new Set(prev).add(friend.uid));
+          }
+        }
+      });
+    });
+
+    // Unsubscribe from chats of friends who are no longer in the friends list
+    Object.values(friendChatUnsubscribersRef.current).forEach(unsub => unsub());
+    friendChatUnsubscribersRef.current = newUnsubscribers;
+
+    return () => {
+      Object.values(friendChatUnsubscribersRef.current).forEach(unsub => unsub());
+      friendChatUnsubscribersRef.current = {};
+    };
+  }, [user, friends, activeChatContext]);
+
+
   // Unified Chat: Fetch messages when activeChatContext changes
   useEffect(() => {
     if (activeChatContext && user) {
       setIsLoadingChatMessages(true);
-      setChatMessages([]); // Clear previous messages
+      setChatMessages([]); 
       const unsubscribe = getMessagesForChat(activeChatContext.id, (messages) => {
         setChatMessages(messages);
         setIsLoadingChatMessages(false);
       });
+      // Clear unread indicator when chat is opened
+      if (activeChatContext.type === 'friend') {
+        setUnreadFriendMessageSenders(prev => {
+          const newSet = new Set(prev);
+          newSet.delete((activeChatContext.targetEntity as UserProfile).uid);
+          return newSet;
+        });
+      }
       return () => unsubscribe(); 
     } else {
       setChatMessages([]); 
@@ -231,7 +282,7 @@ export default function SocialPage() {
       await sendFriendRequest(user.uid, targetUser.uid);
       toast({ title: "Request Sent!", description: `Friend request sent to ${targetUser.displayName}.` });
       await refreshUser(); 
-      setPlayerSearchResults(prev => prev.map(u => u.uid === targetUser.uid ? {...u, relationshipStatus: "request_sent_by_me"} : u)); // Optimistic update for search
+      setPlayerSearchResults(prev => prev.map(u => u.uid === targetUser.uid ? {...u, relationshipStatus: "request_sent_by_me"} : u)); 
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Could not send friend request.", variant: "destructive" });
     }
@@ -244,7 +295,7 @@ export default function SocialPage() {
     try {
       await acceptFriendRequest(user.uid, requester.uid);
       toast({ title: "Friend Added!", description: `You are now friends with ${requester.displayName}.` });
-      await refreshUser(); // This will re-trigger fetchSocialData
+      await refreshUser(); 
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Could not accept friend request.", variant: "destructive" });
     }
@@ -284,7 +335,7 @@ export default function SocialPage() {
       await removeFriend(user.uid, friendToRemove.uid);
       toast({ title: "Friend Removed", description: `${friendToRemove.displayName} has been removed from your friends.`, variant: "destructive" });
       if (activeChatContext?.type === 'friend' && activeChatContext.targetEntity.uid === friendToRemove.uid) {
-        setActiveChatContext(null); // Close chat if active with removed friend
+        setActiveChatContext(null); 
       }
       await refreshUser();
     } catch (error: any) {
@@ -307,7 +358,7 @@ export default function SocialPage() {
     setIsProcessingTeamAction(true);
     try {
       const newTeamId = await createTeamInFirestore(data, user);
-      await updateUserTeamInFirestore(user.uid, newTeamId); // Ensure user's teamId is updated
+      await updateUserTeamInFirestore(user.uid, newTeamId); 
       toast({ title: "Team Created!", description: `Your team "${data.name}" has been created.` });
       await refreshUser(); 
       await fetchUserTeam(); 
@@ -327,13 +378,15 @@ export default function SocialPage() {
       }
       setIsLoadingMemberSearch(true);
       try {
+        // Search among all users, not just non-friends.
+        // The filter for eligibility (not already in a team, not already in *this* team) is key.
         const results = await searchUsersByNameOrEmail(data.memberSearch, user.uid);
         const availableResults = results.filter(foundUser => 
-            !currentTeam.memberUids.includes(foundUser.uid) && !foundUser.teamId
+            !currentTeam.memberUids.includes(foundUser.uid) && !foundUser.teamId 
         );
         setMemberSearchResults(availableResults);
          if(availableResults.length === 0 && results.length > 0) {
-            toast({title: "Note", description: "Found users are already in a team or in your team.", variant: "default"})
+            toast({title: "Note", description: "Found users are already in your team or another team.", variant: "default"})
         } else if (availableResults.length === 0 && results.length === 0) {
             toast({title: "No Users Found", description: `No users found matching "${data.memberSearch}".`})
         }
@@ -346,7 +399,7 @@ export default function SocialPage() {
   const confirmAddMember = async (memberId: string) => {
     if (!currentTeam || !user || user.uid !== currentTeam.leaderUid) return;
     setIsProcessingTeamAction(true);
-    setIsProcessingFriendAction(memberId); // Use friend action state for individual member processing
+    setIsProcessingFriendAction(memberId); 
     try {
         await addMemberToTeamInFirestore(currentTeam.id, memberId);
         toast({title: "Member Added", description: "Player added to your team."});
@@ -389,7 +442,7 @@ export default function SocialPage() {
         await refreshUser(); 
         await fetchUserTeam();
         if (activeChatContext?.type === 'team' && activeChatContext.id === currentTeam.id) {
-            setActiveChatContext(null); // Close team chat if user leaves team
+            setActiveChatContext(null); 
         }
     } catch(error: any) {
         toast({title: "Error Leaving Team", description: error.message || "Could not leave team.", variant: "destructive"});
@@ -404,7 +457,7 @@ export default function SocialPage() {
         await deleteTeamFromFirestore(currentTeam.id, user.uid);
         toast({title: "Team Deleted", description: `Team ${currentTeam.name} has been deleted.`});
         if (activeChatContext?.type === 'team' && activeChatContext.id === currentTeam.id) {
-            setActiveChatContext(null); // Close team chat if team is deleted
+            setActiveChatContext(null); 
         }
         await refreshUser(); 
         await fetchUserTeam();
@@ -448,6 +501,11 @@ export default function SocialPage() {
         id: getChatId(user.uid, friend.uid),
         displayName: friend.displayName || "Friend"
     });
+    setUnreadFriendMessageSenders(prev => { // Clear unread when chat is opened
+        const newSet = new Set(prev);
+        newSet.delete(friend.uid);
+        return newSet;
+    });
   };
 
   const openTeamChat = () => {
@@ -488,8 +546,12 @@ export default function SocialPage() {
       <PageTitle title="Social Hub" subtitle="Connect with players, form teams, and chat!" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-        {/* Column 1: Friends & Requests */}
-        <div className={cn("lg:col-span-1 space-y-6", activeChatContext ? "hidden lg:block" : "block")}>
+        {/* Column 1: Friends & Requests - Hides on lg if chat is active */}
+        <div className={cn(
+            "lg:col-span-1 space-y-6", 
+            activeChatContext && "hidden lg:block" 
+          )}
+        >
           <Card className="shadow-md">
             <CardHeader><CardTitle className="flex items-center text-lg"><Users className="mr-2 h-5 w-5 text-primary" />My Friends ({friends.length})</CardTitle></CardHeader>
             <CardContent>
@@ -499,11 +561,14 @@ export default function SocialPage() {
                 <ul className="space-y-2">
                   {friends.map(friend => (
                     <li key={friend.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => openFriendChat(friend)}>
-                        <Avatar className="h-8 w-8"><AvatarImage src={friend.photoURL || ""} alt={friend.displayName || ""} /><AvatarFallback>{getInitials(friend.displayName)}</AvatarFallback></Avatar>
-                        <span className="font-medium text-sm truncate">{friend.displayName}</span>
+                      <div className="flex items-center gap-2 cursor-pointer flex-grow min-w-0" onClick={() => openFriendChat(friend)}>
+                        {unreadFriendMessageSenders.has(friend.uid) && (
+                            <span className="h-2.5 w-2.5 bg-primary rounded-full shrink-0" title="New messages"></span>
+                        )}
+                        <Avatar className="h-8 w-8 shrink-0"><AvatarImage src={friend.photoURL || ""} alt={friend.displayName || ""} /><AvatarFallback>{getInitials(friend.displayName)}</AvatarFallback></Avatar>
+                        <span className={cn("font-medium text-sm truncate", unreadFriendMessageSenders.has(friend.uid) && "font-bold")}>{friend.displayName}</span>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary/80" onClick={() => openFriendChat(friend)} title="Chat">
                             <MessageCircle className="h-4 w-4"/>
                         </Button>
@@ -576,8 +641,13 @@ export default function SocialPage() {
           </Card>
         </div>
 
-        {/* Column 2: Main Content Area (Search, Team, Active Chat) */}
-        <div className={cn("lg:col-span-2 space-y-6", activeChatContext ? "lg:col-span-2" : "lg:col-span-2")}>
+        {/* Column 2: Main Content Area (Search, Team, or Active Chat) */}
+        {/* Takes full width if chat is active on smaller than lg, or 2/3 on lg if chat is active */}
+        <div className={cn(
+            "space-y-6", 
+            activeChatContext ? "lg:col-span-2" : "lg:col-span-2"
+          )}
+        >
           {!activeChatContext && (
             <>
             <Card className="shadow-md">
@@ -704,7 +774,7 @@ export default function SocialPage() {
 
           {/* Unified Chat Panel */}
           {activeChatContext && user && (
-            <Card className={cn("shadow-lg sticky top-20", activeChatContext.type === 'team' ? 'border-primary' : 'border-border')}>
+            <Card className={cn("shadow-lg sticky top-4", activeChatContext.type === 'team' ? 'border-primary' : 'border-border')}>
               <CardHeader className="flex flex-row items-center justify-between p-3 border-b bg-muted/30">
                 <div className="flex items-center gap-2">
                   {activeChatContext.type === 'friend' && (activeChatContext.targetEntity as UserProfile).photoURL && (
@@ -724,7 +794,7 @@ export default function SocialPage() {
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <ScrollArea className="h-[calc(100vh-18rem)] min-h-[300px] max-h-[500px] p-3 space-y-3 bg-background">
+                <ScrollArea className="h-[calc(100vh-22rem)] min-h-[300px] max-h-[500px] p-3 space-y-3 bg-background">
                   {isLoadingChatMessages ? (
                     <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
                   ) : chatMessages.length > 0 ? (
@@ -733,9 +803,9 @@ export default function SocialPage() {
                         {activeChatContext.type === 'team' && msg.senderId !== user.uid && (
                             <span className="text-xs text-muted-foreground ml-2 mb-0.5">{msg.senderName}</span>
                         )}
-                        <div className={cn("max-w-[75%] p-2 rounded-lg shadow-sm", 
+                        <div className={cn("max-w-[75%] p-2 rounded-lg shadow-sm break-words", 
                                           msg.senderId === user.uid ? "bg-primary text-primary-foreground" : "bg-muted text-foreground")}>
-                          <p className="text-sm break-words">{msg.text}</p>
+                          <p className="text-sm">{msg.text}</p>
                           <div className="flex items-center gap-2 mt-1">
                             <p className="text-xs opacity-70">
                                 {msg.timestamp ? formatDistanceToNow(msg.timestamp.toDate(), { addSuffix: true }) : "sending..."}
@@ -777,5 +847,6 @@ export default function SocialPage() {
     </div>
   );
 }
+    
 
     
