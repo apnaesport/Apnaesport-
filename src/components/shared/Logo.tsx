@@ -11,11 +11,11 @@ import { cn } from "@/lib/utils";
 export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const { settings, loadingSettings } = useSiteSettings();
 
-  // Adjusted sizes for a more substantial logo
+  // Increased sizes for a more prominent logo
   const sizeClasses = {
-    sm: { width: 140, height: 45, svgHeight: 30, customImageWidth: 30 },
-    md: { width: 165, height: 55, svgHeight: 36, customImageWidth: 36 },
-    lg: { width: 190, height: 65, svgHeight: 42, customImageWidth: 42 },
+    sm: { width: 213, height: 50, svgHeight: 45, customImageWidth: 45 }, // Was: width: 140, height: 45, svgHeight: 30, customImageWidth: 30
+    md: { width: 259, height: 60, svgHeight: 55, customImageWidth: 55 }, // Was: width: 165, height: 55, svgHeight: 36, customImageWidth: 36
+    lg: { width: 305, height: 70, svgHeight: 65, customImageWidth: 65 }, // Was: width: 190, height: 65, svgHeight: 42, customImageWidth: 42 
   };
 
   const currentSize = sizeClasses[size] || sizeClasses.md;
@@ -27,13 +27,17 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
   const customLogoUrl = settings?.logoUrl;
 
   return (
-    <Link href="/" className={cn("flex items-center gap-1.5", className)} style={{ height: currentSize.height }}>
+    <Link 
+      href="/" 
+      className={cn("flex items-center gap-1.5", className)} // Reduced gap slightly
+      style={{ height: currentSize.height }}
+    >
       {customLogoUrl && (
         <div
           className="relative flex items-center justify-center"
           style={{
-            height: currentSize.svgHeight, // Use svgHeight for consistent vertical alignment
-            width: currentSize.customImageWidth,
+            height: currentSize.svgHeight, // Use svgHeight for consistency
+            width: currentSize.customImageWidth, // Use explicit width for custom image container
           }}
         >
           <Image
