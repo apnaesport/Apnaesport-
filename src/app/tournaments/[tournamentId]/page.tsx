@@ -13,8 +13,7 @@ import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTr
 import { format } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useEffect, useCallback } 
-from "react"; 
+import { useState, useEffect, useCallback, use } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
 import { getTournamentByIdFromFirestore, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
@@ -43,26 +42,11 @@ type Props = {
   searchParams: { [key: string]: string | string[] | undefined };
 };
 
-// export async function generateMetadata({ params }: Props): Promise<Metadata> { // Keep this if page can be server-rendered
-//   const tournamentId = params.tournamentId;
-//   const tournament = await getTournamentByIdFromFirestore(tournamentId);
-
-//   if (!tournament) {
-//     return {
-//       title: "Tournament Not Found | Apna Esport",
-//       description: "The requested tournament could not be found.",
-//     };
-//   }
-
-//   return {
-//     title: `${tournament.name} | Apna Esport`,
-//     description: tournament.description || `Details for the ${tournament.name} tournament on Apna Esport.`,
-//   };
-// }
-
+// Removed generateMetadata as this is a Client Component
 
 export default function TournamentPage({ params }: TournamentPageProps) {
-  const { tournamentId } = params;
+  const resolvedParams = use(params); 
+  const { tournamentId } = resolvedParams;
   const [tournament, setTournament] = useState<Tournament | undefined>(undefined);
   const { user, isAdmin, loading: authLoading } = useAuth(); 
   const router = useRouter(); 
@@ -141,8 +125,12 @@ export default function TournamentPage({ params }: TournamentPageProps) {
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
       };
       
-      const updatedParticipants = [...tournament.participants, newParticipant];
-      await updateTournamentInFirestore(tournament.id, { participants: updatedParticipants });
+      const updatedTournamentData = {
+        ...tournament,
+        participants: [...tournament.participants, newParticipant]
+      };
+      
+      await updateTournamentInFirestore(tournament.id, { participants: updatedTournamentData.participants });
       
       toast({
         title: "Successfully Registered!",
