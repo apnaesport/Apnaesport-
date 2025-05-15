@@ -20,27 +20,7 @@ interface GameTournamentsPageProps {
   params: { gameId: string };
 }
 
-type Props = {
-  params: { gameId: string };
-  searchParams: { [key: string]: string | string[] | undefined };
-};
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const gameId = params.gameId;
-  const game = await getGameDetails(gameId);
-
-  if (!game) {
-    return {
-      title: "Game Not Found | Apna Esport",
-      description: "The requested game could not be found.",
-    };
-  }
-
-  return {
-    title: `${game.name} Tournaments | Apna Esport`,
-    description: `Find and join ${game.name} tournaments on Apna Esport.`,
-  };
-}
+// Removed generateMetadata as this is a Client Component
 
 export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
   const resolvedParams = use(params); 
@@ -111,7 +91,7 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
         <Image 
           src={game.bannerUrl || `https://placehold.co/1200x300.png`} 
           alt={`${game.name} banner`} 
-          layout="fill" 
+          fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint={game.dataAiHint || "game background art"}
           unoptimized={game.bannerUrl?.startsWith('data:image')}
@@ -125,7 +105,7 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
               <Image 
                 src={game.iconUrl} 
                 alt={game.name} 
-                layout="fill"
+                fill
                 className="rounded-lg border-2 border-background shadow-md object-cover" 
                 data-ai-hint={game.dataAiHint || "game logo large"}
                 unoptimized={game.iconUrl?.startsWith('data:image')}
