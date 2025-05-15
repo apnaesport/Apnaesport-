@@ -11,17 +11,17 @@ import { cn } from "@/lib/utils";
 export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const { settings, loadingSettings } = useSiteSettings();
 
-  // Adjusted sizes for a more compact logo
+  // Adjusted sizes for a more substantial logo
   const sizeClasses = {
-    sm: { width: 120, height: 40, svgHeight: 28, customImageWidth: 28 }, 
-    md: { width: 150, height: 50, svgHeight: 34, customImageWidth: 34 }, 
-    lg: { width: 180, height: 60, svgHeight: 40, customImageWidth: 40 }, 
+    sm: { width: 140, height: 45, svgHeight: 30, customImageWidth: 30 },
+    md: { width: 165, height: 55, svgHeight: 36, customImageWidth: 36 },
+    lg: { width: 190, height: 65, svgHeight: 42, customImageWidth: 42 },
   };
 
   const currentSize = sizeClasses[size] || sizeClasses.md;
 
   if (loadingSettings) {
-    return <Skeleton className={className} style={{ width: currentSize.width, height: currentSize.height, borderRadius: '0.375rem' }} />;
+    return <Skeleton className={cn(className, "rounded-md")} style={{ width: currentSize.width, height: currentSize.height }} />;
   }
 
   const customLogoUrl = settings?.logoUrl;
@@ -29,20 +29,20 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
   return (
     <Link href="/" className={cn("flex items-center gap-1.5", className)} style={{ height: currentSize.height }}>
       {customLogoUrl && (
-        <div 
-          className="relative flex items-center justify-center" 
-          style={{ 
+        <div
+          className="relative flex items-center justify-center"
+          style={{
             height: currentSize.svgHeight, // Use svgHeight for consistent vertical alignment
-            width: currentSize.customImageWidth, // Use customImageWidth
+            width: currentSize.customImageWidth,
           }}
         >
           <Image
             src={customLogoUrl}
             alt={settings?.siteName || "Custom Site Logo"}
-            fill 
+            fill
             className="object-contain" // Ensures aspect ratio is maintained
             unoptimized={customLogoUrl.startsWith('data:image')}
-            priority 
+            priority
           />
         </div>
       )}
