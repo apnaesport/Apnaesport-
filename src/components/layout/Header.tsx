@@ -11,16 +11,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu, Bell } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu, Bell, Sun, Moon, Laptop } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export function Header() {
   const { user, logout, loading, isAdmin } = useAuth();
   const { toggleSidebar, isMobile } = useSidebar();
+  const { theme, setTheme } = useTheme();
 
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "AE"; // Apna Esport
@@ -99,6 +106,27 @@ export function Header() {
                   Settings
                 </Link>
               </DropdownMenuItem>
+               <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  {theme === 'light' && <Sun className="mr-2 h-4 w-4" />}
+                  {theme === 'dark' && <Moon className="mr-2 h-4 w-4" />}
+                  {theme === 'system' && <Laptop className="mr-2 h-4 w-4" />}
+                  <span>Theme</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent>
+                  <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}>
+                    <DropdownMenuRadioItem value="light" className="gap-2">
+                      <Sun className="h-3.5 w-3.5" /> Light
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="dark" className="gap-2">
+                      <Moon className="h-3.5 w-3.5" /> Dark
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="system" className="gap-2">
+                      <Laptop className="h-3.5 w-3.5" /> System
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                 <LogOut className="mr-2 h-4 w-4" />

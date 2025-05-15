@@ -8,14 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Palette, Shield, LogIn } from "lucide-react";
+import { Bell, Palette, Shield, LogIn, Sun, Moon, Laptop } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 
 export default function SettingsPage() {
   const { user, loading } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   if (loading) {
     return (
@@ -33,6 +35,7 @@ export default function SettingsPage() {
             <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
             <CardContent className="space-y-6">
               <Skeleton className="h-12 w-full" />
+               <Skeleton className="h-10 w-1/3" />
             </CardContent>
           </Card>
            <Card>
@@ -100,15 +103,33 @@ export default function SettingsPage() {
             <CardDescription>Customize the look and feel of Apna Esport.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="flex items-center justify-between p-4 border rounded-md">
-              <div>
-                <Label htmlFor="dark-mode" className="font-medium">Dark Mode</Label>
-                <p className="text-sm text-muted-foreground">Toggle between light and dark themes.</p>
+            <div>
+              <Label className="font-medium">Theme</Label>
+              <p className="text-sm text-muted-foreground mb-2">Select your preferred color scheme.</p>
+              <div className="flex space-x-2 rounded-md bg-muted p-1">
+                <Button
+                  variant={theme === 'light' ? 'default' : 'ghost'}
+                  onClick={() => setTheme('light')}
+                  className={cn("flex-1", theme === 'light' && "bg-background text-foreground shadow-sm")}
+                >
+                  <Sun className="mr-2 h-4 w-4" /> Light
+                </Button>
+                <Button
+                   variant={theme === 'dark' ? 'default' : 'ghost'}
+                  onClick={() => setTheme('dark')}
+                  className={cn("flex-1", theme === 'dark' && "bg-background text-foreground shadow-sm")}
+                >
+                  <Moon className="mr-2 h-4 w-4" /> Dark
+                </Button>
+                <Button
+                  variant={theme === 'system' ? 'default' : 'ghost'}
+                  onClick={() => setTheme('system')}
+                  className={cn("flex-1", theme === 'system' && "bg-background text-foreground shadow-sm")}
+                >
+                  <Laptop className="mr-2 h-4 w-4" /> System
+                </Button>
               </div>
-              {/* The theme is globally dark right now. This switch is a UI placeholder. */}
-              <Switch id="dark-mode" checked={true} disabled />
             </div>
-            {/* Add other appearance settings here, e.g., language */}
           </CardContent>
         </Card>
 
@@ -120,10 +141,10 @@ export default function SettingsPage() {
             <CardDescription>Manage your account security and data.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button variant="outline">Change Password</Button>
-            <Button variant="outline">Two-Factor Authentication</Button>
+            <Button variant="outline" disabled>Change Password</Button>
+            <Button variant="outline" disabled>Two-Factor Authentication</Button>
             <Separator />
-            <Button variant="destructive">Delete Account</Button>
+            <Button variant="destructive" disabled>Delete Account</Button>
             <p className="text-xs text-muted-foreground">
               Deleting your account is permanent and cannot be undone. All your data, including tournament history and stats, will be removed.
             </p>

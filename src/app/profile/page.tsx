@@ -29,9 +29,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const profileSchema = z.object({
   displayName: z.string().min(2, "Display name must be at least 2 characters."),
-  bio: z.string().max(500, "Bio can be max 500 characters.").optional(),
+  bio: z.string().max(500, "Bio can be max 500 characters.").optional().nullable(),
   favoriteGameIds: z.array(z.string()).optional(),
-  streamingChannelUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  streamingChannelUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional().nullable(),
 });
 
 type ProfileFormData = z.infer<typeof profileSchema>;
@@ -102,9 +102,9 @@ export default function ProfilePage() {
       
       await updateUserProfileInFirestore(user.uid, {
         displayName: data.displayName,
-        bio: data.bio,
-        favoriteGameIds: data.favoriteGameIds,
-        streamingChannelUrl: data.streamingChannelUrl,
+        bio: data.bio || "", // Ensure empty string if null
+        favoriteGameIds: data.favoriteGameIds || [],
+        streamingChannelUrl: data.streamingChannelUrl || "", // Ensure empty string if null
       });
 
       if (auth.currentUser && auth.currentUser.displayName !== data.displayName) {

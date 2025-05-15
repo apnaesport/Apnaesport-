@@ -77,7 +77,7 @@ export default function AdminNotificationsPage() {
         description: `"${data.title}" has been broadcasted to ${data.target.replace('_', ' ')}.`,
       });
       form.reset();
-      await fetchNotificationHistory(); // Refresh history
+      await fetchNotificationHistory(); 
     } catch (error) {
       console.error("Error sending notification:", error);
       toast({ title: "Send Failed", description: "Could not send notification.", variant: "destructive" });

@@ -56,7 +56,52 @@ body {
     --sidebar-ring: 195 90% 55%; /* Sidebar ring (focus) */
   }
 
-  /* No .dark class needed as dark is default now */
+  html.light {
+    --background: 0 0% 100%; /* White */
+    --foreground: 220 15% 12%; /* Dark Text */
+
+    --card: 0 0% 97%; /* Light gray card */
+    --card-foreground: 220 15% 15%; /* Dark text on card */
+
+    --popover: 0 0% 97%;
+    --popover-foreground: 220 15% 15%;
+
+    --primary: 195 80% 45%; /* Slightly less vibrant blue for light theme */
+    --primary-foreground: 0 0% 100%; /* White text on primary */
+
+    --secondary: 210 30% 90%; /* Light gray secondary */
+    --secondary-foreground: 220 10% 25%; /* Darker text on secondary */
+
+    --muted: 210 30% 95%; /* Very light gray muted */
+    --muted-foreground: 210 25% 55%; /* Slightly darker muted text */
+
+    --accent: 195 90% 55%; /* Accent blue */
+    --accent-foreground: 0 0% 100%; /* White text on accent */
+
+    --destructive: 0 80% 55%; /* Destructive red */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 85%; /* Light border */
+    --input: 210 30% 92%; /* Light input background */
+    --ring: 195 80% 50%; /* Ring color */
+
+    /* Chart colors for light theme */
+    --chart-1: 195 70% 50%;
+    --chart-2: 220 50% 45%;
+    --chart-3: 250 35% 50%;
+    --chart-4: 25 70% 55%;
+    --chart-5: 300 60% 60%;
+
+    /* Sidebar specific colors for light theme */
+    --sidebar-background: 0 0% 98%; 
+    --sidebar-foreground: 220 15% 20%;
+    --sidebar-primary: 195 80% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 210 30% 88%;
+    --sidebar-accent-foreground: 195 80% 40%;
+    --sidebar-border: 210 20% 80%;
+    --sidebar-ring: 195 80% 50%;
+  }
 }
 
 @layer base {

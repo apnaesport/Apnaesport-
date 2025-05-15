@@ -121,17 +121,16 @@ export default function AdminGamesPage() {
 
     if (iconPreview && iconPreview.startsWith('data:image')) { 
         finalIconUrl = iconPreview;
-    } else if (!finalIconUrl && !editingGame?.iconUrl) { // Only set placeholder if no URL and no existing icon
+    } else if (!finalIconUrl && !editingGame?.iconUrl) { 
          finalIconUrl = `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`;
     }
 
     if (bannerPreview && bannerPreview.startsWith('data:image')) {
         finalBannerUrl = bannerPreview;
-    } else if (!finalBannerUrl && !editingGame?.bannerUrl) { // Only set placeholder if no URL and no existing banner
+    } else if (!finalBannerUrl && !editingGame?.bannerUrl) { 
         finalBannerUrl = `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`;
     }
     
-    // Validate URLs if they are not Data URIs or known placeholder service
     if (finalIconUrl && !finalIconUrl.startsWith('data:image') && !finalIconUrl.startsWith('https://placehold.co') && !z.string().url().safeParse(finalIconUrl).success) {
       form.setError("iconUrl", { type: "manual", message: "Icon URL must be a valid URL." });
     }
@@ -222,7 +221,8 @@ export default function AdminGamesPage() {
         subtitle="Add, edit, or remove games supported on the platform."
         actions={
           <Button onClick={openNewGameDialog} disabled={isSubmitting || isLoading}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Add New Game
+            {isSubmitting && !editingGame ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" /> }
+            Add New Game
           </Button>
         }
       />
@@ -235,7 +235,7 @@ export default function AdminGamesPage() {
           setIconPreview(null);
           setBannerPreview(null);
           setEditingGame(null);
-          form.clearErrors(); // Clear errors when dialog closes
+          form.clearErrors(); 
         }
       }}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-4 sm:p-6">
@@ -340,8 +340,9 @@ export default function AdminGamesPage() {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDelete(game.id, game.name)}>
+                        <AlertDialogCancel disabled={isDeleting === game.id}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(game.id, game.name)} disabled={isDeleting === game.id}>
+                          {isDeleting === game.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" /> }
                           Delete
                         </AlertDialogAction>
                       </AlertDialogFooter>

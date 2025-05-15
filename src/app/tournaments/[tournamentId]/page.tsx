@@ -43,22 +43,22 @@ type Props = {
   searchParams: { [key: string]: string | string[] | undefined };
 };
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const tournamentId = params.tournamentId;
-  const tournament = await getTournamentByIdFromFirestore(tournamentId);
+// export async function generateMetadata({ params }: Props): Promise<Metadata> { // Keep this if page can be server-rendered
+//   const tournamentId = params.tournamentId;
+//   const tournament = await getTournamentByIdFromFirestore(tournamentId);
 
-  if (!tournament) {
-    return {
-      title: "Tournament Not Found | Apna Esport",
-      description: "The requested tournament could not be found.",
-    };
-  }
+//   if (!tournament) {
+//     return {
+//       title: "Tournament Not Found | Apna Esport",
+//       description: "The requested tournament could not be found.",
+//     };
+//   }
 
-  return {
-    title: `${tournament.name} | Apna Esport`,
-    description: tournament.description || `Details for the ${tournament.name} tournament on Apna Esport.`,
-  };
-}
+//   return {
+//     title: `${tournament.name} | Apna Esport`,
+//     description: tournament.description || `Details for the ${tournament.name} tournament on Apna Esport.`,
+//   };
+// }
 
 
 export default function TournamentPage({ params }: TournamentPageProps) {
@@ -456,7 +456,8 @@ export default function TournamentPage({ params }: TournamentPageProps) {
                     height={80}
                     className="rounded-md object-contain mb-2"
                     data-ai-hint="sponsor logo"
-                    onError={(e) => e.currentTarget.style.display = 'none'} // Hide if logo fails
+                    unoptimized={tournament.sponsorLogoUrl.startsWith('data:image')}
+                    onError={(e) => e.currentTarget.style.display = 'none'} 
                   />
                 )}
                 {tournament.sponsorName && (

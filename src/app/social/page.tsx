@@ -101,12 +101,10 @@ export default function SocialPage() {
         setIsLoadingTeam(false);
       }
     } else if (user && !user.teamId) {
-        // Check if user is a leader of any team (in case teamId on user profile was out of sync)
         const ledTeams = await getTeamsByUserIdFromFirestore(user.uid, true);
         if (ledTeams.length > 0) {
             setCurrentTeam(ledTeams[0]);
-            await updateUserTeamInFirestore(user.uid, ledTeams[0].id); // Sync user's teamId
-            // Re-fetch team members for the found team
+            await updateUserTeamInFirestore(user.uid, ledTeams[0].id); 
              const memberProfiles = await Promise.all(
                 ledTeams[0].memberUids.map(uid => getUserProfileFromFirestore(uid).then(p => p || {uid, displayName: 'Unknown User'} as UserProfile))
             );
@@ -169,7 +167,7 @@ export default function SocialPage() {
     try {
       await addFriend(user.uid, targetUserId);
       toast({ title: "Friend Added!", description: "They are now on your friends list." });
-      await refreshUser(); // Refresh user context to get updated friendUids
+      await refreshUser(); 
       setPlayerSearchResults(prev => prev.filter(u => u.uid !== targetUserId)); 
     } catch (error) {
       console.error("Error adding friend:", error);
@@ -198,9 +196,8 @@ export default function SocialPage() {
     try {
       const teamId = await createTeamInFirestore(data, user);
       toast({ title: "Team Created!", description: `Your team "${data.name}" has been created.` });
-      await refreshUser(); // This will update user.teamId
+      await refreshUser(); 
       teamForm.reset();
-      // fetchUserTeam will be called due to user context update
     } catch (error: any) {
       console.error("Error creating team:", error);
       toast({ title: "Team Creation Failed", description: error.message || "Could not create team.", variant: "destructive" });
@@ -217,7 +214,6 @@ export default function SocialPage() {
       setIsLoadingMemberSearch(true);
       try {
         const results = await searchUsersByNameOrEmail(data.memberSearch, user.uid);
-        // Filter out existing team members and users who are already in another team
         const availableResults = results.filter(foundUser => 
             !currentTeam.memberUids.includes(foundUser.uid) && !foundUser.teamId
         );
@@ -237,12 +233,12 @@ export default function SocialPage() {
     try {
         await addMemberToTeamInFirestore(currentTeam.id, memberId);
         toast({title: "Member Added", description: "Player added to your team."});
-        await fetchUserTeam(); // Refresh team details
+        await fetchUserTeam(); 
         setMemberSearchTerm("");
         setMemberSearchResults([]);
         addMemberForm.reset();
-    } catch (error) {
-        toast({title: "Error Adding Member", description: "Could not add member.", variant: "destructive"})
+    } catch (error: any) {
+        toast({title: "Error Adding Member", description: error.message || "Could not add member.", variant: "destructive"})
     }
     setIsProcessingTeamAction(false);
   }
@@ -257,23 +253,22 @@ export default function SocialPage() {
     try {
         await removeMemberFromTeamInFirestore(currentTeam.id, memberIdToRemove);
         toast({title: "Member Removed", description: "Player removed from team."});
-        await fetchUserTeam(); // Refresh team details
-    } catch(error) {
-        toast({title: "Error Removing Member", description: "Could not remove member.", variant: "destructive"});
+        await fetchUserTeam(); 
+    } catch(error: any) {
+        toast({title: "Error Removing Member", description: error.message || "Could not remove member.", variant: "destructive"});
     }
     setIsProcessingTeamAction(false);
   };
 
   const handleLeaveTeam = async () => {
-    if (!currentTeam || !user || currentTeam.leaderUid === user.uid) return; // Leader should use delete
+    if (!currentTeam || !user || currentTeam.leaderUid === user.uid) return; 
     setIsProcessingTeamAction(true);
     try {
         await removeMemberFromTeamInFirestore(currentTeam.id, user.uid);
         toast({title: "Left Team", description: `You have left ${currentTeam.name}.`});
-        await refreshUser(); // This will update user.teamId
-        // fetchUserTeam will be called due to user context update
-    } catch(error) {
-        toast({title: "Error Leaving Team", description: "Could not leave team.", variant: "destructive"});
+        await refreshUser(); 
+    } catch(error: any) {
+        toast({title: "Error Leaving Team", description: error.message || "Could not leave team.", variant: "destructive"});
     }
     setIsProcessingTeamAction(false);
   };
@@ -284,8 +279,7 @@ export default function SocialPage() {
     try {
         await deleteTeamFromFirestore(currentTeam.id, user.uid);
         toast({title: "Team Deleted", description: `Team ${currentTeam.name} has been deleted.`});
-        await refreshUser(); // This will update user.teamId
-        // fetchUserTeam will be called due to user context update
+        await refreshUser(); 
     } catch (error: any) {
         toast({title: "Error Deleting Team", description: error.message || "Could not delete team.", variant: "destructive"});
     }
@@ -327,7 +321,6 @@ export default function SocialPage() {
       <PageTitle title="Social Hub" subtitle="Connect with players, form teams, and join the conversation!" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Friends Card */}
         <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
@@ -363,8 +356,11 @@ export default function SocialPage() {
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleRemoveFriend(friend.uid)}>Remove</AlertDialogAction>
+                                <AlertDialogCancel disabled={isUpdatingFriend === friend.uid}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleRemoveFriend(friend.uid)} disabled={isUpdatingFriend === friend.uid}>
+                                  {isUpdatingFriend === friend.uid && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                                  Remove
+                                </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
                     </AlertDialog>
@@ -377,7 +373,6 @@ export default function SocialPage() {
           </CardContent>
         </Card>
 
-        {/* Player Search Card */}
         <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center text-xl">
@@ -395,8 +390,8 @@ export default function SocialPage() {
                 disabled={isLoadingPlayerSearch}
               />
               <Button type="submit" disabled={isLoadingPlayerSearch || !searchTerm.trim()} className="w-full sm:w-auto">
-                {isLoadingPlayerSearch ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                <span className="ml-1">Search</span>
+                {isLoadingPlayerSearch ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Search className="h-4 w-4 mr-1" />}
+                Search
               </Button>
             </form>
 
@@ -433,7 +428,6 @@ export default function SocialPage() {
         </Card>
       </div>
 
-      {/* Teams Card */}
        <Card>
         <CardHeader>
           <CardTitle className="flex items-center text-xl">
@@ -462,15 +456,18 @@ export default function SocialPage() {
                        <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="xs" disabled={isProcessingTeamAction}>
-                                {isProcessingTeamAction && <Loader2 className="h-3 w-3 animate-spin mr-1"/>} Remove
+                                {isProcessingTeamAction && isUpdatingFriend === member.uid && <Loader2 className="h-3 w-3 animate-spin mr-1"/>} Remove
                             </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                             <AlertDialogHeader><AlertDialogTitle>Remove {member.displayName}?</AlertDialogTitle></AlertDialogHeader>
                             <AlertDialogDescription>Are you sure you want to remove this member from the team?</AlertDialogDescription>
                             <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleRemoveMember(member.uid)}>Remove</AlertDialogAction>
+                                <AlertDialogCancel disabled={isProcessingTeamAction}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => { setIsUpdatingFriend(member.uid); handleRemoveMember(member.uid);}} disabled={isProcessingTeamAction}>
+                                  {isProcessingTeamAction && isUpdatingFriend === member.uid && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                                  Remove
+                                </AlertDialogAction>
                             </AlertDialogFooter>
                           </AlertDialogContent>
                        </AlertDialog>
@@ -487,10 +484,11 @@ export default function SocialPage() {
                             placeholder="Search user by name/email"
                             className="flex-grow"
                             disabled={isProcessingTeamAction || isLoadingMemberSearch}
+                            onChange={(e) => setMemberSearchTerm(e.target.value)}
                         />
-                        <Button type="submit" disabled={isProcessingTeamAction || isLoadingMemberSearch || !addMemberForm.watch("memberSearch")?.trim()} className="w-full sm:w-auto">
-                            {isLoadingMemberSearch ? <Loader2 className="h-4 w-4 animate-spin"/> : <Search className="h-4 w-4"/>}
-                            <span className="ml-1">Search</span>
+                        <Button type="submit" disabled={isProcessingTeamAction || isLoadingMemberSearch || !memberSearchTerm.trim()} className="w-full sm:w-auto">
+                            {isLoadingMemberSearch ? <Loader2 className="h-4 w-4 animate-spin mr-1"/> : <Search className="h-4 w-4 mr-1"/>}
+                            Search
                         </Button>
                    </form>
                    {isLoadingMemberSearch && <div className="flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}
@@ -500,14 +498,15 @@ export default function SocialPage() {
                                <li key={foundUser.uid} className="flex items-center justify-between p-1.5 rounded hover:bg-muted">
                                    <span className="text-sm">{foundUser.displayName} ({foundUser.email})</span>
                                    <Button size="xs" onClick={() => confirmAddMember(foundUser.uid)} disabled={isProcessingTeamAction}>
-                                       <UserPlus2 className="h-3 w-3 mr-1"/> Add
+                                       {isProcessingTeamAction && isUpdatingFriend === foundUser.uid ? <Loader2 className="h-3 w-3 animate-spin mr-1"/> : <UserPlus2 className="h-3 w-3 mr-1"/> }
+                                       Add
                                    </Button>
                                </li>
                            ))}
                        </ul>
                    )}
-                   {memberSearchResults.length === 0 && addMemberForm.watch("memberSearch") && !isLoadingMemberSearch && (
-                       <p className="text-xs text-muted-foreground">No available users found for "{addMemberForm.watch("memberSearch")}". They might be in your team or another team already.</p>
+                   {memberSearchResults.length === 0 && addMemberForm.getValues("memberSearch") && !isLoadingMemberSearch && (
+                       <p className="text-xs text-muted-foreground">No available users found for "{addMemberForm.getValues("memberSearch")}". They might be in your team or another team already.</p>
                    )}
 
                   <AlertDialog>
@@ -518,8 +517,11 @@ export default function SocialPage() {
                         <AlertDialogHeader><AlertDialogTitle>Delete Team "{currentTeam.name}"?</AlertDialogTitle></AlertDialogHeader>
                         <AlertDialogDescription>This action cannot be undone. All members will be removed from the team.</AlertDialogDescription>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDeleteTeam}>Delete Team</AlertDialogAction>
+                            <AlertDialogCancel disabled={isProcessingTeamAction}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteTeam} disabled={isProcessingTeamAction}>
+                              {isProcessingTeamAction && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                              Delete Team
+                            </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -534,8 +536,11 @@ export default function SocialPage() {
                         <AlertDialogHeader><AlertDialogTitle>Leave Team "{currentTeam.name}"?</AlertDialogTitle></AlertDialogHeader>
                         <AlertDialogDescription>Are you sure you want to leave this team?</AlertDialogDescription>
                         <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleLeaveTeam}>Leave Team</AlertDialogAction>
+                            <AlertDialogCancel disabled={isProcessingTeamAction}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleLeaveTeam} disabled={isProcessingTeamAction}>
+                              {isProcessingTeamAction && <Loader2 className="h-4 w-4 animate-spin mr-2"/>}
+                              Leave Team
+                            </AlertDialogAction>
                         </AlertDialogFooter>
                     </AlertDialogContent>
                  </AlertDialog>
@@ -550,8 +555,8 @@ export default function SocialPage() {
                 {teamForm.formState.errors.name && <p className="text-destructive text-xs mt-1">{teamForm.formState.errors.name.message}</p>}
               </div>
               <Button type="submit" disabled={isProcessingTeamAction} className="w-full sm:w-auto">
-                {isProcessingTeamAction ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users2 className="h-4 w-4" />}
-                <span className="ml-1">Create Team</span>
+                {isProcessingTeamAction ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Users2 className="h-4 w-4 mr-1" />}
+                Create Team
               </Button>
             </form>
           )}
@@ -559,7 +564,6 @@ export default function SocialPage() {
         </CardContent>
       </Card>
 
-      {/* Discussions Card */}
       <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle className="flex items-center text-xl">
@@ -570,7 +574,6 @@ export default function SocialPage() {
         <CardContent className="text-center">
           <p className="text-muted-foreground mb-4">Community Forums & Tournament Chat</p>
           <Button asChild variant="outline" disabled> 
-            {/* <Link href="/forums">Go to Forums (Coming Soon)</Link> */}
              <span>Explore Discussions (Coming Soon)</span>
           </Button>
            <p className="text-xs text-muted-foreground mt-2">Real-time chat and forums are planned for a future update.</p>

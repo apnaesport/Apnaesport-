@@ -21,6 +21,17 @@ import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { getAllUsersFromFirestore, updateUserAdminStatusInFirestore } from "@/lib/tournamentStore";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -30,9 +41,9 @@ const getInitials = (name: string | null | undefined) => {
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const { toast } = useToast();
-  const { user: currentUser } = useAuth(); // Get the currently logged-in admin
+  const { user: currentUser } = useAuth(); 
   const [isLoading, setIsLoading] = useState(true);
-  const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null); // Store UID of user being updated
+  const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null); 
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -61,24 +72,20 @@ export default function AdminUsersPage() {
     }
 
     const newIsAdmin = !currentIsAdmin;
-    if (confirm(`Are you sure you want to ${newIsAdmin ? 'promote' : 'demote'} ${displayName || 'this user'} ${newIsAdmin ? 'to' : 'from'} admin?`)) {
-      setIsUpdatingRole(userIdToUpdate);
-      try {
-        await updateUserAdminStatusInFirestore(userIdToUpdate, newIsAdmin);
-        toast({ title: "User Role Updated", description: `${displayName || 'User'}'s role has been changed.` });
-        await fetchUsers(); // Re-fetch users to reflect changes
-      } catch (error) {
-        console.error("Error updating user role:", error);
-        toast({ title: "Error", description: "Could not update user role.", variant: "destructive" });
-      } finally {
-        setIsUpdatingRole(null);
-      }
+    setIsUpdatingRole(userIdToUpdate);
+    try {
+      await updateUserAdminStatusInFirestore(userIdToUpdate, newIsAdmin);
+      toast({ title: "User Role Updated", description: `${displayName || 'User'}'s role has been changed.` });
+      await fetchUsers(); 
+    } catch (error) {
+      console.error("Error updating user role:", error);
+      toast({ title: "Error", description: "Could not update user role.", variant: "destructive" });
+    } finally {
+      setIsUpdatingRole(null);
     }
   };
   
   const handleBanUser = (userId: string, displayName: string | null) => {
-    // This is a placeholder. True user banning requires Firebase Admin SDK (backend).
-    // For UI simulation, you could add an `isBanned` flag to the user's Firestore document.
     alert(`Simulating ban for user: ${displayName || userId}. This requires backend implementation to disable Firebase Auth user.`);
     toast({ title: "Ban Action (Simulated)", description: `Banning ${displayName || userId} would typically involve backend actions.`});
   };
@@ -151,16 +158,35 @@ export default function AdminUsersPage() {
                   </Button>
                    {user.email !== ADMIN_EMAIL && user.uid !== currentUser?.uid && ( 
                     <>
-                     <Button 
-                        variant={user.isAdmin ? "secondary" : "default"} 
-                        size="icon" 
-                        title={user.isAdmin ? "Demote to Player" : "Promote to Admin"}
-                        onClick={() => handleToggleAdmin(user.uid, user.isAdmin, user.displayName)}
-                        disabled={isUpdatingRole === user.uid}
-                        className="h-8 w-8 sm:h-9 sm:w-9"
-                      >
-                        {isUpdatingRole === user.uid ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.isAdmin ? <Users className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />) }
-                      </Button>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                             <Button 
+                                variant={user.isAdmin ? "secondary" : "default"} 
+                                size="icon" 
+                                title={user.isAdmin ? "Demote to Player" : "Promote to Admin"}
+                                disabled={isUpdatingRole === user.uid}
+                                className="h-8 w-8 sm:h-9 sm:w-9"
+                              >
+                                {isUpdatingRole === user.uid ? <Loader2 className="h-4 w-4 animate-spin" /> : (user.isAdmin ? <Users className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />) }
+                              </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Confirm Role Change</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Are you sure you want to {user.isAdmin ? 'demote' : 'promote'} {user.displayName || 'this user'} {user.isAdmin ? 'from' : 'to'} admin?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isUpdatingRole === user.uid}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleToggleAdmin(user.uid, user.isAdmin, user.displayName)} disabled={isUpdatingRole === user.uid}>
+                                    {isUpdatingRole === user.uid && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Confirm
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+
                       <Button variant="destructive" size="icon" title="Ban User (Simulated)" onClick={() => handleBanUser(user.uid, user.displayName)} className="h-8 w-8 sm:h-9 sm:w-9">
                         <Ban className="h-4 w-4" />
                       </Button>

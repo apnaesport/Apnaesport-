@@ -167,8 +167,8 @@ export default function CreateTournamentPage() {
       featured: data.featured || false,
       entryFee: data.entryFee || 0,
       currency: data.entryFee && data.entryFee > 0 ? data.currency || defaultCurrency : undefined,
-      sponsorName: data.sponsorName,
-      sponsorLogoUrl: data.sponsorLogoUrl,
+      sponsorName: data.sponsorName || undefined,
+      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     };
     
     try {
@@ -461,11 +461,7 @@ export default function CreateTournamentPage() {
 
 
             <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading} className="w-full md:w-auto">
-              {isSubmittingForm ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <PlusCircle className="mr-2 h-4 w-4" />
-              )}
+              {isSubmittingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" /> }
               {isSubmittingForm ? "Creating..." : "Create Tournament"}
             </Button>
           </form>
