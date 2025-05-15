@@ -18,8 +18,8 @@ export interface UserProfile extends FirebaseUser {
   friendUids?: string[];
   teamId?: string | null;
   points?: number;
-  sentFriendRequests?: string[]; // New: UIDs of users to whom requests were sent
-  receivedFriendRequests?: string[]; // New: UIDs of users from whom requests were received
+  sentFriendRequests?: string[];
+  receivedFriendRequests?: string[];
 }
 
 export type Game = {
@@ -141,7 +141,7 @@ export interface Team {
   id: string;
   name: string;
   leaderUid: string;
-  leaderName: string; // Denormalized for easier display
+  leaderName: string; 
   memberUids: string[];
   createdAt: Timestamp;
   lastActivityAt: Timestamp;
@@ -149,4 +149,13 @@ export interface Team {
 
 export interface TeamFormData {
   name: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderName: string; // Denormalized for display
+  text: string;
+  timestamp: Timestamp;
 }

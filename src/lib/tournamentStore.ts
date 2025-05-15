@@ -17,10 +17,12 @@ import {
   setDoc,
   writeBatch,
   arrayUnion,
-  arrayRemove
+  arrayRemove,
+  onSnapshot, // For real-time chat messages
+  Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -29,6 +31,8 @@ const USERS_COLLECTION = "users";
 const SETTINGS_COLLECTION = "settings";
 const GLOBAL_SETTINGS_ID = "global";
 const TEAMS_COLLECTION = "teams";
+const CHATS_COLLECTION = "chats";
+const MESSAGES_SUBCOLLECTION = "messages";
 
 
 // --- Game Functions ---
@@ -376,6 +380,10 @@ export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId
   if (!searchTerm.trim()) return [];
   const lowerSearchTerm = searchTerm.toLowerCase();
 
+  // Note: Firestore doesn't support case-insensitive search or partial string matching (like SQL LIKE) directly on its own.
+  // For small user bases, fetching all and filtering client-side is okay for prototyping.
+  // For larger scale, you'd use a dedicated search service like Algolia or Typesense,
+  // or denormalize searchable fields (e.g., all lowercase name).
   const allUsers = await getAllUsersFromFirestore();
   return allUsers.filter(user =>
     user.uid !== currentUserId &&
@@ -393,7 +401,6 @@ export const sendFriendRequest = async (fromUid: string, toUid: string): Promise
 
   const batch = writeBatch(db);
 
-  // Check if already friends or request already sent/received
   const fromUserSnap = await getDoc(fromUserRef);
   const toUserSnap = await getDoc(toUserRef);
 
@@ -402,7 +409,6 @@ export const sendFriendRequest = async (fromUid: string, toUid: string): Promise
   }
 
   const fromUserData = fromUserSnap.data() as UserProfile;
-  const toUserData = toUserSnap.data() as UserProfile;
 
   if (fromUserData.friendUids?.includes(toUid)) {
     throw new Error("You are already friends with this user.");
@@ -431,15 +437,14 @@ export const acceptFriendRequest = async (currentUserUid: string, requesterUid: 
   const requesterRef = doc(db, USERS_COLLECTION, requesterUid);
   const batch = writeBatch(db);
 
-  // Remove from pending requests
   batch.update(currentUserRef, {
     receivedFriendRequests: arrayRemove(requesterUid),
-    friendUids: arrayUnion(requesterUid), // Add to friends
+    friendUids: arrayUnion(requesterUid),
     updatedAt: serverTimestamp()
   });
   batch.update(requesterRef, {
     sentFriendRequests: arrayRemove(currentUserUid),
-    friendUids: arrayUnion(currentUserUid), // Add to friends
+    friendUids: arrayUnion(currentUserUid),
     updatedAt: serverTimestamp()
   });
 
@@ -464,7 +469,6 @@ export const declineFriendRequest = async (currentUserUid: string, requesterUid:
 };
 
 export const cancelFriendRequest = async (currentUserUid: string, targetUid: string): Promise<void> => {
-  // Similar to decline, but initiated by the sender
   const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
   const targetRef = doc(db, USERS_COLLECTION, targetUid);
   const batch = writeBatch(db);
@@ -546,14 +550,15 @@ export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | n
 export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly: boolean = false): Promise<Team[]> => {
   let qConstraints: QueryConstraint[] = [];
   if (asLeaderOnly) {
-    // Index needed for leaderUid + orderBy createdAt (ASC or DESC)
+    // Index needed: leaderUid (ASC), createdAt (DESC)
     // Example: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Ck5wcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARoNCglsZWFkZXJVaWQQARoNCgljcmVhdGVkQXQQAhoMCghfX25hbWVfXxAC
     qConstraints.push(where("leaderUid", "==", userId));
+    qConstraints.push(orderBy("createdAt", "desc")); // Added orderBy for consistency
   } else {
-    // Index required for memberUids array-contains + orderBy createdAt (ASC or DESC)
+    // Index needed for memberUids array-contains + orderBy createdAt (ASC or DESC)
     qConstraints.push(where("memberUids", "array-contains", userId));
+    qConstraints.push(orderBy("createdAt", "desc"));
   }
-  qConstraints.push(orderBy("createdAt", "desc"));
   
   const q = query(collection(db, TEAMS_COLLECTION), ...qConstraints);
   const teamsSnapshot = await getDocs(q);
@@ -607,19 +612,14 @@ export const removeMemberFromTeamInFirestore = async (teamId: string, userIdToRe
   if (teamData.memberUids.length === 1 && teamData.memberUids.includes(userIdToRemove)) {
     batch.delete(teamRef);
   } else if (teamData.leaderUid === userIdToRemove && teamData.memberUids.length > 1) {
-    // Simple: if leader leaves and others remain, delete team.
-    // Advanced: transfer leadership (not implemented here for simplicity)
-    // For this prototype, if leader leaves a team with members, the team is deleted.
     teamData.memberUids.forEach(memberUid => {
-        if (memberUid !== userIdToRemove) { // Ensure other members are also removed from team context
+        if (memberUid !== userIdToRemove) { 
             const otherUserRef = doc(db, USERS_COLLECTION, memberUid);
             batch.update(otherUserRef, { teamId: null, updatedAt: serverTimestamp() });
         }
     });
     batch.delete(teamRef);
   }
-
-
   await batch.commit();
 };
 
@@ -672,9 +672,73 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
   }, { merge: true });
 };
 
+// --- Chat Functions ---
+
+/**
+ * Generates a consistent chat ID for two user UIDs.
+ * The UIDs are sorted to ensure the ID is the same regardless of who initiated the chat.
+ */
+export const getChatId = (uid1: string, uid2: string): string => {
+  return [uid1, uid2].sort().join('_');
+};
+
+export const sendMessageToFirestore = async (chatId: string, senderId: string, senderName: string, text: string): Promise<string> => {
+  const messagesColRef = collection(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION);
+  const messageData: Omit<ChatMessage, 'id' | 'chatId'> = {
+    senderId,
+    senderName,
+    text,
+    timestamp: serverTimestamp() as Timestamp,
+  };
+  const messageDocRef = await addDoc(messagesColRef, messageData);
+  
+  // Optionally, update a 'lastMessageTimestamp' on the parent chat document
+  // const chatDocRef = doc(db, CHATS_COLLECTION, chatId);
+  // await setDoc(chatDocRef, { lastMessageTimestamp: serverTimestamp(), participantUids: chatId.split('_') }, { merge: true });
+
+  return messageDocRef.id;
+};
+
+export const getMessagesForChat = (
+  chatId: string,
+  callback: (messages: ChatMessage[]) => void
+): (() => void) => { // Returns an unsubscribe function
+  const messagesColRef = collection(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION);
+  const q = query(messagesColRef, orderBy("timestamp", "asc"));
+
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const messages = querySnapshot.docs.map(docSnap => ({
+      id: docSnap.id,
+      chatId: chatId,
+      ...docSnap.data()
+    } as ChatMessage));
+    callback(messages);
+  }, (error) => {
+    console.error("Error fetching real-time messages:", error);
+    // Optionally, notify the user via toast or other UI element
+  });
+
+  return unsubscribe; // Return the unsubscribe function
+};
+
+export const deleteMessageFromFirestore = async (chatId: string, messageId: string, currentUserId: string): Promise<void> => {
+  const messageDocRef = doc(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION, messageId);
+  const messageSnap = await getDoc(messageDocRef);
+
+  if (messageSnap.exists()) {
+    const messageData = messageSnap.data() as ChatMessage;
+    if (messageData.senderId === currentUserId) {
+      await deleteDoc(messageDocRef);
+    } else {
+      throw new Error("You can only delete your own messages.");
+    }
+  } else {
+    throw new Error("Message not found.");
+  }
+};
+
 
 // Aliases for easier use
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-

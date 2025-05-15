@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { LogIn, Users, UserPlus, UserMinus, Search, MessageSquare, Shield, Loader2, Users2, Trash2, LogOutIcon, UserPlus2, UserCheck, UserX, Send, Ban, CheckCircle, XCircle } from "lucide-react";
-import { useState, useEffect, useCallback } from "react";
-import type { UserProfile, Team, TeamFormData } from "@/lib/types";
-import { Badge } from "@/components/ui/badge"; // Added import
+import { LogIn, Users, UserPlus, UserMinus, Search, Shield, Loader2, Users2, Trash2, LogOutIcon, UserPlus2, UserCheck, UserX, Send, Ban, CheckCircle, XCircle, MessageCircle, X } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import type { UserProfile, Team, TeamFormData, ChatMessage } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 import { 
   searchUsersByNameOrEmail,
   getUserProfileFromFirestore,
@@ -26,7 +26,11 @@ import {
   acceptFriendRequest,
   declineFriendRequest,
   cancelFriendRequest,
-  removeFriend
+  removeFriend,
+  getChatId, // Chat function
+  sendMessageToFirestore, // Chat function
+  getMessagesForChat, // Chat function
+  deleteMessageFromFirestore, // Chat function
 } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -46,7 +50,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatDistanceToNow } from "date-fns";
 
 const teamFormSchema = z.object({
   name: z.string().min(3, "Team name must be at least 3 characters.").max(50, "Team name too long."),
@@ -74,13 +79,22 @@ export default function SocialPage() {
   const [isLoadingIncomingRequests, setIsLoadingIncomingRequests] = useState(true);
   const [isLoadingSentRequests, setIsLoadingSentRequests] = useState(true);
   const [isLoadingPlayerSearch, setIsLoadingPlayerSearch] = useState(false);
-  const [isProcessingFriendAction, setIsProcessingFriendAction] = useState<string | null>(null); // Stores UID of user being processed
+  const [isProcessingFriendAction, setIsProcessingFriendAction] = useState<string | null>(null);
   
   const [isLoadingTeam, setIsLoadingTeam] = useState(true);
   const [isProcessingTeamAction, setIsProcessingTeamAction] = useState(false);
   const [memberSearchTerm, setMemberSearchTerm] = useState("");
   const [memberSearchResults, setMemberSearchResults] = useState<UserProfile[]>([]);
   const [isLoadingMemberSearch, setIsLoadingMemberSearch] = useState(false);
+
+  // Chat state
+  const [selectedChatFriend, setSelectedChatFriend] = useState<UserProfile | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isLoadingChatMessages, setIsLoadingChatMessages] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
 
   const teamForm = useForm<TeamFormData>({
     resolver: zodResolver(teamFormSchema),
@@ -99,11 +113,9 @@ export default function SocialPage() {
 
   const fetchSocialData = useCallback(async () => {
     if (!user) return;
-
     setIsLoadingFriends(true);
     setIsLoadingIncomingRequests(true);
     setIsLoadingSentRequests(true);
-
     try {
       const [friendProfiles, incomingProfiles, sentProfiles] = await Promise.all([
         Promise.all((user.friendUids || []).map(uid => getUserProfileFromFirestore(uid))),
@@ -170,6 +182,27 @@ export default function SocialPage() {
     }
   }, [user, fetchSocialData, fetchUserTeam]);
 
+  // Chat: Fetch messages when selectedChatFriend changes
+  useEffect(() => {
+    if (selectedChatFriend && user) {
+      setIsLoadingChatMessages(true);
+      const chatId = getChatId(user.uid, selectedChatFriend.uid);
+      const unsubscribe = getMessagesForChat(chatId, (messages) => {
+        setChatMessages(messages);
+        setIsLoadingChatMessages(false);
+      });
+      return () => unsubscribe(); // Cleanup on unmount or if friend changes
+    } else {
+      setChatMessages([]); // Clear messages if no chat selected
+    }
+  }, [selectedChatFriend, user]);
+  
+  // Chat: Scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+
   const handlePlayerSearch = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!playerSearchTerm.trim() || !user) return;
@@ -185,14 +218,13 @@ export default function SocialPage() {
     setIsLoadingPlayerSearch(false);
   };
   
-  // Friend Actions
   const handleSendFriendRequest = async (targetUserId: string) => {
     if (!user) return;
     setIsProcessingFriendAction(targetUserId);
     try {
       await sendFriendRequest(user.uid, targetUserId);
       toast({ title: "Request Sent!", description: "Your friend request has been sent." });
-      await refreshUser(); // Refreshes AuthContext and re-triggers fetchSocialData
+      await refreshUser(); 
       setPlayerSearchResults(prev => prev.map(u => u.uid === targetUserId ? {...u, relationshipStatus: "request_sent_by_me"} : u));
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Could not send friend request.", variant: "destructive" });
@@ -245,6 +277,9 @@ export default function SocialPage() {
     try {
       await removeFriend(user.uid, friendUid);
       toast({ title: "Friend Removed", variant: "destructive" });
+      if (selectedChatFriend?.uid === friendUid) {
+        setSelectedChatFriend(null); // Close chat if active
+      }
       await refreshUser();
     } catch (error: any) {
       toast({ title: "Error", description: error.message || "Could not remove friend.", variant: "destructive" });
@@ -261,7 +296,6 @@ export default function SocialPage() {
     return "none";
   };
 
-
   const handleCreateTeam: SubmitHandler<TeamFormData> = async (data) => {
     if (!user) return;
     setIsProcessingTeamAction(true);
@@ -269,7 +303,7 @@ export default function SocialPage() {
       await createTeamInFirestore(data, user);
       toast({ title: "Team Created!", description: `Your team "${data.name}" has been created.` });
       await refreshUser(); 
-      fetchUserTeam(); // Re-fetch team details
+      fetchUserTeam(); 
       teamForm.reset();
     } catch (error: any) {
       console.error("Error creating team:", error);
@@ -305,7 +339,7 @@ export default function SocialPage() {
   const confirmAddMember = async (memberId: string) => {
     if (!currentTeam || !user || user.uid !== currentTeam.leaderUid) return;
     setIsProcessingTeamAction(true);
-    setIsProcessingFriendAction(memberId); // Use friend action state for member button loading
+    setIsProcessingFriendAction(memberId); 
     try {
         await addMemberToTeamInFirestore(currentTeam.id, memberId);
         toast({title: "Member Added", description: "Player added to your team."});
@@ -367,6 +401,32 @@ export default function SocialPage() {
     setIsProcessingTeamAction(false);
   };
 
+  const handleSendMessage = async () => {
+    if (!user || !selectedChatFriend || !chatInput.trim()) return;
+    setIsSendingMessage(true);
+    const chatId = getChatId(user.uid, selectedChatFriend.uid);
+    try {
+      await sendMessageToFirestore(chatId, user.uid, user.displayName || "User", chatInput.trim());
+      setChatInput("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({ title: "Message Error", description: "Could not send message.", variant: "destructive" });
+    }
+    setIsSendingMessage(false);
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!user || !selectedChatFriend) return;
+    const chatId = getChatId(user.uid, selectedChatFriend.uid);
+    try {
+      await deleteMessageFromFirestore(chatId, messageId, user.uid);
+      toast({ title: "Message Deleted", variant: "default" });
+      // Real-time listener will update the UI
+    } catch (error: any) {
+      toast({ title: "Error Deleting Message", description: error.message, variant: "destructive" });
+    }
+  };
+
 
   if (authLoading) {
     return (
@@ -392,84 +452,157 @@ export default function SocialPage() {
 
   return (
     <div className="space-y-8">
-      <PageTitle title="Social Hub" subtitle="Connect with players, form teams, and grow your network!" />
+      <PageTitle title="Social Hub" subtitle="Connect with players, form teams, and chat!" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Column 1: Friends & Requests */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Column 1: Friends & Requests & Chat */}
         <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader><CardTitle className="flex items-center text-xl"><Users className="mr-2 h-5 w-5 text-primary" />My Friends ({friends.length})</CardTitle></CardHeader>
             <CardContent>
               {isLoadingFriends ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
                 : friends.length > 0 ? (
-                <ul className="space-y-2 max-h-60 overflow-y-auto">
+                <ScrollArea className="max-h-60">
+                <ul className="space-y-2">
                   {friends.map(friend => (
-                    <li key={friend.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30">
-                      <div className="flex items-center gap-2">
+                    <li key={friend.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30 transition-colors">
+                      <div className="flex items-center gap-2 cursor-pointer" onClick={() => setSelectedChatFriend(friend)}>
                         <Avatar className="h-8 w-8"><AvatarImage src={friend.photoURL || ""} alt={friend.displayName || ""} /><AvatarFallback>{getInitials(friend.displayName)}</AvatarFallback></Avatar>
                         <span className="font-medium text-sm truncate">{friend.displayName}</span>
                       </div>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" disabled={isProcessingFriendAction === friend.uid} title="Remove Friend"><UserMinus className="h-4 w-4" /></Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader><AlertDialogTitle>Remove {friend.displayName}?</AlertDialogTitle><AlertDialogDescription>Are you sure?</AlertDialogDescription></AlertDialogHeader>
-                          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveFriend(friend.uid)} className="bg-destructive hover:bg-destructive/90">Remove</AlertDialogAction></AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <div className="flex items-center gap-1">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-primary hover:text-primary/80" onClick={() => setSelectedChatFriend(friend)} title="Chat">
+                            <MessageCircle className="h-4 w-4"/>
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" disabled={isProcessingFriendAction === friend.uid} title="Remove Friend"><UserMinus className="h-4 w-4" /></Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHeader><AlertDialogTitle>Remove {friend.displayName}?</AlertDialogTitle><AlertDialogDescription>Are you sure?</AlertDialogDescription></AlertDialogHeader>
+                            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => handleRemoveFriend(friend.uid)} className="bg-destructive hover:bg-destructive/90">Remove</AlertDialogAction></AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </li>))}
                 </ul>
+                </ScrollArea>
               ) : <p className="text-muted-foreground text-center py-2 text-sm">No friends yet. Find some!</p>}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader><CardTitle className="flex items-center text-xl"><UserPlus2 className="mr-2 h-5 w-5 text-primary" />Incoming Requests ({incomingRequests.length})</CardTitle></CardHeader>
-            <CardContent>
-              {isLoadingIncomingRequests ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-                : incomingRequests.length > 0 ? (
-                <ul className="space-y-2 max-h-60 overflow-y-auto">
-                  {incomingRequests.map(req => (
-                    <li key={req.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8"><AvatarImage src={req.photoURL || ""} alt={req.displayName || ""} /><AvatarFallback>{getInitials(req.displayName)}</AvatarFallback></Avatar>
-                        <span className="font-medium text-sm truncate">{req.displayName}</span>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button size="xs" variant="default" onClick={() => handleAcceptFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Accept">
-                            {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle className="h-3 w-3"/>}
+          {/* Incoming & Sent Requests Cards (condensed for space if chat is open) */}
+          {!selectedChatFriend && (
+            <>
+            <Card>
+                <CardHeader><CardTitle className="flex items-center text-xl"><UserPlus2 className="mr-2 h-5 w-5 text-primary" />Incoming Requests ({incomingRequests.length})</CardTitle></CardHeader>
+                <CardContent>
+                {isLoadingIncomingRequests ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+                    : incomingRequests.length > 0 ? (
+                    <ScrollArea className="max-h-60">
+                    <ul className="space-y-2">
+                    {incomingRequests.map(req => (
+                        <li key={req.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30">
+                        <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8"><AvatarImage src={req.photoURL || ""} alt={req.displayName || ""} /><AvatarFallback>{getInitials(req.displayName)}</AvatarFallback></Avatar>
+                            <span className="font-medium text-sm truncate">{req.displayName}</span>
+                        </div>
+                        <div className="flex gap-1">
+                            <Button size="xs" variant="default" onClick={() => handleAcceptFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Accept">
+                                {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <CheckCircle className="h-3 w-3"/>}
+                            </Button>
+                            <Button size="xs" variant="destructive" onClick={() => handleDeclineFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Decline">
+                            {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>}
+                            </Button>
+                        </div>
+                        </li>))}
+                    </ul>
+                    </ScrollArea>
+                    ) : <p className="text-muted-foreground text-center py-2 text-sm">No incoming requests.</p>}
+                </CardContent>
+            </Card>
+            
+            <Card>
+                <CardHeader><CardTitle className="flex items-center text-xl"><Send className="mr-2 h-5 w-5 text-primary" />Sent Requests ({sentRequests.length})</CardTitle></CardHeader>
+                <CardContent>
+                {isLoadingSentRequests ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+                    : sentRequests.length > 0 ? (
+                    <ScrollArea className="max-h-60">
+                    <ul className="space-y-2">
+                    {sentRequests.map(req => (
+                        <li key={req.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30">
+                        <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8"><AvatarImage src={req.photoURL || ""} alt={req.displayName || ""} /><AvatarFallback>{getInitials(req.displayName)}</AvatarFallback></Avatar>
+                            <span className="font-medium text-sm truncate">{req.displayName}</span>
+                        </div>
+                        <Button variant="outline" size="xs" onClick={() => handleCancelFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Cancel Request">
+                            {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <Ban className="h-3 w-3"/>}
                         </Button>
-                        <Button size="xs" variant="destructive" onClick={() => handleDeclineFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Decline">
-                           {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <XCircle className="h-3 w-3"/>}
-                        </Button>
+                        </li>))}
+                    </ul>
+                    </ScrollArea>
+                    ) : <p className="text-muted-foreground text-center py-2 text-sm">No pending sent requests.</p>}
+                </CardContent>
+            </Card>
+            </>
+          )}
+
+          {/* Chat Panel */}
+          {selectedChatFriend && user && (
+            <Card className="mt-6 sticky top-20"> {/* Sticky for better UX while scrolling other content */}
+              <CardHeader className="flex flex-row items-center justify-between p-3 border-b">
+                <div className="flex items-center gap-2">
+                  <Avatar className="h-8 w-8"><AvatarImage src={selectedChatFriend.photoURL || ""} /><AvatarFallback>{getInitials(selectedChatFriend.displayName)}</AvatarFallback></Avatar>
+                  <CardTitle className="text-lg">{selectedChatFriend.displayName}</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChatFriend(null)} className="h-7 w-7">
+                  <X className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[calc(100vh-28rem)] min-h-[300px] max-h-[500px] p-3 space-y-3">
+                  {isLoadingChatMessages ? (
+                    <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+                  ) : chatMessages.length > 0 ? (
+                    chatMessages.map(msg => (
+                      <div key={msg.id} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
+                        <div className={cn("max-w-[75%] p-2 rounded-lg shadow", 
+                                          msg.senderId === user.uid ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground")}>
+                          <p className="text-sm break-words">{msg.text}</p>
+                          <p className="text-xs opacity-70 mt-1 text-right">
+                            {msg.timestamp ? formatDistanceToNow(msg.timestamp.toDate(), { addSuffix: true }) : "sending..."}
+                            {msg.senderId === user.uid && (
+                              <Trash2 
+                                className="inline ml-2 h-3 w-3 cursor-pointer hover:text-destructive" 
+                                onClick={() => handleDeleteMessage(msg.id)}
+                              />
+                            )}
+                          </p>
+                        </div>
                       </div>
-                    </li>))}
-                </ul>
-              ) : <p className="text-muted-foreground text-center py-2 text-sm">No incoming requests.</p>}
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader><CardTitle className="flex items-center text-xl"><Send className="mr-2 h-5 w-5 text-primary" />Sent Requests ({sentRequests.length})</CardTitle></CardHeader>
-            <CardContent>
-              {isLoadingSentRequests ? <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-                : sentRequests.length > 0 ? (
-                <ul className="space-y-2 max-h-60 overflow-y-auto">
-                  {sentRequests.map(req => (
-                    <li key={req.uid} className="flex items-center justify-between p-2 border rounded-md hover:bg-secondary/30">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8"><AvatarImage src={req.photoURL || ""} alt={req.displayName || ""} /><AvatarFallback>{getInitials(req.displayName)}</AvatarFallback></Avatar>
-                        <span className="font-medium text-sm truncate">{req.displayName}</span>
-                      </div>
-                      <Button variant="outline" size="xs" onClick={() => handleCancelFriendRequest(req.uid)} disabled={isProcessingFriendAction === req.uid} title="Cancel Request">
-                        {isProcessingFriendAction === req.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <Ban className="h-3 w-3"/>}
-                      </Button>
-                    </li>))}
-                </ul>
-              ) : <p className="text-muted-foreground text-center py-2 text-sm">No pending sent requests.</p>}
-            </CardContent>
-          </Card>
+                    ))
+                  ) : (
+                    <p className="text-muted-foreground text-center py-4">No messages yet. Say hi!</p>
+                  )}
+                  <div ref={messagesEndRef} />
+                </ScrollArea>
+                <div className="p-3 border-t">
+                  <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex gap-2">
+                    <Input 
+                      value={chatInput} 
+                      onChange={(e) => setChatInput(e.target.value)} 
+                      placeholder="Type a message..." 
+                      disabled={isSendingMessage}
+                      className="h-9"
+                    />
+                    <Button type="submit" size="sm" disabled={isSendingMessage || !chatInput.trim()} className="h-9">
+                      {isSendingMessage ? <Loader2 className="h-4 w-4 animate-spin"/> : <Send className="h-4 w-4" />}
+                    </Button>
+                  </form>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Column 2: Find Players & Teams */}
@@ -485,7 +618,8 @@ export default function SocialPage() {
               </form>
               {isLoadingPlayerSearch && <div className="flex justify-center py-2"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>}
               {!isLoadingPlayerSearch && playerSearchResults.length > 0 && (
-                <ul className="space-y-2 max-h-80 overflow-y-auto">
+                <ScrollArea className="max-h-80">
+                <ul className="space-y-2">
                   {playerSearchResults.map(foundUser => {
                     const status = determineRelationshipStatus(foundUser);
                     return (
@@ -503,7 +637,7 @@ export default function SocialPage() {
                             </Button>}
                         {status === "request_sent_by_me" && <Button variant="outline" size="sm" disabled>Request Sent</Button>}
                         {status === "request_received_from_them" && 
-                            <Button variant="secondary" size="sm" onClick={() => { /* Could scroll to incoming requests or open a modal */ toast({title: "Respond to Request", description: "Check your incoming requests list."}) } }>
+                            <Button variant="secondary" size="sm" onClick={() => { toast({title: "Respond to Request", description: "Check your incoming requests list."}) } }>
                                 Respond
                             </Button>}
                         {status === "friends" && <Badge variant="secondary" className="text-xs"><UserCheck className="h-3 w-3 mr-1"/>Friends</Badge>}
@@ -511,6 +645,7 @@ export default function SocialPage() {
                     );
                   })}
                 </ul>
+                </ScrollArea>
               )}
               {!isLoadingPlayerSearch && playerSearchResults.length === 0 && playerSearchTerm && <p className="text-muted-foreground text-center text-sm">No users found.</p>}
             </CardContent>
@@ -525,7 +660,8 @@ export default function SocialPage() {
                   <h3 className="text-lg font-semibold text-foreground">{currentTeam.name}</h3>
                   <p className="text-sm text-muted-foreground">Leader: {currentTeam.leaderName}</p>
                   <h4 className="font-medium text-sm">Members ({teamMembers.length}):</h4>
-                  <ul className="space-y-1.5 max-h-48 overflow-y-auto text-xs">
+                   <ScrollArea className="max-h-48">
+                  <ul className="space-y-1.5 text-xs">
                     {teamMembers.map(member => (
                       <li key={member.uid} className="flex items-center justify-between p-1.5 border rounded hover:bg-muted">
                         <div className="flex items-center gap-2">
@@ -540,6 +676,7 @@ export default function SocialPage() {
                         )}
                       </li>))}
                   </ul>
+                   </ScrollArea>
                   {user.uid === currentTeam.leaderUid && (
                     <div className="pt-3 border-t mt-3 space-y-2">
                       <h4 className="font-medium text-sm">Add New Member:</h4>
@@ -550,7 +687,8 @@ export default function SocialPage() {
                        </form>
                        {isLoadingMemberSearch && <div className="flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary"/></div>}
                        {memberSearchResults.length > 0 && (
-                           <ul className="space-y-1.5 max-h-32 overflow-y-auto border p-1.5 rounded-md text-xs">
+                           <ScrollArea className="max-h-32">
+                           <ul className="space-y-1.5 border p-1.5 rounded-md text-xs">
                                {memberSearchResults.map(foundUser => (
                                    <li key={foundUser.uid} className="flex items-center justify-between p-1 rounded hover:bg-muted">
                                        <span>{foundUser.displayName} ({foundUser.email})</span>
@@ -558,6 +696,7 @@ export default function SocialPage() {
                                            {isProcessingTeamAction && isProcessingFriendAction === foundUser.uid ? <Loader2 className="h-3 w-3 animate-spin"/> : <UserPlus2 className="h-3 w-3"/>}<span className="ml-1">Add</span></Button>
                                    </li>))}
                            </ul>
+                           </ScrollArea>
                        )}
                        {memberSearchResults.length === 0 && addMemberForm.getValues("memberSearch") && !isLoadingMemberSearch && (<p className="text-xs text-muted-foreground">No available users found.</p>)}
                       <Separator className="my-2"/>
@@ -583,15 +722,6 @@ export default function SocialPage() {
                 </form>
               )}
               <p className="text-xs text-muted-foreground mt-3 text-center">Note: Team features are basic. Team chat and advanced management are coming soon.</p>
-            </CardContent>
-          </Card>
-
-          <Card className="hover:shadow-lg transition-shadow">
-            <CardHeader><CardTitle className="flex items-center text-xl"><MessageSquare className="mr-2 h-5 w-5 text-primary" />Discussions</CardTitle></CardHeader>
-            <CardContent className="text-center min-h-[100px] flex flex-col justify-center items-center">
-              <p className="text-muted-foreground mb-3">Community Forums & Chat</p>
-              <Button asChild variant="outline" disabled><span>Explore (Coming Soon)</span></Button>
-              <p className="text-xs text-muted-foreground mt-1.5">Real-time chat and forums are planned.</p>
             </CardContent>
           </Card>
         </div>
