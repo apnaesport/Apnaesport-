@@ -11,6 +11,7 @@ import Link from "next/link";
 import { LogIn, Users, UserPlus, UserMinus, Search, MessageSquare, Shield, Loader2, Users2, Trash2, LogOutIcon, UserPlus2, UserCheck, UserX, Send, Ban, CheckCircle, XCircle } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import type { UserProfile, Team, TeamFormData } from "@/lib/types";
+import { Badge } from "@/components/ui/badge"; // Added import
 import { 
   searchUsersByNameOrEmail,
   getUserProfileFromFirestore,
