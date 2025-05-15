@@ -12,9 +12,9 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
   const { settings, loadingSettings } = useSiteSettings();
 
   const sizeClasses = {
-    sm: { width: 120, height: 46, svgHeight: 30 }, // Adjusted svgHeight for balance
-    md: { width: 180, height: 70, svgHeight: 40 }, // Adjusted svgHeight
-    lg: { width: 240, height: 93, svgHeight: 50 }, // Adjusted svgHeight
+    sm: { width: 130, height: 50, svgHeight: 34, customImageWidth: 34 }, // Adjusted for better proportions
+    md: { width: 190, height: 75, svgHeight: 46, customImageWidth: 46 }, // Adjusted for better proportions
+    lg: { width: 250, height: 100, svgHeight: 60, customImageWidth: 60 }, // Adjusted for better proportions
   };
 
   const currentSize = sizeClasses[size] || sizeClasses.md;
@@ -27,28 +27,25 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
   const customLogoUrl = settings?.logoUrl;
 
   return (
-    <Link href="/" className={cn("flex items-center gap-2", className)} style={{ height: currentSize.height }}>
+    <Link href="/" className={cn("flex items-center gap-1.5", className)} style={{ height: currentSize.height }}>
       {customLogoUrl && (
-        // Container for the custom image
         <div 
           className="relative flex items-center justify-center" 
           style={{ 
             height: currentSize.svgHeight, 
-            // Max width for custom logo, e.g., twice its height. Aspect ratio will be maintained by object-contain.
-            width: currentSize.svgHeight * 2, 
+            width: currentSize.customImageWidth, 
           }}
         >
           <Image
             src={customLogoUrl}
             alt={settings?.siteName || "Custom Site Logo"}
-            fill // Use fill and object-contain for better responsive scaling within the parent div
+            fill 
             className="object-contain"
             unoptimized={customLogoUrl.startsWith('data:image')}
-            priority // Consider if logo is LCP
+            priority 
           />
         </div>
       )}
-      {/* Apna Esport Text Logo - SVG scales based on height prop and its viewBox */}
       <ApnaEsportLogo height={currentSize.svgHeight} className="shrink-0" />
     </Link>
   );
