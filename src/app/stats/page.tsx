@@ -17,6 +17,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Badge } from "@/components/ui/badge"; // Added Badge import
 
 const placeholderPerformanceData = [
   { month: "Jan", wins: 0, losses: 0 }, { month: "Feb", wins: 0, losses: 0 },
@@ -88,7 +89,7 @@ export default function StatsPage() {
     if (!authLoading) {
       fetchUserStats();
     }
-  }, [authLoading, fetchUserStats]);
+  }, [authLoading, user, fetchUserStats]);
 
 
   if (authLoading || isLoading) {
@@ -198,3 +199,4 @@ export default function StatsPage() {
     </MainLayout>
   );
 }
+
