@@ -1,10 +1,11 @@
+
 // components/shared/ApnaEsportLogo.tsx
 import type { SVGProps } from 'react';
 
 export function ApnaEsportLogo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
-      viewBox="0 0 220 50" // Increased viewBox width for potentially wider text
+      viewBox="0 0 220 50" // Adjusted viewBox width to better fit "APNA ESPORT"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-labelledby="apnaEsportLogoTitle"
@@ -17,11 +18,11 @@ export function ApnaEsportLogo(props: SVGProps<SVGSVGElement>) {
         y="50%"
         dominantBaseline="middle"
         textAnchor="middle"
-        fontSize="36" // Increased font size for more vertical fill
+        fontSize="30" // Slightly adjusted font size for balance
         fontWeight="bold"
         fill="hsl(var(--foreground))"
-        fontFamily="Arial, sans-serif"
-        letterSpacing="1"
+        fontFamily="Arial, sans-serif" // Consider a more modern sans-serif if available/themed
+        letterSpacing="0.5" // Adjusted letter spacing
       >
         APNA ESPORT
       </text>

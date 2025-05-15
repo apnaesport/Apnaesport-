@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Upload } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -18,27 +18,27 @@ import type { SiteSettings } from "@/lib/types";
 import { useEffect, useState, useCallback } from "react";
 import { getSiteSettingsFromFirestore, saveSiteSettingsToFirestore } from "@/lib/tournamentStore";
 import { useTheme } from "@/contexts/ThemeContext";
-import { useSiteSettings as useGlobalSiteSettings, SiteSettingsProvider } from "@/contexts/SiteSettingsContext"; // Renamed import
+import { useSiteSettings as useGlobalSiteSettings, SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { cn } from "@/lib/utils";
-import Image from "next/image";
+// Image import is no longer needed for logo preview
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
   siteDescription: z.string().min(10, "Site description must be at least 10 characters."),
   maintenanceMode: z.boolean(),
   allowRegistrations: z.boolean(),
-  logoUrl: z.string().optional(), // Can be Data URL or external URL
+  // logoUrl: z.string().optional(), // Kept in schema if SiteSettings type still has it, but UI removed
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
-  logoFile: z.custom<FileList>().optional(), // For handling file input
+  // logoFile: z.custom<FileList>().optional(), // Removed as logo upload is removed
 });
 
-const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt'> = {
+const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> = { // logoUrl removed from defaults for this form
   siteName: "Apna Esport",
   siteDescription: "Your Ultimate Gaming Tournament Platform",
   maintenanceMode: false,
   allowRegistrations: true,
-  logoUrl: "", 
+  // logoUrl: "", // No longer a form default
   faviconUrl: "",
   defaultTheme: "system", 
 };
@@ -48,10 +48,10 @@ function AdminSettingsPageContent() {
   const [isSaving, setIsSaving] = useState(false); 
   const [isFetchingSettings, setIsFetchingSettings] = useState(true);
   const { theme, setTheme } = useTheme();
-  const { settings: globalSettings, refreshSiteSettings } = useGlobalSiteSettings(); // Use global settings context
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const { settings: globalSettings, refreshSiteSettings } = useGlobalSiteSettings();
+  // const [logoPreview, setLogoPreview] = useState<string | null>(null); // Removed logo preview state
   
-  const form = useForm<SiteSettings & { logoFile?: FileList }>({ // Added logoFile to form type
+  const form = useForm<Omit<SiteSettings, 'logoUrl'> & { logoFile?: FileList }>({ // Adjusted form type
     resolver: zodResolver(settingsSchema),
     defaultValues: defaultSettingsValues,
   });
@@ -59,66 +59,53 @@ function AdminSettingsPageContent() {
   const fetchSettings = useCallback(async () => {
     setIsFetchingSettings(true);
     if (globalSettings) {
+      const { logoUrl, ...relevantGlobalSettings } = globalSettings; // Exclude logoUrl from form reset
       form.reset({
-        ...globalSettings,
-        logoFile: undefined, // Reset file input
+        ...relevantGlobalSettings,
+        // logoFile: undefined, // Reset file input (already removed)
       });
       if (globalSettings.defaultTheme && ["light", "dark", "system"].includes(globalSettings.defaultTheme)) {
         setTheme(globalSettings.defaultTheme as "light" | "dark" | "system");
       }
-      if (globalSettings.logoUrl) {
-        setLogoPreview(globalSettings.logoUrl);
-      } else {
-        setLogoPreview(null);
-      }
+      // setLogoPreview(globalSettings.logoUrl || null); // Removed logo preview logic
     } else {
-      // Fallback if globalSettings context hasn't loaded yet or if there are no settings
       const loadedSettings = await getSiteSettingsFromFirestore();
       if (loadedSettings) {
-        form.reset(loadedSettings);
+        const { logoUrl, ...relevantLoadedSettings } = loadedSettings; // Exclude logoUrl
+        form.reset(relevantLoadedSettings);
         if (loadedSettings.defaultTheme) setTheme(loadedSettings.defaultTheme as "light" | "dark" | "system");
-        if (loadedSettings.logoUrl) setLogoPreview(loadedSettings.logoUrl); else setLogoPreview(null);
+        // if (loadedSettings.logoUrl) setLogoPreview(loadedSettings.logoUrl); else setLogoPreview(null); // Removed
       } else {
          form.reset(defaultSettingsValues);
-         setLogoPreview(null);
+         // setLogoPreview(null); // Removed
       }
     }
     setIsFetchingSettings(false);
-  }, [form, globalSettings, setTheme, toast]); // Added toast here
+  }, [form, globalSettings, setTheme]);
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
-  const handleLogoFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUri = reader.result as string;
-        setLogoPreview(dataUri);
-        form.setValue("logoUrl", dataUri); // Store as Data URL directly
-      };
-      reader.readAsDataURL(file);
-    } else {
-      // If file is removed, revert to original logoUrl or clear if none
-      setLogoPreview(globalSettings?.logoUrl || null);
-      form.setValue("logoUrl", globalSettings?.logoUrl || "");
-    }
-  };
+  // handleLogoFileChange is removed as logo upload is removed
 
-  const onSubmit: SubmitHandler<SiteSettings & { logoFile?: FileList }> = async (data) => {
+  const onSubmit: SubmitHandler<Omit<SiteSettings, 'logoUrl'>> = async (data) => {
     setIsSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, updatedAt, logoFile, ...settingsToSave } = data; 
-      settingsToSave.defaultTheme = theme; 
+      const { id, updatedAt, ...settingsToSave } = data as any; // Cast to any to avoid type issues with spread
       
-      // logoUrl is already updated by handleLogoFileChange if a new file was selected
-      // If no new file, existing data.logoUrl (from form state) will be used.
+      // Retrieve the existing logoUrl from globalSettings if it exists, otherwise it remains undefined or null
+      const currentLogoUrl = globalSettings?.logoUrl;
 
-      await saveSiteSettingsToFirestore(settingsToSave as Omit<SiteSettings, 'id' | 'updatedAt'>);
-      await refreshSiteSettings(); // Refresh global site settings context
+      const completeSettingsToSave = {
+        ...settingsToSave,
+        logoUrl: currentLogoUrl, // Preserve existing logoUrl or set to undefined/null
+        defaultTheme: theme,
+      };
+
+      await saveSiteSettingsToFirestore(completeSettingsToSave as Omit<SiteSettings, 'id' | 'updatedAt'>);
+      await refreshSiteSettings();
       toast({
         title: "Settings Saved",
         description: "Site settings have been updated successfully.",
@@ -211,28 +198,11 @@ function AdminSettingsPageContent() {
           <CardDescription>Customize the visual theme and branding.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="space-y-2">
+          {/* Site Logo upload section removed */}
+          {/* <div className="space-y-2">
             <Label htmlFor="logoFile">Site Logo</Label>
-            <div className="flex items-center gap-4">
-              <Input 
-                id="logoFile" 
-                type="file" 
-                {...form.register("logoFile")}
-                className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90 flex-grow" 
-                accept="image/png, image/jpeg, image/svg+xml, image/webp" 
-                onChange={handleLogoFileChange}
-                disabled={isSaving}
-              />
-            </div>
-            {logoPreview && (
-              <div className="mt-2 p-2 border rounded-md inline-block bg-muted">
-                <Image src={logoPreview} alt="Logo preview" width={180} height={70} className="object-contain max-h-[70px]" data-ai-hint="site logo preview" unoptimized={logoPreview.startsWith('data:image')}/>
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">Upload a new logo. If empty, the default text logo will be used. SVG, PNG, JPG, WEBP supported.</p>
-             {form.formState.errors.logoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.logoUrl.message}</p>}
-          </div>
-
+            <p className="text-xs text-muted-foreground">The site logo is now text-based ("Apna Esport") and cannot be uploaded here.</p>
+          </div> */}
           <div className="space-y-2">
             <Label htmlFor="faviconUrl">Favicon URL</Label>
             <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://example.com/favicon.ico" disabled={isSaving}/>
@@ -299,7 +269,7 @@ function AdminSettingsPageContent() {
 
 export default function AdminSettingsPage() {
   return (
-    <SiteSettingsProvider> {/* Ensures context is available if page is accessed directly */}
+    <SiteSettingsProvider>
       <AdminSettingsPageContent />
     </SiteSettingsProvider>
   )
