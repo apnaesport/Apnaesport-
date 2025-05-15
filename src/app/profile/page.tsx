@@ -37,7 +37,7 @@ const profileSchema = z.object({
 type ProfileFormData = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, setUser: setAuthContextUser } = useAuth();
+  const { user, loading: authLoading, setUser: setAuthContextUser, refreshUser } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -74,8 +74,9 @@ export default function ProfilePage() {
     } catch (error) {
       console.error("Error fetching profile or games:", error);
       toast({ title: "Error", description: "Could not load your profile data or game list.", variant: "destructive" });
+    } finally {
+      setPageLoading(false);
     }
-    setPageLoading(false);
   }, [form, toast]);
 
   useEffect(() => {
@@ -102,19 +103,18 @@ export default function ProfilePage() {
       
       await updateUserProfileInFirestore(user.uid, {
         displayName: data.displayName,
-        bio: data.bio || "", // Ensure empty string if null
+        bio: data.bio || "", 
         favoriteGameIds: data.favoriteGameIds || [],
-        streamingChannelUrl: data.streamingChannelUrl || "", // Ensure empty string if null
+        streamingChannelUrl: data.streamingChannelUrl || "", 
       });
 
+      // Update Firebase Auth display name if changed
       if (auth.currentUser && auth.currentUser.displayName !== data.displayName) {
         await updateFirebaseProfile(auth.currentUser, { displayName: data.displayName });
       }
       
-      const updatedUserProfile = await getUserProfileFromFirestore(user.uid);
-      if (updatedUserProfile) {
-        setAuthContextUser(updatedUserProfile); 
-      }
+      // Refresh user data in AuthContext to reflect changes globally
+      await refreshUser();
 
       toast({ title: "Profile Updated", description: "Your profile information has been saved." });
     } catch (error) {

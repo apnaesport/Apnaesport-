@@ -17,8 +17,6 @@ interface LoadingSpinnerProps {
 }
 
 const loadingMessages = [
-  "Initializing TournamentHub...",
-  "Loading user data...",
   "Preparing dashboard...",
   "Fetching latest tournaments...",
   "Almost there...",
@@ -31,7 +29,7 @@ export function LoadingSpinner({
   size = "md",
   className,
   fullPage = false,
-  text: initialText = "Loading...", // Renamed prop for clarity, will be the first message shown
+  text: initialText = "Loading...",
   showLogo = false,
   showProgressBar = false,
 }: LoadingSpinnerProps) {
@@ -46,15 +44,14 @@ export function LoadingSpinner({
   const [progress, setProgress] = useState(10);
 
   useEffect(() => {
-    // Always set the initial message when the component mounts or initialText changes
-    setCurrentMessage(initialText);
+    setCurrentMessage(initialText); // Always set the initial message
 
     let progressInterval: NodeJS.Timeout | undefined;
     let messageInterval: NodeJS.Timeout | undefined;
     let initialDisplayTimeout: NodeJS.Timeout | undefined;
 
     if (showProgressBar) {
-      setProgress(10); // Reset progress
+      setProgress(10);
 
       progressInterval = setInterval(() => {
         setProgress((prev) => {
@@ -66,19 +63,16 @@ export function LoadingSpinner({
         });
       }, 800);
 
-      // Show the initialText for a short duration before starting to cycle
-      initialDisplayTimeout = setTimeout(() => {
-        // Set the first cycling message
-        setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
-        // Then start the interval for cycling messages
-        messageInterval = setInterval(() => {
+      // Only cycle messages if not in fullPage mode, or if specifically desired later.
+      // For fullPage, stick to initialText unless showProgressBar is false.
+      if (!fullPage) { 
+        initialDisplayTimeout = setTimeout(() => {
           setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
-        }, 2000);
-      }, 750); // Display initialText for 0.75 seconds
-
-    } else {
-      // If not showing progress bar, just stick with the initial text
-      setCurrentMessage(initialText);
+          messageInterval = setInterval(() => {
+            setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
+          }, 2000);
+        }, 750);
+      }
     }
 
     return () => {
@@ -86,7 +80,7 @@ export function LoadingSpinner({
       if (messageInterval) clearInterval(messageInterval);
       if (initialDisplayTimeout) clearTimeout(initialDisplayTimeout);
     };
-  }, [initialText, showProgressBar]); // Rerun if initialText or showProgressBar changes
+  }, [initialText, showProgressBar, fullPage]);
 
   const spinnerContent = (
     <div className={cn("flex flex-col items-center justify-center gap-6", className)}>

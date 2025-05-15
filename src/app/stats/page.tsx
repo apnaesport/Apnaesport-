@@ -17,7 +17,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge"; // Added Badge import
+import { Badge } from "@/components/ui/badge";
 
 const placeholderPerformanceData = [
   { month: "Jan", wins: 0, losses: 0 }, { month: "Feb", wins: 0, losses: 0 },
@@ -40,7 +40,7 @@ export default function StatsPage() {
 
   const fetchUserStats = useCallback(async () => {
     if (!user) {
-      setIsLoading(false);
+      setIsLoading(false); // Ensure loading is false if no user
       return;
     }
     setIsLoading(true);
@@ -54,23 +54,19 @@ export default function StatsPage() {
       let totalMatchesPlayed = 0;
       joinedTournaments.forEach(t => {
         totalMatchesPlayed += t.matches?.length || 0;
-        // Basic estimation for Round Robin if no explicit matches yet
         if (t.bracketType === "Round Robin" && (!t.matches || t.matches.length === 0) && t.participants.length > 1) {
             totalMatchesPlayed += (t.participants.length * (t.participants.length - 1) / 2);
         }
       });
       
-      // Placeholder values for stats not yet implemented
-      const tournamentsWon = 0; // Needs backend logic for tracking winners
-      const winRate = "0%"; // Needs match outcome tracking
-      const avgKDRatio = "N/A"; // Highly game-specific, not tracked
+      const tournamentsWon = 0; 
+      const winRate = "0%"; 
+      const avgKDRatio = "N/A"; 
 
       setUserOverallStats([
         { title: "Tournaments Joined", value: joinedTournaments.length, icon: ListChecks },
         { title: "Total Matches Played (Est.)", value: totalMatchesPlayed, icon: Swords },
         { title: "Tournaments Won", value: tournamentsWon, icon: Trophy },
-        // { title: "Win Rate", value: winRate, icon: Percent }, // Hiding until implementable
-        // { title: "Average K/D Ratio", value: avgKDRatio, icon: Zap }, // Hiding until implementable
       ]);
 
     } catch (error) {
@@ -81,12 +77,13 @@ export default function StatsPage() {
         { title: "Total Matches Played", value: 0, icon: Swords },
         { title: "Tournaments Won", value: 0, icon: Trophy },
       ]);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [user, toast]);
 
   useEffect(() => {
-    if (!authLoading) {
+    if (!authLoading) { // Only fetch if auth state is resolved
       fetchUserStats();
     }
   }, [authLoading, user, fetchUserStats]);
@@ -185,8 +182,6 @@ export default function StatsPage() {
                         <p className="text-xs text-muted-foreground mt-1">
                             {tournament.gameName} - {format(new Date(tournament.startDate), "MMM dd, yyyy")}
                         </p>
-                         {/* Placeholder for placement, would require more data */}
-                        {/* <p className="text-sm text-green-400">1st Place</p>  */}
                     </li>
                 ))}
                 </ul>
@@ -199,4 +194,3 @@ export default function StatsPage() {
     </MainLayout>
   );
 }
-
