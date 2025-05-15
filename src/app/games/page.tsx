@@ -11,11 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Search, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// Removed metadata export as this is a Client Component
-// export const metadata: Metadata = {
-//   title: "Browse Games | Apna Esport",
-//   description: "Discover a wide variety of esports games and find active tournaments on Apna Esport.",
-// };
 
 export default function GamesPage() {
   const [allGames, setAllGames] = useState<Game[]>([]);
@@ -29,7 +24,7 @@ export default function GamesPage() {
     try {
       const gamesFromDb = await getGamesFromFirestore();
       setAllGames(gamesFromDb);
-      setFilteredGames(gamesFromDb); // Initialize filtered games
+      setFilteredGames(gamesFromDb); 
     } catch (error) {
       console.error("Error fetching games:", error);
       toast({ title: "Error", description: "Could not fetch games.", variant: "destructive" });
@@ -91,14 +86,3 @@ export default function GamesPage() {
     </div>
   );
 }
-
-// CardSkeleton is not used if a full page loader is preferred
-// const CardSkeleton = () => (
-//   <div className="space-y-3">
-//     <Skeleton className="h-60 w-full" />
-//     <Skeleton className="h-8 w-3/4" />
-//     <Skeleton className="h-6 w-1/2" />
-//     <Skeleton className="h-10 w-full" />
-//   </div>
-// );
-

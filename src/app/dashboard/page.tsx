@@ -36,29 +36,35 @@ export default function DashboardPage() {
       ]);
 
       const upcomingOrLiveTournaments = allTournaments.filter(t => t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing");
-      const explicitlyFeatured = upcomingOrLiveTournaments.filter(t => t.featured);
+      
+      const explicitlyFeaturedAndActive = upcomingOrLiveTournaments.filter(t => t.featured);
+      explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
-      if (explicitlyFeatured.length > 0) {
-        explicitlyFeatured.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-        setFeaturedTournament(explicitlyFeatured[0]);
+      if (explicitlyFeaturedAndActive.length > 0) {
+        setFeaturedTournament(explicitlyFeaturedAndActive[0]);
       } else if (upcomingOrLiveTournaments.length > 0) {
         upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
         setFeaturedTournament(upcomingOrLiveTournaments[0]);
       } else {
-        setFeaturedTournament(allTournaments.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())[0]);
+         // Fallback: show most recently created tournament if no active/upcoming
+        const sortedByCreation = [...allTournaments].sort((a, b) => {
+            const dateA = a.createdAt ? (a.createdAt as any).toDate().getTime() : 0;
+            const dateB = b.createdAt ? (b.createdAt as any).toDate().getTime() : 0;
+            return dateB - dateA;
+        });
+        setFeaturedTournament(sortedByCreation[0]);
       }
 
       setLiveTournaments(allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing"));
       setGames(allGames);
 
-      // Personalized recommendations
       if (user && user.favoriteGameIds && user.favoriteGameIds.length > 0) {
         const userFavGameIds = user.favoriteGameIds;
         const recommendations = allTournaments.filter(t => 
           userFavGameIds.includes(t.gameId) && 
           (t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing")
         ).sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-        setRecommendedTournaments(recommendations.slice(0, 3)); // Show top 3 recommendations
+        setRecommendedTournaments(recommendations.slice(0, 3));
       } else {
         setRecommendedTournaments([]);
       }
@@ -78,7 +84,7 @@ export default function DashboardPage() {
         toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive"});
     }
     setIsLoading(false);
-  }, [toast, user]);
+  }, [toast, user]); // user is a dependency as recommendations depend on it
 
   useEffect(() => {
     loadData();

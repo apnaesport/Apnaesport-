@@ -47,8 +47,6 @@ export default function AdminAnalyticsPage() {
       const currentTournaments = await getTournamentsFromFirestore();
       const totalMatchesPlayed = currentTournaments.reduce((acc, t) => {
           const matchesCount = t.matches?.length || 0;
-          // For Round Robin, if each pair plays once, N*(N-1)/2 matches for N participants
-          // This is a simplified calculation for placeholder; real match counting can be complex.
           if (t.bracketType === "Round Robin" && t.participants.length > 1 && matchesCount === 0) {
               return acc + (t.participants.length * (t.participants.length - 1) / 2);
           }

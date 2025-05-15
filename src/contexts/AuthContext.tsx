@@ -4,8 +4,7 @@
 import type { User as FirebaseUser } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore"; // Ensure Timestamp is imported
-import { createContext, useContext, useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"; // Added useCallback
 import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -15,26 +14,26 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   logout: () => Promise<void>;
-  setUser: (user: UserProfile | null) => void; // Renamed for clarity
-  refreshUser: () => Promise<void>; // Added for manual refresh
+  setUser: (user: UserProfile | null) => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUserState] = useState<UserProfile | null>(null); // Renamed internal state setter
+  const [user, setUserState] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
 
-  const fetchAndSetUser = async (firebaseUser: FirebaseUser | null) => {
+  const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
       const userDocRef = doc(db, "users", firebaseUser.uid);
       let userDocSnap = await getDoc(userDocRef);
 
       if (!userDocSnap.exists()) {
         const userIsAdmin = firebaseUser.email === ADMIN_EMAIL;
-        const initialProfileData: Partial<UserProfile> = { 
+        const initialProfileData: Partial<UserProfile> = {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User",
           email: firebaseUser.email,
@@ -47,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           streamingChannelUrl: "",
           friendUids: [],
           teamId: null,
-          points: 0, // Initialize points
+          points: 0,
         };
         await setDoc(userDocRef, initialProfileData);
         userDocSnap = await getDoc(userDocRef);
@@ -69,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         streamingChannelUrl: userProfileData.streamingChannelUrl || "",
         friendUids: userProfileData.friendUids || [],
         teamId: userProfileData.teamId || null,
-        points: userProfileData.points || 0, // Load points
+        points: userProfileData.points || 0,
         emailVerified: firebaseUser.emailVerified,
         isAnonymous: firebaseUser.isAnonymous,
         metadata: firebaseUser.metadata,
@@ -93,7 +92,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsAdmin(false);
     }
     setLoading(false);
-  };
+  }, []);
 
 
   useEffect(() => {
@@ -101,32 +100,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       fetchAndSetUser(fbUser);
     });
     return () => unsubscribe();
-  }, []);
+  }, [fetchAndSetUser]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     setLoading(true);
     await auth.signOut();
     setUserState(null);
     setIsAdmin(false);
     setLoading(false);
     router.push("/auth/login");
-  };
+  }, [router]);
   
-  const setContextUser = (updatedUser: UserProfile | null) => {
+  const setContextUser = useCallback((updatedUser: UserProfile | null) => {
     setUserState(updatedUser);
     if (updatedUser) {
         setIsAdmin(updatedUser.isAdmin || false);
     } else {
         setIsAdmin(false);
     }
-  };
+  }, []);
 
-  const refreshUser = async () => {
+  const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       setLoading(true);
       await fetchAndSetUser(auth.currentUser);
     }
-  };
+  }, [fetchAndSetUser]);
 
 
   return (
