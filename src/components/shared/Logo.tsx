@@ -1,5 +1,5 @@
 
-"use client"; // Required because we're using a hook
+"use client";
 
 import Link from "next/link";
 import Image from "next/image";
@@ -11,17 +11,21 @@ import { cn } from "@/lib/utils";
 export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; className?: string }) {
   const { settings, loadingSettings } = useSiteSettings();
 
-  // Increased sizes for a more prominent logo
+  // Adjusted sizes: svgHeight dictates the height of graphic elements.
+  // customImageWidth is same as svgHeight to make a square container.
+  // height is for the overall Link container for alignment.
   const sizeClasses = {
-    sm: { width: 213, height: 50, svgHeight: 45, customImageWidth: 45 }, // Was: width: 140, height: 45, svgHeight: 30, customImageWidth: 30
-    md: { width: 259, height: 60, svgHeight: 55, customImageWidth: 55 }, // Was: width: 165, height: 55, svgHeight: 36, customImageWidth: 36
-    lg: { width: 305, height: 70, svgHeight: 65, customImageWidth: 65 }, // Was: width: 190, height: 65, svgHeight: 42, customImageWidth: 42 
+    sm: { height: 32, svgHeight: 28, customImageWidth: 28 },
+    md: { height: 40, svgHeight: 36, customImageWidth: 36 },
+    lg: { height: 48, svgHeight: 42, customImageWidth: 42 },
   };
 
   const currentSize = sizeClasses[size] || sizeClasses.md;
 
   if (loadingSettings) {
-    return <Skeleton className={cn(className, "rounded-md")} style={{ width: currentSize.width, height: currentSize.height }} />;
+    // Skeleton width approximates a square custom logo + text logo width
+    const skeletonWidth = currentSize.customImageWidth + (currentSize.svgHeight * 3.6); // Approx aspect ratio of text logo
+    return <Skeleton className={cn(className, "rounded-md")} style={{ width: skeletonWidth, height: currentSize.height }} />;
   }
 
   const customLogoUrl = settings?.logoUrl;
@@ -29,22 +33,22 @@ export function Logo({ size = "md", className }: { size?: "sm" | "md" | "lg"; cl
   return (
     <Link 
       href="/" 
-      className={cn("flex items-center gap-1.5", className)} // Reduced gap slightly
+      className={cn("flex items-center gap-1.5", className)}
       style={{ height: currentSize.height }}
     >
       {customLogoUrl && (
         <div
           className="relative flex items-center justify-center"
           style={{
-            height: currentSize.svgHeight, // Use svgHeight for consistency
-            width: currentSize.customImageWidth, // Use explicit width for custom image container
+            height: currentSize.svgHeight,
+            width: currentSize.customImageWidth, 
           }}
         >
           <Image
             src={customLogoUrl}
-            alt={settings?.siteName || "Custom Site Logo"}
+            alt={settings?.siteName || "Apna Esport Custom Logo"}
             fill
-            className="object-contain" // Ensures aspect ratio is maintained
+            className="object-contain"
             unoptimized={customLogoUrl.startsWith('data:image')}
             priority
           />
