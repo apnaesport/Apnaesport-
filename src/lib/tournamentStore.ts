@@ -71,8 +71,8 @@ export const getGameByIdFromFirestore = async (gameId: string): Promise<Game | u
         ...data,
         iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
         bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-        createdAt: data.createdAt as Timestamp, // Keep as Timestamp
-        updatedAt: data.updatedAt as Timestamp, // Keep as Timestamp
+        createdAt: data.createdAt as Timestamp,
+        updatedAt: data.updatedAt as Timestamp,
     } as Game;
   }
   return undefined;
@@ -117,9 +117,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("status", "==", queryParams.status));
   }
   if (queryParams?.gameId) {
-    // Index needed: gameId (ASC), startDate (DESC) on tournaments collection
-    // Example Firestore index creation link: https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
-    // Or if sorting startDate ASC: https://console.firebase.google.com/project/_/firestore/indexes?create_composite=ClVwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQARoMCghfX25hbWVfXxAC
+    // Index needed: gameId (ASC), startDate (DESC) on tournaments collection.
+    // https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
     qConstraints = [where("gameId", "==", queryParams.gameId), orderBy("startDate", "desc")]
   }
    if (queryParams?.featured !== undefined) {
@@ -163,7 +162,6 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
     const data = docSnap.data();
 
     let matches = data.matches || [];
-    // Basic match generation for Single Elimination if none exist and participants are present
     if (matches.length === 0 && data.participants && data.participants.length >= 2 && data.bracketType === "Single Elimination") {
         const numMatches = Math.floor(data.participants.length / 2);
         for(let i = 0; i < numMatches; i++) {
@@ -229,7 +227,6 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
     if (currentParticipants.length >= tournamentData.maxParticipants) {
       throw new Error("Tournament is full");
     }
-    // Use arrayUnion to add a participant to avoid duplicates if this function is called multiple times concurrently
     await updateDoc(tournamentRef, {
         participants: arrayUnion(participant),
         updatedAt: serverTimestamp()
@@ -256,9 +253,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     qConstraints.push(where("target", "==", target));
   }
   // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // Create in Firebase Console if error. Example link:
-  // https://console.firebase.google.com/v1/r/project/YOUR_PROJECT_ID/firestore/indexes?create_composite=ClZwcm9qZWN0cy9YOUR_PROJECT_ID_HERE/ZGF0YWJhc2VzLyhkZWZhdWx0KS9jb2xsZWN0aW9uR3JvdXBzL25vdGlmaWNhdGlvbnMvaW5kZXhlcy9fEAEaCgoGdGFyZ2V0EAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
-  // For this project: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
+  // Create in Firebase Console if error. Link: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -267,7 +262,7 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
     return {
       id: doc.id,
       ...data,
-      createdAt: data.createdAt as Timestamp, // Keep as Timestamp for now, convert to Date in component
+      createdAt: data.createdAt as Timestamp,
     } as NotificationMessage;
   });
 };
@@ -290,9 +285,10 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
       friendUids: data.friendUids || [],
+      sentFriendRequests: data.sentFriendRequests || [],
+      receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
-      points: data.points || 0, // Added for leaderboard
-      // Dummy FirebaseUser properties - not fully populated from Firestore
+      points: data.points || 0,
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
       metadata: data.metadata || {},
@@ -327,9 +323,10 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
       friendUids: data.friendUids || [],
+      sentFriendRequests: data.sentFriendRequests || [],
+      receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
-      points: data.points || 0, // Added for leaderboard
-      // Dummy FirebaseUser properties
+      points: data.points || 0,
       emailVerified: data.emailVerified || false,
       isAnonymous: data.isAnonymous || false,
       metadata: data.metadata || {},
@@ -352,7 +349,7 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId' | 'points'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId' | 'points' | 'sentFriendRequests' | 'receivedFriendRequests'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const dataToUpdate: any = { ...profileData, updatedAt: serverTimestamp() };
   
@@ -362,8 +359,14 @@ export const updateUserProfileInFirestore = async (userId: string, profileData: 
   if (profileData.hasOwnProperty('friendUids') && !Array.isArray(profileData.friendUids)) {
     dataToUpdate.friendUids = [];
   }
+   if (profileData.hasOwnProperty('sentFriendRequests') && !Array.isArray(profileData.sentFriendRequests)) {
+    dataToUpdate.sentFriendRequests = [];
+  }
+  if (profileData.hasOwnProperty('receivedFriendRequests') && !Array.isArray(profileData.receivedFriendRequests)) {
+    dataToUpdate.receivedFriendRequests = [];
+  }
   if (profileData.hasOwnProperty('teamId') && profileData.teamId === undefined) {
-    dataToUpdate.teamId = null; // Ensure we can clear teamId
+    dataToUpdate.teamId = null;
   }
 
   await updateDoc(userRef, dataToUpdate);
@@ -373,36 +376,129 @@ export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId
   if (!searchTerm.trim()) return [];
   const lowerSearchTerm = searchTerm.toLowerCase();
 
-  const allUsers = await getAllUsersFromFirestore(); // Inefficient for large user bases
+  const allUsers = await getAllUsersFromFirestore();
   return allUsers.filter(user =>
     user.uid !== currentUserId &&
     (user.displayName?.toLowerCase().includes(lowerSearchTerm) || user.email?.toLowerCase().includes(lowerSearchTerm))
   );
 };
 
-export const addFriend = async (currentUserUid: string, targetUserUid: string): Promise<void> => {
-  if (currentUserUid === targetUserUid) throw new Error("Cannot add yourself as a friend.");
+// --- Friend Request System ---
+
+export const sendFriendRequest = async (fromUid: string, toUid: string): Promise<void> => {
+  if (fromUid === toUid) throw new Error("Cannot send a friend request to yourself.");
+
+  const fromUserRef = doc(db, USERS_COLLECTION, fromUid);
+  const toUserRef = doc(db, USERS_COLLECTION, toUid);
 
   const batch = writeBatch(db);
-  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
 
-  batch.update(currentUserRef, { friendUids: arrayUnion(targetUserUid), updatedAt: serverTimestamp() });
-  batch.update(targetUserRef, { friendUids: arrayUnion(currentUserUid), updatedAt: serverTimestamp() });
+  // Check if already friends or request already sent/received
+  const fromUserSnap = await getDoc(fromUserRef);
+  const toUserSnap = await getDoc(toUserRef);
+
+  if (!fromUserSnap.exists() || !toUserSnap.exists()) {
+    throw new Error("User not found.");
+  }
+
+  const fromUserData = fromUserSnap.data() as UserProfile;
+  const toUserData = toUserSnap.data() as UserProfile;
+
+  if (fromUserData.friendUids?.includes(toUid)) {
+    throw new Error("You are already friends with this user.");
+  }
+  if (fromUserData.sentFriendRequests?.includes(toUid)) {
+    throw new Error("Friend request already sent.");
+  }
+  if (fromUserData.receivedFriendRequests?.includes(toUid)) {
+    throw new Error("This user has already sent you a friend request. Please check your incoming requests.");
+  }
+
+  batch.update(fromUserRef, {
+    sentFriendRequests: arrayUnion(toUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(toUserRef, {
+    receivedFriendRequests: arrayUnion(fromUid),
+    updatedAt: serverTimestamp()
+  });
 
   await batch.commit();
 };
 
-export const removeFriend = async (currentUserUid: string, targetUserUid: string): Promise<void> => {
-  const batch = writeBatch(db);
+export const acceptFriendRequest = async (currentUserUid: string, requesterUid: string): Promise<void> => {
   const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const targetUserRef = doc(db, USERS_COLLECTION, targetUserUid);
+  const requesterRef = doc(db, USERS_COLLECTION, requesterUid);
+  const batch = writeBatch(db);
 
-  batch.update(currentUserRef, { friendUids: arrayRemove(targetUserUid), updatedAt: serverTimestamp() });
-  batch.update(targetUserRef, { friendUids: arrayRemove(currentUserUid), updatedAt: serverTimestamp() });
+  // Remove from pending requests
+  batch.update(currentUserRef, {
+    receivedFriendRequests: arrayRemove(requesterUid),
+    friendUids: arrayUnion(requesterUid), // Add to friends
+    updatedAt: serverTimestamp()
+  });
+  batch.update(requesterRef, {
+    sentFriendRequests: arrayRemove(currentUserUid),
+    friendUids: arrayUnion(currentUserUid), // Add to friends
+    updatedAt: serverTimestamp()
+  });
 
   await batch.commit();
 };
+
+export const declineFriendRequest = async (currentUserUid: string, requesterUid: string): Promise<void> => {
+  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
+  const requesterRef = doc(db, USERS_COLLECTION, requesterUid);
+  const batch = writeBatch(db);
+
+  batch.update(currentUserRef, {
+    receivedFriendRequests: arrayRemove(requesterUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(requesterRef, {
+    sentFriendRequests: arrayRemove(currentUserUid),
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+};
+
+export const cancelFriendRequest = async (currentUserUid: string, targetUid: string): Promise<void> => {
+  // Similar to decline, but initiated by the sender
+  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
+  const targetRef = doc(db, USERS_COLLECTION, targetUid);
+  const batch = writeBatch(db);
+
+  batch.update(currentUserRef, {
+    sentFriendRequests: arrayRemove(targetUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(targetRef, {
+    receivedFriendRequests: arrayRemove(currentUserUid),
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+};
+
+
+export const removeFriend = async (currentUserUid: string, friendToRemoveUid: string): Promise<void> => {
+  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
+  const friendToRemoveRef = doc(db, USERS_COLLECTION, friendToRemoveUid);
+  const batch = writeBatch(db);
+
+  batch.update(currentUserRef, {
+    friendUids: arrayRemove(friendToRemoveUid),
+    updatedAt: serverTimestamp()
+  });
+  batch.update(friendToRemoveRef, {
+    friendUids: arrayRemove(currentUserUid),
+    updatedAt: serverTimestamp()
+  });
+
+  await batch.commit();
+};
+
 
 // --- Team Functions ---
 
@@ -455,7 +551,6 @@ export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly
     qConstraints.push(where("leaderUid", "==", userId));
   } else {
     // Index required for memberUids array-contains + orderBy createdAt (ASC or DESC)
-    // Example: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Clxwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARISCgptZW1iZXJVaWRzEAEaDQoJY3JlYXRlZEF0EAIaDAoIX19uYW1lX18QAg
     qConstraints.push(where("memberUids", "array-contains", userId));
   }
   qConstraints.push(orderBy("createdAt", "desc"));
@@ -487,6 +582,9 @@ export const addMemberToTeamInFirestore = async (teamId: string, userIdToAdd: st
   if (userSnap.exists() && userSnap.data().teamId) {
       throw new Error("User is already in another team.");
   }
+  if (!userSnap.exists()) {
+    throw new Error("User to add not found.");
+  }
 
   const batch = writeBatch(db);
   batch.update(teamRef, { memberUids: arrayUnion(userIdToAdd), lastActivityAt: serverTimestamp() });
@@ -506,12 +604,21 @@ export const removeMemberFromTeamInFirestore = async (teamId: string, userIdToRe
   batch.update(teamRef, { memberUids: arrayRemove(userIdToRemove), lastActivityAt: serverTimestamp() });
   batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
 
-  // If the leader is being removed AND they are the last member, or if the team becomes empty, delete the team.
-  // This simple logic deletes the team if the removed member was the last one.
-  // A more robust system might involve transferring leadership if the leader leaves and others remain.
   if (teamData.memberUids.length === 1 && teamData.memberUids.includes(userIdToRemove)) {
     batch.delete(teamRef);
+  } else if (teamData.leaderUid === userIdToRemove && teamData.memberUids.length > 1) {
+    // Simple: if leader leaves and others remain, delete team.
+    // Advanced: transfer leadership (not implemented here for simplicity)
+    // For this prototype, if leader leaves a team with members, the team is deleted.
+    teamData.memberUids.forEach(memberUid => {
+        if (memberUid !== userIdToRemove) { // Ensure other members are also removed from team context
+            const otherUserRef = doc(db, USERS_COLLECTION, memberUid);
+            batch.update(otherUserRef, { teamId: null, updatedAt: serverTimestamp() });
+        }
+    });
+    batch.delete(teamRef);
   }
+
 
   await batch.commit();
 };
@@ -528,12 +635,11 @@ export const deleteTeamFromFirestore = async (teamId: string, currentUserId: str
   }
 
   const batch = writeBatch(db);
-  // Clear teamId for all members
   for (const memberUid of teamData.memberUids) {
     const userRef = doc(db, USERS_COLLECTION, memberUid);
     batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
   }
-  batch.delete(teamRef); // Delete the team document
+  batch.delete(teamRef);
   await batch.commit();
 };
 
@@ -571,3 +677,4 @@ export const saveSiteSettingsToFirestore = async (settingsData: Omit<SiteSetting
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
+

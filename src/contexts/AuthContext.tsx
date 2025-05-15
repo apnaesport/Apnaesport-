@@ -3,8 +3,8 @@
 
 import type { User as FirebaseUser } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore"; // Ensure Timestamp is imported
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react"; // Added useCallback
+import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
@@ -14,7 +14,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   logout: () => Promise<void>;
-  setUser: (user: UserProfile | null) => void;
+  setUser: (user: UserProfile | null) => void; // Renamed to setUser for external use
   refreshUser: () => Promise<void>;
 }
 
@@ -45,6 +45,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           favoriteGameIds: [],
           streamingChannelUrl: "",
           friendUids: [],
+          sentFriendRequests: [],
+          receivedFriendRequests: [],
           teamId: null,
           points: 0,
         };
@@ -67,6 +69,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         favoriteGameIds: userProfileData.favoriteGameIds || [],
         streamingChannelUrl: userProfileData.streamingChannelUrl || "",
         friendUids: userProfileData.friendUids || [],
+        sentFriendRequests: userProfileData.sentFriendRequests || [],
+        receivedFriendRequests: userProfileData.receivedFriendRequests || [],
         teamId: userProfileData.teamId || null,
         points: userProfileData.points || 0,
         emailVerified: firebaseUser.emailVerified,
@@ -122,7 +126,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
-      setLoading(true);
+      setLoading(true); // Indicate loading state
       await fetchAndSetUser(auth.currentUser);
     }
   }, [fetchAndSetUser]);

@@ -17,7 +17,9 @@ export interface UserProfile extends FirebaseUser {
   streamingChannelUrl?: string;
   friendUids?: string[];
   teamId?: string | null;
-  points?: number; // Added for leaderboard
+  points?: number;
+  sentFriendRequests?: string[]; // New: UIDs of users to whom requests were sent
+  receivedFriendRequests?: string[]; // New: UIDs of users from whom requests were received
 }
 
 export type Game = {

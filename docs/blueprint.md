@@ -1,4 +1,4 @@
-# **App Name**: TournamentHub
+# **App Name**: Apna Esport 
 
 ## Core Features:
 

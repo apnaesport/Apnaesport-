@@ -22,8 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox"; // Added Checkbox
-import { Label } from "@/components/ui/label"; // Added Label for Checkbox
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -58,7 +58,6 @@ export function RegisterForm() {
 
       await updateFirebaseProfile(user, { displayName: values.name });
 
-      // Store additional user info in Firestore
       const userIsAdmin = values.email === ADMIN_EMAIL;
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
@@ -72,6 +71,8 @@ export function RegisterForm() {
         favoriteGameIds: [],
         streamingChannelUrl: "",
         friendUids: [],
+        sentFriendRequests: [],
+        receivedFriendRequests: [],
         teamId: null,
         points: 0, 
       });
