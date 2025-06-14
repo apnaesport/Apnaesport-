@@ -12,7 +12,7 @@ import {
   Loader2,
   Bell,
   Users,
-  TrendingUp // Added TrendingUp icon for Leaderboard
+  TrendingUp
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,10 +29,10 @@ const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp }, // Added Leaderboard
-  { href: "/stats", label: "My Stats", icon: BarChart3 },
+  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
+  // { href: "/stats", label: "My Stats", icon: BarChart3 }, // Locked
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/social", label: "Social", icon: Users },
+  // { href: "/social", label: "Social", icon: Users }, // Locked
 ];
 
 const secondaryNavItems = [
