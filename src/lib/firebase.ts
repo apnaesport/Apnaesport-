@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, getApp, type FirebaseOptions } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
@@ -19,4 +20,4 @@ const db = getFirestore(app);
 
 export { app, auth, db };
 
-export const ADMIN_EMAIL = "karateboyjitenderprajapat@gmail.com";
+export const ADMIN_EMAIL = "karateboyjitderprajapat@gmail.com";
