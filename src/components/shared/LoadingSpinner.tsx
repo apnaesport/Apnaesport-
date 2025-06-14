@@ -65,7 +65,7 @@ export function LoadingSpinner({
 
       // Only cycle messages if not in fullPage mode, or if specifically desired later.
       // For fullPage, stick to initialText unless showProgressBar is false.
-      if (!fullPage) { 
+      if (!fullPage && showProgressBar) { 
         initialDisplayTimeout = setTimeout(() => {
           setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
           messageInterval = setInterval(() => {
@@ -81,6 +81,11 @@ export function LoadingSpinner({
       if (initialDisplayTimeout) clearTimeout(initialDisplayTimeout);
     };
   }, [initialText, showProgressBar, fullPage]);
+
+  if (fullPage) {
+    // Returning null when fullPage is true to "remove" the full-page loading system as requested.
+    return null;
+  }
 
   const spinnerContent = (
     <div className={cn("flex flex-col items-center justify-center gap-6", className)}>
@@ -99,14 +104,6 @@ export function LoadingSpinner({
       )}
     </div>
   );
-
-  if (fullPage) {
-    return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm">
-        {spinnerContent}
-      </div>
-    );
-  }
 
   return spinnerContent;
 }
