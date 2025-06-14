@@ -1,0 +1,72 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny all access
+    // match /{document=**} {
+    //   allow read, write: if false;
+    // }
+
+    // Allow read and write access to all authenticated users for all collections.
+    // This is for prototyping and development ONLY.
+    // **SECURE THESE RULES BEFORE PRODUCTION!**
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+
+    // More specific examples (keep these commented out or adapt for production):
+
+    // Allow users to read and write their own user document
+    // match /users/{userId} {
+    //   allow read: if request.auth != null;
+    //   allow create: if request.auth != null && request.auth.uid == userId;
+    //   allow update, delete: if request.auth != null && request.auth.uid == userId;
+    // }
+
+    // Allow admin users to manage games
+    // match /games/{gameId} {
+    //   allow read: if true; // Anyone can read game list
+    //   allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // }
+
+    // Allow authenticated users to read tournaments, and organizers/admins to write
+    // match /tournaments/{tournamentId} {
+    //   allow read: if true; // Anyone can read tournament details
+    //   allow create: if request.auth != null; // Authenticated users can create
+    //   allow update: if request.auth != null && (request.auth.uid == resource.data.organizerId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+    //   allow delete: if request.auth != null && (request.auth.uid == resource.data.organizerId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true);
+    // }
+
+    // Allow admin users to manage notifications
+    // match /notifications/{notificationId} {
+    //    allow read: if true; // Anyone can read notifications
+    //    allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // }
+
+    // Allow admin users to manage site settings
+    // match /settings/global {
+    //    allow read: if true; // Anyone can read site settings
+    //    allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // }
+
+    // Allow authenticated users to manage teams they are part of or lead
+    // match /teams/{teamId} {
+    //   allow read: if request.auth != null;
+    //   allow create: if request.auth != null; // User creates a team
+    //   allow update: if request.auth != null && (request.auth.uid == resource.data.leaderUid || resource.data.memberUids.hasAny([request.auth.uid]));
+    //   allow delete: if request.auth != null && request.auth.uid == resource.data.leaderUid;
+    // }
+
+    // Allow authenticated users to read/write messages in chats they are part of
+    // The document ID for friend chats is typically <uid1>_<uid2> sorted.
+    // For team chats, the document ID is the teamId.
+    // match /chats/{chatId}/messages/{messageId} {
+    //   allow read, write: if request.auth != null && 
+    //                         (
+    //                           (chatId.split('_')[0] == request.auth.uid || chatId.split('_')[1] == request.auth.uid) || // Friend chat
+    //                           (exists(/databases/$(database)/documents/teams/$(chatId)) && get(/databases/$(database)/documents/teams/$(chatId)).data.memberUids.hasAny([request.auth.uid])) // Team chat
+    //                         );
+    // }
+  }
+}
