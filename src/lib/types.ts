@@ -115,6 +115,7 @@ export interface SiteSettings {
   logoUrl?: string;
   faviconUrl?: string;
   defaultTheme?: string;
+  basePlayerCount?: number; // New field for fake player count
   updatedAt?: Timestamp;
 }
 

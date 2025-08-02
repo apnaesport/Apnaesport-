@@ -20,38 +20,35 @@ import { getSiteSettingsFromFirestore, saveSiteSettingsToFirestore } from "@/lib
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSiteSettings as useGlobalSiteSettings, SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { cn } from "@/lib/utils";
-// Image import is no longer needed for logo preview
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
   siteDescription: z.string().min(10, "Site description must be at least 10 characters."),
   maintenanceMode: z.boolean(),
   allowRegistrations: z.boolean(),
-  // logoUrl: z.string().optional(), // Kept in schema if SiteSettings type still has it, but UI removed
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
-  // logoFile: z.custom<FileList>().optional(), // Removed as logo upload is removed
+  basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
 });
 
-const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> = { // logoUrl removed from defaults for this form
+const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> = {
   siteName: "Apna Esport",
   siteDescription: "Your Ultimate Gaming Tournament Platform",
   maintenanceMode: false,
   allowRegistrations: true,
-  // logoUrl: "", // No longer a form default
   faviconUrl: "",
-  defaultTheme: "system", 
+  defaultTheme: "system",
+  basePlayerCount: 0,
 };
 
 function AdminSettingsPageContent() {
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false); 
+  const [isSaving, setIsSaving] = useState(false);
   const [isFetchingSettings, setIsFetchingSettings] = useState(true);
   const { theme, setTheme } = useTheme();
   const { settings: globalSettings, refreshSiteSettings } = useGlobalSiteSettings();
-  // const [logoPreview, setLogoPreview] = useState<string | null>(null); // Removed logo preview state
-  
-  const form = useForm<Omit<SiteSettings, 'logoUrl'> & { logoFile?: FileList }>({ // Adjusted form type
+
+  const form = useForm<Omit<SiteSettings, 'logoUrl'>>({
     resolver: zodResolver(settingsSchema),
     defaultValues: defaultSettingsValues,
   });
@@ -59,25 +56,25 @@ function AdminSettingsPageContent() {
   const fetchSettings = useCallback(async () => {
     setIsFetchingSettings(true);
     if (globalSettings) {
-      const { logoUrl, ...relevantGlobalSettings } = globalSettings; // Exclude logoUrl from form reset
+      const { logoUrl, ...relevantGlobalSettings } = globalSettings;
       form.reset({
         ...relevantGlobalSettings,
-        // logoFile: undefined, // Reset file input (already removed)
+        basePlayerCount: relevantGlobalSettings.basePlayerCount || 0,
       });
       if (globalSettings.defaultTheme && ["light", "dark", "system"].includes(globalSettings.defaultTheme)) {
         setTheme(globalSettings.defaultTheme as "light" | "dark" | "system");
       }
-      // setLogoPreview(globalSettings.logoUrl || null); // Removed logo preview logic
     } else {
       const loadedSettings = await getSiteSettingsFromFirestore();
       if (loadedSettings) {
-        const { logoUrl, ...relevantLoadedSettings } = loadedSettings; // Exclude logoUrl
-        form.reset(relevantLoadedSettings);
+        const { logoUrl, ...relevantLoadedSettings } = loadedSettings;
+        form.reset({
+            ...relevantLoadedSettings,
+            basePlayerCount: loadedSettings.basePlayerCount || 0,
+        });
         if (loadedSettings.defaultTheme) setTheme(loadedSettings.defaultTheme as "light" | "dark" | "system");
-        // if (loadedSettings.logoUrl) setLogoPreview(loadedSettings.logoUrl); else setLogoPreview(null); // Removed
       } else {
          form.reset(defaultSettingsValues);
-         // setLogoPreview(null); // Removed
       }
     }
     setIsFetchingSettings(false);
@@ -87,20 +84,16 @@ function AdminSettingsPageContent() {
     fetchSettings();
   }, [fetchSettings]);
 
-  // handleLogoFileChange is removed as logo upload is removed
-
   const onSubmit: SubmitHandler<Omit<SiteSettings, 'logoUrl'>> = async (data) => {
     setIsSaving(true);
     try {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { id, updatedAt, ...settingsToSave } = data as any; // Cast to any to avoid type issues with spread
-      
-      // Retrieve the existing logoUrl from globalSettings if it exists, otherwise it remains undefined or null
+      const { id, updatedAt, ...settingsToSave } = data as any;
       const currentLogoUrl = globalSettings?.logoUrl;
-
       const completeSettingsToSave = {
         ...settingsToSave,
-        logoUrl: currentLogoUrl, // Preserve existing logoUrl or set to undefined/null
+        basePlayerCount: Number(settingsToSave.basePlayerCount) || 0,
+        logoUrl: currentLogoUrl,
         defaultTheme: theme,
       };
 
@@ -125,7 +118,6 @@ function AdminSettingsPageContent() {
       </div>
     );
   }
-
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -187,6 +179,12 @@ function AdminSettingsPageContent() {
               </div>
             )}
           />
+           <div className="space-y-2">
+            <Label htmlFor="basePlayerCount">Base Player Count (Fake Users)</Label>
+            <Input id="basePlayerCount" type="number" {...form.register("basePlayerCount")} placeholder="e.g., 1000" disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">This number will be added to your real user count for display purposes.</p>
+            {form.formState.errors.basePlayerCount && <p className="text-destructive text-xs mt-1">{form.formState.errors.basePlayerCount.message}</p>}
+          </div>
         </CardContent>
       </Card>
       
@@ -198,11 +196,6 @@ function AdminSettingsPageContent() {
           <CardDescription>Customize the visual theme and branding.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Site Logo upload section removed */}
-          {/* <div className="space-y-2">
-            <Label htmlFor="logoFile">Site Logo</Label>
-            <p className="text-xs text-muted-foreground">The site logo is now text-based ("Apna Esport") and cannot be uploaded here.</p>
-          </div> */}
           <div className="space-y-2">
             <Label htmlFor="faviconUrl">Favicon URL</Label>
             <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://example.com/favicon.ico" disabled={isSaving}/>

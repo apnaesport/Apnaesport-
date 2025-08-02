@@ -3,14 +3,16 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import type { StatItem } from "@/lib/types";
+import type { StatItem, SiteSettings } from "@/lib/types";
 import { Users, Swords, Gamepad2, Bell, PlusCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useEffect, useState, useCallback } from "react";
-import { getGamesFromFirestore, getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { getGamesFromFirestore, getTournamentsFromFirestore, getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const quickActions = [
     {label: "Create Tournament", href: "/tournaments/new", icon: PlusCircle},
@@ -23,22 +25,25 @@ export default function AdminDashboardPage() {
   const [adminStats, setAdminStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { settings } = useSiteSettings();
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (siteSettings: SiteSettings | null) => {
     setIsLoading(true);
     try {
-      const [currentGames, currentTournaments] = await Promise.all([
+      const [currentGames, currentTournaments, allUsers] = await Promise.all([
         getGamesFromFirestore(),
-        getTournamentsFromFirestore()
+        getTournamentsFromFirestore(),
+        getAllUsersFromFirestore(),
       ]);
 
       const activeTournaments = currentTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
       
-      const placeholderTotalUsers = "1,250"; 
-      const placeholderPendingApprovals = 3; 
+      const basePlayerCount = siteSettings?.basePlayerCount || 0;
+      const totalUsers = allUsers.length + basePlayerCount;
+      const placeholderPendingApprovals = 3;
 
       setAdminStats([
-        { title: "Total Users", value: placeholderTotalUsers, icon: "Users", change: "+0 this week" }, 
+        { title: "Total Users", value: totalUsers.toLocaleString(), icon: "Users" }, 
         { title: "Active Tournaments", value: activeTournaments, icon: "Swords", change: `${currentTournaments.filter(t => t.status === "Live").length} live` }, 
         { title: "Supported Games", value: currentGames.length, icon: "Gamepad2" }, 
         { title: "Pending Approvals", value: placeholderPendingApprovals, icon: "Bell", change: "Action needed" }, 
@@ -51,18 +56,11 @@ export default function AdminDashboardPage() {
   }, [toast]);
   
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (settings !== undefined) {
+      loadData(settings);
+    }
+  }, [loadData, settings]);
 
-
-  if (isLoading) {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
-            <Loader2 className="h-16 w-16 animate-spin text-primary" />
-            <p className="mt-4 text-lg text-muted-foreground">Loading admin dashboard...</p>
-        </div>
-    );
-  }
 
   return (
     <div className="space-y-8">
@@ -71,9 +69,24 @@ export default function AdminDashboardPage() {
       <section>
         <h2 className="text-xl font-semibold mb-4 text-foreground">Platform Overview</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {adminStats.map((stat) => (
-            <StatsCard key={stat.title} item={stat} className="bg-card border-border"/>
-          ))}
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                   <Skeleton className="h-5 w-2/3" />
+                   <Skeleton className="h-5 w-5 rounded-sm" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-1/3 mb-2" />
+                  <Skeleton className="h-4 w-1/2" />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            adminStats.map((stat) => (
+              <StatsCard key={stat.title} item={stat} className="bg-card border-border"/>
+            ))
+          )}
         </div>
       </section>
 

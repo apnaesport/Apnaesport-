@@ -6,8 +6,8 @@ import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamen
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
-import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
-import { getTournamentsFromFirestore, getGamesFromFirestore } from "@/lib/tournamentStore";
+import type { Tournament, Game, StatItem, LucideIconName, SiteSettings } from "@/lib/types";
+import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import { useEffect, useState, useCallback } from "react";
 import { Loader2, Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +15,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 
 export default function DashboardPage() {
@@ -26,13 +29,16 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<StatItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { settings } = useSiteSettings();
 
-  const loadData = useCallback(async () => {
+
+  const loadData = useCallback(async (siteSettings: SiteSettings | null) => {
     setIsLoading(true);
     try {
-      const [allTournaments, allGames] = await Promise.all([
+      const [allTournaments, allGames, allUsers] = await Promise.all([
         getTournamentsFromFirestore(), 
-        getGamesFromFirestore()
+        getGamesFromFirestore(),
+        getAllUsersFromFirestore(),
       ]);
 
       const upcomingOrLiveTournaments = allTournaments.filter(t => t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing");
@@ -46,7 +52,6 @@ export default function DashboardPage() {
         upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
         setFeaturedTournament(upcomingOrLiveTournaments[0]);
       } else {
-         // Fallback: show most recently created tournament if no active/upcoming
         const sortedByCreation = [...allTournaments].sort((a, b) => {
             const dateA = a.createdAt ? (a.createdAt as any).toDate().getTime() : 0;
             const dateB = b.createdAt ? (b.createdAt as any).toDate().getTime() : 0;
@@ -70,28 +75,33 @@ export default function DashboardPage() {
       }
 
       const activeTournamentCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
+      const basePlayerCount = siteSettings?.basePlayerCount || 0;
+      const totalUsers = allUsers.length + basePlayerCount;
+      const totalMatchesPlayed = allTournaments.reduce((acc, t) => acc + (t.matches?.length || 0), 0);
 
-      const placeholderStats: StatItem[] = [
-        { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName, change: "" },
-        { title: "Total Players", value: "1,234", icon: "Users" as LucideIconName, change: "+52" }, 
-        { title: "Matches Played Today", value: 87, icon: "Gamepad2" as LucideIconName, change: "+15" }, 
-        { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" }, 
+      const dashboardStats: StatItem[] = [
+        { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName },
+        { title: "Total Players", value: totalUsers.toLocaleString(), icon: "Users" as LucideIconName },
+        { title: "Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" as LucideIconName },
+        { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" },
       ];
-      setStats(placeholderStats);
+      setStats(dashboardStats);
 
     } catch (error) {
         console.error("Error loading dashboard data:", error);
         toast({ title: "Error", description: "Could not load dashboard data.", variant: "destructive"});
     }
     setIsLoading(false);
-  }, [toast, user]); // user is a dependency as recommendations depend on it
+  }, [toast, user]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (settings !== undefined) {
+      loadData(settings);
+    }
+  }, [loadData, settings]);
 
 
-  if (isLoading) {
+  if (isLoading && !featuredTournament) { // Show full page loader only on initial load
     return (
       <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
@@ -104,16 +114,16 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
 
-      {featuredTournament ? (
+      {isLoading && !featuredTournament ? (
+        <Skeleton className="h-96 w-full rounded-lg" />
+      ) : featuredTournament ? (
         <section>
           <FeaturedTournamentCard tournament={featuredTournament} />
         </section>
       ) : (
-        !isLoading && ( 
-          <div className="bg-card p-8 rounded-lg shadow-md text-center">
-            <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
-          </div>
-        )
+        <div className="bg-card p-8 rounded-lg shadow-md text-center">
+          <p className="text-muted-foreground">No featured tournaments right now. Check back soon!</p>
+        </div>
       )}
 
       {user && recommendedTournaments.length > 0 && (
@@ -163,23 +173,42 @@ export default function DashboardPage() {
 
       <section>
         <h2 className="text-2xl font-semibold mb-4 text-foreground">Live Now</h2>
-        {liveTournaments.length > 0 ? (
+        {isLoading ? (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 {Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-80 w-full" />)}
+            </div>
+        ) : liveTournaments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {liveTournaments.map((tournament) => (
               <LiveTournamentCard key={tournament.id} tournament={tournament} />
             ))}
           </div>
         ) : (
-           !isLoading && <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
+           <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
         )}
       </section>
 
       <section>
-        <h2 className="text-2xl font-semibold mb-4 text-foreground">Your Stats Overview</h2>
+        <h2 className="text-2xl font-semibold mb-4 text-foreground">Stats Overview</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <StatsCard key={stat.title} item={stat} />
-          ))}
+          {isLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                   <Skeleton className="h-5 w-2/3" />
+                   <Skeleton className="h-5 w-5 rounded-sm" />
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-8 w-1/3 mb-2" />
+                  <Skeleton className="h-4 w-1/2" />
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            stats.map((stat) => (
+              <StatsCard key={stat.title} item={stat} />
+            ))
+          )}
         </div>
       </section>
 
