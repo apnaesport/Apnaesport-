@@ -35,6 +35,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
           logoUrl: "",
           faviconUrl: "",
           defaultTheme: "system",
+          basePlayerCount: 0,
         });
       }
     } catch (error) {
@@ -48,6 +49,7 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
           logoUrl: "",
           faviconUrl: "",
           defaultTheme: "system",
+          basePlayerCount: 0,
         });
     } finally {
       setLoadingSettings(false);
