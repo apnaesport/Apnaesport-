@@ -20,4 +20,4 @@ const db = getFirestore(app);
 
 export { app, auth, db };
 
-export const ADMIN_EMAIL = "karateboyjitderprajapat@gmail.com";
+export const ADMIN_EMAIL = "xyzadminserviceacc@gmail.com";
