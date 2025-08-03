@@ -1,16 +1,13 @@
 
 import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
-import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Game, Tournament } from "@/lib/types";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import Image from "next/image";
-import { PlusCircle, AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { getGameDetails, getTournamentsForGame } from "@/lib/tournamentStore";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import GameTournamentsClient from "./GameTournamentsClient";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
@@ -61,28 +58,28 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
   return (
     <div className="space-y-8">
       <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-xl border border-border">
-        <Image 
-          src={game.bannerUrl || `https://placehold.co/1200x300.png`} 
+        <ImageWithFallback 
+          src={game.bannerUrl || `https://placehold.co/1200x300.png`}
+          fallbackSrc={`https://placehold.co/1200x300.png?text=${encodeURIComponent(game.name)}`}
           alt={`${game.name} banner`} 
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint={game.dataAiHint || "game background art"}
           unoptimized={game.bannerUrl?.startsWith('data:image')}
-          onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x300.png?text=${encodeURIComponent(game.name)}`)}
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
           <div className="flex items-center">
             <div className="relative w-16 h-16 md:w-20 md:h-20 mr-4 shrink-0">
-              <Image 
-                src={game.iconUrl} 
+               <ImageWithFallback 
+                src={game.iconUrl}
+                fallbackSrc={`https://placehold.co/80x80.png?text=${game.name.substring(0,2)}`}
                 alt={game.name} 
                 fill
                 className="rounded-lg border-2 border-background shadow-md object-cover" 
                 data-ai-hint={game.dataAiHint || "game logo large"}
                 unoptimized={game.iconUrl?.startsWith('data:image')}
-                onError={(e) => (e.currentTarget.src = `https://placehold.co/80x80.png?text=${game.name.substring(0,2)}`)}
               />
             </div>
             <PageTitle title={`${game.name} Tournaments`} className="mb-0 text-white text-shadow !text-2xl md:!text-3xl" />
@@ -95,9 +92,3 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
     </div>
   );
 }
-
-// Create a new client component to handle client-side logic
-const GameTournamentsClientPage = ({ game, initialTournaments }: { game: Game, initialTournaments: Tournament[] }) => {
-    return null; // This is a placeholder. The actual client component logic is in GameTournamentsClient.tsx
-}
-

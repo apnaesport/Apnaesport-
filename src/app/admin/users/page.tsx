@@ -32,6 +32,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -130,11 +131,12 @@ export default function AdminUsersPage() {
                 <TableCell>
                   <div className="flex items-center gap-3">
                     <Avatar>
-                      <AvatarImage 
-                        src={user.photoURL || ""} 
+                      <ImageWithFallback 
+                        as={AvatarImage}
+                        src={user.photoURL || ""}
+                        fallbackSrc={`https://placehold.co/40x40.png?text=${getInitials(user.displayName)}`}
                         alt={user.displayName || "User"} 
                         data-ai-hint="user avatar"
-                        onError={(e) => e.currentTarget.src = `https://placehold.co/40x40.png?text=${getInitials(user.displayName)}`}
                       />
                       <AvatarFallback>{getInitials(user.displayName)}</AvatarFallback>
                     </Avatar>

@@ -3,13 +3,13 @@ import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTriangle, DollarSign, Building } from "lucide-react"; 
+import { DollarSign, ChevronLeft, AlertTriangle } from "lucide-react"; 
 import { format } from "date-fns";
 import { getTournamentByIdFromFirestore } from "@/lib/tournamentStore"; 
 import TournamentPageClient from "./TournamentPageClient";
 import type { Tournament } from "@/lib/types";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 interface TournamentPageProps {
   params: { tournamentId: string };
@@ -96,8 +96,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   return (
     <div className="space-y-8">
       <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
-        <Image 
+        <ImageWithFallback 
           src={tournament.bannerImageUrl} 
+          fallbackSrc={`https://placehold.co/1200x400.png?text=${encodeURIComponent(tournament.name)}`}
           alt={`${tournament.name} banner`} 
           fill
           sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
@@ -105,7 +106,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports event stage"
           unoptimized={tournament.bannerImageUrl.startsWith('data:image')}
-          onError={(e) => (e.currentTarget.src = `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournament.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
@@ -119,14 +119,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </div>
           <PageTitle title={tournament.name} className="mb-0 text-shadow !text-xl sm:!text-2xl md:!text-3xl text-white" /> 
           <div className="flex items-center mt-1 sm:mt-2 text-xs sm:text-sm text-slate-200 drop-shadow-sm">
-            <Image 
-              src={tournament.gameIconUrl} 
+             <ImageWithFallback 
+              src={tournament.gameIconUrl}
+              fallbackSrc={`https://placehold.co/24x24.png?text=${tournament.gameName.substring(0,2)}`}
               alt={tournament.gameName} 
               width={24} height={24} 
               className="rounded-sm mr-2 object-cover" 
               data-ai-hint="game icon mini"
               unoptimized={tournament.gameIconUrl.startsWith('data:image')}
-              onError={(e) => (e.currentTarget.src = `https://placehold.co/24x24.png?text=${tournament.gameName.substring(0,2)}`)}
             />
             <span>{tournament.gameName}</span>
           </div>

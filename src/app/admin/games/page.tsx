@@ -42,6 +42,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { getGamesFromFirestore, addGameToFirestore, updateGameInFirestore, deleteGameFromFirestore } from "@/lib/tournamentStore";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 const gameSchema = z.object({
   id: z.string().optional(),
@@ -308,15 +309,16 @@ export default function AdminGamesPage() {
             {games.length > 0 ? games.map((game) => (
               <TableRow key={game.id}>
                 <TableCell>
-                  <Image 
-                    src={game.iconUrl || `https://placehold.co/40x40.png?text=${game.name.substring(0,1)}`} 
+                  <ImageWithFallback 
+                    src={game.iconUrl || `https://placehold.co/40x40.png`} 
+                    fallbackSrc={`https://placehold.co/40x40.png?text=${game.name.substring(0,2)}`}
                     alt={game.name} 
                     width={40} 
                     height={40} 
                     className="rounded-md object-cover" 
                     data-ai-hint={game.dataAiHint || "game logo"}
-                    unoptimized={game.iconUrl.startsWith('data:image')} 
-                    onError={(e) => (e.currentTarget.src = `https://placehold.co/40x40.png?text=${game.name.substring(0,2)}`)} />
+                    unoptimized={game.iconUrl.startsWith('data:image')}
+                  />
                 </TableCell>
                 <TableCell className="font-medium">{game.name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{game.dataAiHint}</TableCell>

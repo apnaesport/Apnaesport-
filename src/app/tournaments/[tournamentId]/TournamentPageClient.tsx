@@ -30,6 +30,7 @@ import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 
 interface TournamentPageClientProps {
@@ -44,7 +45,7 @@ const deserializeTournament = (serializedTournament: any): Tournament => {
     const value = newTournament[key];
     if (typeof value === 'string') {
       // Very basic ISO date string check
-      if (/\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z/.test(value)) {
+      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)) {
         newTournament[key] = new Date(value);
       }
     }
@@ -348,14 +349,14 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
                   <ul className="space-y-2 max-h-96 overflow-y-auto">
                       {tournament.participants.map(p => (
                           <li key={p.id} className="flex items-center space-x-3 p-2 border rounded-md bg-secondary/30">
-                              <Image 
+                              <ImageWithFallback 
                                 src={p.avatarUrl || `https://placehold.co/40x40.png`} 
+                                fallbackSrc={`https://placehold.co/32x32.png?text=${p.name.substring(0,2)}`}
                                 alt={p.name} 
                                 width={32} height={32} 
                                 className="rounded-full object-cover" 
                                 data-ai-hint="player avatar"
                                 unoptimized={p.avatarUrl?.startsWith('data:image')}
-                                onError={(e) => (e.currentTarget.src = `https://placehold.co/32x32.png?text=${p.name.substring(0,2)}`)}
                               />
                               <span>{p.name}</span>
                           </li>
@@ -481,13 +482,13 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
           </CardHeader>
           <CardContent>
             <div className="flex items-center space-x-3">
-              <Image 
-                src={`https://placehold.co/50x50.png`} 
+              <ImageWithFallback 
+                src={``} 
+                fallbackSrc={`https://placehold.co/50x50.png?text=OG`}
                 alt={tournament.organizer || "Organizer"} 
                 width={40} height={40} 
                 className="rounded-full object-cover" 
                 data-ai-hint="company logo"
-                onError={(e) => (e.currentTarget.src = "https://placehold.co/50x50.png?text=OG")}
               />
               <p className="font-medium">{tournament.organizer || "Apna Esport Community"}</p>
             </div>
