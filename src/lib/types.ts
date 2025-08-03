@@ -77,6 +77,8 @@ export type Tournament = {
   currency?: string;
   sponsorName?: string;
   sponsorLogoUrl?: string;
+  roomCode?: string;
+  roomPassword?: string;
 };
 
 export type TournamentFormDataUI = {

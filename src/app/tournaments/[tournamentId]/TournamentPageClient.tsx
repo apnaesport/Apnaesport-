@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, DollarSign, ShieldCheck, Building } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, DollarSign, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useState, useEffect, useCallback } from "react"; 
+import { useState, useEffect, useCallback, useMemo } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
 import { getTournamentByIdFromFirestore, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
@@ -27,6 +27,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { differenceInMinutes, formatDistanceToNow } from "date-fns";
+
 
 interface TournamentPageClientProps {
   tournamentId: string;
@@ -45,12 +49,40 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   const [isJoining, setIsJoining] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
+  const [isUpdatingRoom, setIsUpdatingRoom] = useState(false);
+  const [roomCode, setRoomCode] = useState(initialTournament.roomCode || "");
+  const [roomPassword, setRoomPassword] = useState(initialTournament.roomPassword || "");
+  const [showPassword, setShowPassword] = useState(false);
+  
+  const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
+
+  const isTournamentCreator = useMemo(() => user && tournament.organizerId === user.uid, [user, tournament.organizerId]);
+  
+  const canManageRoom = useMemo(() => {
+    if (!tournament.startDate) return false;
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+    return differenceInMinutes(startDate, new Date()) <= 15;
+  }, [tournament.startDate]);
+
+
+  useEffect(() => {
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+    const calculateTime = () => {
+        setTimeUntilStart(differenceInMinutes(startDate, new Date()));
+    };
+    calculateTime();
+    const interval = setInterval(calculateTime, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, [tournament.startDate]);
+
 
   const fetchTournament = useCallback(async () => {
     try {
       const fetchedTournament = await getTournamentByIdFromFirestore(tournamentId);
       if (fetchedTournament) {
         setTournament(fetchedTournament);
+         setRoomCode(fetchedTournament.roomCode || "");
+         setRoomPassword(fetchedTournament.roomPassword || "");
         if (user) {
           setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
         }
@@ -145,41 +177,84 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
     }
   };
 
-  const isTournamentCreator = user && tournament.organizerId === user.uid;
+  const handleUpdateRoomDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isTournamentCreator) return;
+    setIsUpdatingRoom(true);
+    try {
+      await updateTournamentInFirestore(tournament.id, { roomCode, roomPassword });
+      toast({ title: "Room Details Updated", description: "Participants can now see the room information." });
+      await fetchTournament();
+    } catch (error) {
+      console.error("Error updating room details:", error);
+      toast({ title: "Update Failed", description: "Could not update room details.", variant: "destructive"});
+    } finally {
+      setIsUpdatingRoom(false);
+    }
+  };
+  
+  const handleCopyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: "Copied!", description: "Password copied to clipboard." });
+  }
+
   const isPremium = tournament.entryFee && tournament.entryFee > 0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div className="lg:col-span-2">
-        <Tabs defaultValue="bracket" className="w-full">
+        <Tabs defaultValue="overview" className="w-full">
           <ScrollArea className="w-full whitespace-nowrap pb-2">
             <TabsList className="inline-flex w-auto">
-              <TabsTrigger value="bracket">Bracket</TabsTrigger>
               <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="bracket">Bracket</TabsTrigger>
               <TabsTrigger value="participants">Participants ({tournament.participants.length})</TabsTrigger>
               <TabsTrigger value="rules">Rules</TabsTrigger>
               {tournament.registrationInstructions && <TabsTrigger value="howToJoin">How to Join</TabsTrigger>}
+              {isTournamentCreator && <TabsTrigger value="manageRoom">Manage Room</TabsTrigger>}
             </TabsList>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
-
-          <TabsContent value="bracket" className="mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Tournament Bracket</CardTitle>
-                <CardDescription>{tournament.bracketType}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <TournamentBracket tournament={tournament} />
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="overview" className="mt-6 space-y-6">
             <Card>
               <CardHeader><CardTitle>About this Tournament</CardTitle></CardHeader>
               <CardContent><p className="text-muted-foreground leading-relaxed">{tournament.description}</p></CardContent>
             </Card>
+            
+            {isRegistered && (tournament.roomCode || tournament.roomPassword) && (
+              <Card className="border-primary/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary"/> Room Details</CardTitle>
+                  <CardDescription>Use this information to join the custom room in-game.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {tournament.roomCode && (
+                    <div className="space-y-1">
+                      <Label>Room Code / ID</Label>
+                      <p className="font-mono text-lg p-2 bg-muted rounded-md">{tournament.roomCode}</p>
+                    </div>
+                  )}
+                  {tournament.roomPassword && (
+                    <div className="space-y-1">
+                      <Label>Password</Label>
+                      <div className="flex items-center gap-2">
+                        <p className="font-mono text-lg p-2 bg-muted rounded-md flex-grow">
+                          {showPassword ? tournament.roomPassword : "••••••••••"}
+                        </p>
+                        <Button variant="ghost" size="icon" onClick={() => setShowPassword(!showPassword)}>
+                          {showPassword ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
+                        </Button>
+                        <Button variant="outline" size="icon" onClick={() => handleCopyToClipboard(tournament.roomPassword!)}>
+                          <Copy className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader><CardTitle>Details</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -224,6 +299,18 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
             </Card>
           </TabsContent>
 
+          <TabsContent value="bracket" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tournament Bracket</CardTitle>
+                <CardDescription>{tournament.bracketType}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TournamentBracket tournament={tournament} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="participants" className="mt-6">
             <Card>
               <CardHeader>
@@ -260,6 +347,48 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
               <CardContent><p className="text-muted-foreground whitespace-pre-line">{tournament.rules || "No specific rules provided for this tournament."}</p></CardContent>
             </Card>
           </TabsContent>
+          
+           {isTournamentCreator && (
+            <TabsContent value="manageRoom" className="mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> Manage Room Details</CardTitle>
+                  <CardDescription>Add the room ID and password here. This will only be visible to registered participants.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {canManageRoom ? (
+                     <form onSubmit={handleUpdateRoomDetails} className="space-y-4">
+                        <div>
+                          <Label htmlFor="roomCode">Room Code / ID</Label>
+                          <Input id="roomCode" value={roomCode} onChange={e => setRoomCode(e.target.value)} disabled={isUpdatingRoom} />
+                        </div>
+                        <div>
+                          <Label htmlFor="roomPassword">Room Password</Label>
+                          <Input id="roomPassword" value={roomPassword} onChange={e => setRoomPassword(e.target.value)} disabled={isUpdatingRoom} />
+                        </div>
+                        <Button type="submit" disabled={isUpdatingRoom}>
+                          {isUpdatingRoom ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                          {isUpdatingRoom ? "Saving..." : "Save Room Details"}
+                        </Button>
+                     </form>
+                  ) : (
+                    <div className="flex flex-col items-center text-center p-6 border-2 border-dashed rounded-lg bg-muted/50">
+                        <Lock className="h-12 w-12 text-muted-foreground mb-4" />
+                        <h3 className="font-semibold text-lg">Room Management Locked</h3>
+                        {timeUntilStart !== null && timeUntilStart > 0 ? (
+                            <p className="text-muted-foreground">
+                                You can add room details {formatDistanceToNow(tournament.startDate as Date, { includeSeconds: false, addSuffix: true})}.
+                            </p>
+                        ) : (
+                             <p className="text-muted-foreground">The start time has passed, but management is still available.</p>
+                        )}
+                        
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+           )}
 
           {tournament.registrationInstructions && (
               <TabsContent value="howToJoin" className="mt-6">

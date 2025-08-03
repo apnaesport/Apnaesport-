@@ -9,7 +9,7 @@ import Link from "next/link";
 import { PlusCircle, Search, Filter, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext"; 
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -24,7 +24,6 @@ import { useToast } from "@/hooks/use-toast";
 
 export default function AllTournamentsPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
-  const [filteredTournaments, setFilteredTournaments] = useState<Tournament[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<Record<Tournament["status"] | "all", boolean>>({
@@ -44,12 +43,10 @@ export default function AllTournamentsPage() {
     try {
       const tournamentsFromDb = await getTournamentsFromFirestore();
       setAllTournaments(tournamentsFromDb);
-      setFilteredTournaments(tournamentsFromDb); // Initialize with all tournaments
     } catch (error) {
       console.error("Error fetching tournaments:", error);
       toast({ title: "Error", description: "Could not fetch tournaments.", variant: "destructive" });
       setAllTournaments([]); 
-      setFilteredTournaments([]);
     }
     setIsLoading(false);
   }, [toast]);
@@ -58,8 +55,22 @@ export default function AllTournamentsPage() {
     fetchTournaments();
   }, [fetchTournaments]);
 
-  useEffect(() => {
+  const filteredTournaments = useMemo(() => {
     let newFilteredTournaments = allTournaments;
+
+    // Filter out completed tournaments older than 7 days, unless specifically filtering for "Completed"
+    const isFilteringForCompleted = statusFilter.Completed && !statusFilter.all;
+    if (!isFilteringForCompleted) {
+       newFilteredTournaments = newFilteredTournaments.filter(tournament => {
+        if (tournament.status === 'Completed') {
+          const completedDate = (tournament.endDate || tournament.updatedAt) as any;
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          return completedDate.toDate() > sevenDaysAgo;
+        }
+        return true;
+      });
+    }
 
     if (searchTerm) {
       newFilteredTournaments = newFilteredTournaments.filter(tournament =>
@@ -78,7 +89,7 @@ export default function AllTournamentsPage() {
       );
     }
     
-    setFilteredTournaments(newFilteredTournaments);
+    return newFilteredTournaments;
   }, [searchTerm, statusFilter, allTournaments]);
 
 
