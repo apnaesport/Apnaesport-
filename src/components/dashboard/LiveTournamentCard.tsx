@@ -9,6 +9,7 @@ import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Radio, Users, CalendarDays } from "lucide-react";
 import { formatDistanceToNowStrict } from 'date-fns';
+import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 
 interface LiveTournamentCardProps {
@@ -19,27 +20,29 @@ export function LiveTournamentCard({ tournament }: LiveTournamentCardProps) {
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
       <CardHeader className="relative p-0 h-40">
-        <Image
-          src={tournament.bannerImageUrl || `https://placehold.co/400x200.png`}
+        <ImageWithFallback
+          src={tournament.bannerImageUrl || ""}
+          fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="gaming match"
-          onError={(e) => e.currentTarget.src = "https://placehold.co/400x200.png"}
+          unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <Badge variant="destructive" className="absolute top-3 right-3 uppercase tracking-wider">
           <Radio className="h-3 w-3 mr-1 animate-pulse" /> Live
         </Badge>
         <div className="absolute bottom-0 left-0 p-4">
-          <Image 
-            src={tournament.gameIconUrl || `https://placehold.co/40x40.png`} 
+          <ImageWithFallback 
+            src={tournament.gameIconUrl || ""}
+            fallbackSrc={`https://placehold.co/40x40.png?text=${tournament.gameName.substring(0,2)}`}
             alt={tournament.gameName} 
             width={32} height={32} 
             className="rounded-md mb-1 border-2 border-background" 
             data-ai-hint="game logo small"
-            onError={(e) => e.currentTarget.src = "https://placehold.co/40x40.png"}
+            unoptimized={tournament.gameIconUrl?.startsWith('data:image')}
           />
           <CardTitle className="text-xl font-semibold text-white drop-shadow-md line-clamp-1">
             {tournament.name}

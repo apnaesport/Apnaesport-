@@ -11,6 +11,7 @@ import { CalendarDays, Users, Gamepad2, Eye, DollarSign } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
   tournament: Tournament;
@@ -55,15 +56,15 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
       <CardHeader className="relative p-0 h-48">
-        <Image
-          src={tournament.bannerImageUrl || `https://placehold.co/400x200.png`}
+        <ImageWithFallback
+          src={tournament.bannerImageUrl || ''}
+          fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="tournament banner small"
           unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
-          onError={(e) => (e.currentTarget.src = `https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute top-3 right-3 flex flex-col items-end gap-1">

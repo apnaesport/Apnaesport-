@@ -13,6 +13,27 @@ import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/firebase"; // Assuming a way to get current user on server
 import { getUserProfileFromFirestore } from "@/lib/tournamentStore";
 
+// Helper to convert Firestore Timestamps to ISO strings for serialization
+const serializeTournament = (tournament: Tournament): any => {
+  const newTournament = { ...tournament };
+  for (const key of Object.keys(newTournament)) {
+    const value = (newTournament as any)[key];
+    if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+      (newTournament as any)[key] = value.toDate().toISOString();
+    }
+  }
+   if (newTournament.matches) {
+    newTournament.matches = newTournament.matches.map((match: any) => {
+      const newMatch = {...match};
+      if (newMatch.startTime && typeof newMatch.startTime === 'object' && 'toDate' in newMatch.startTime) {
+        (newMatch.startTime as any) = newMatch.startTime.toDate().toISOString();
+      }
+      return newMatch;
+    });
+  }
+  return newTournament;
+}
+
 export default async function DashboardPage() {
   const [allTournaments, allGames, allUsers, settings] = await Promise.all([
     getTournamentsFromFirestore(), 
@@ -25,12 +46,12 @@ export default async function DashboardPage() {
   
   let featuredTournament: Tournament | undefined = undefined;
   const explicitlyFeaturedAndActive = upcomingOrLiveTournaments.filter(t => t.featured);
-  explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+  explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate as Date).getTime() - new Date(b.startDate as Date).getTime());
 
   if (explicitlyFeaturedAndActive.length > 0) {
     featuredTournament = explicitlyFeaturedAndActive[0];
   } else if (upcomingOrLiveTournaments.length > 0) {
-    upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate as Date).getTime() - new Date(b.startDate as Date).getTime());
     featuredTournament = upcomingOrLiveTournaments[0];
   } else {
     const sortedByCreation = [...allTournaments].sort((a, b) => {
@@ -66,7 +87,7 @@ export default async function DashboardPage() {
 
       {featuredTournament ? (
         <section>
-          <FeaturedTournamentCard tournament={featuredTournament} />
+          <FeaturedTournamentCard tournament={serializeTournament(featuredTournament)} />
         </section>
       ) : (
         <div className="bg-card p-8 rounded-lg shadow-md text-center">
@@ -82,7 +103,7 @@ export default async function DashboardPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recommendedTournaments.map((tournament) => (
-              <TournamentCard key={tournament.id} tournament={tournament} />
+              <TournamentCard key={tournament.id} tournament={serializeTournament(tournament)} />
             ))}
           </div>
         </section>
@@ -93,7 +114,7 @@ export default async function DashboardPage() {
         {liveTournaments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {liveTournaments.map((tournament) => (
-              <LiveTournamentCard key={tournament.id} tournament={tournament} />
+              <LiveTournamentCard key={tournament.id} tournament={serializeTournament(tournament)} />
             ))}
           </div>
         ) : (

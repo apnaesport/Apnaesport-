@@ -9,6 +9,7 @@ import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Trophy } from "lucide-react";
 import { format } from "date-fns";
+import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface FeaturedTournamentCardProps {
   tournament: Tournament;
@@ -18,14 +19,15 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
   return (
     <Card className="overflow-hidden shadow-xl hover:shadow-primary/30 transition-shadow duration-300 group bg-card/80 backdrop-blur-sm">
       <CardHeader className="relative p-0 h-64 md:h-80">
-        <Image
-          src={tournament.bannerImageUrl || `https://placehold.co/800x400.png`}
+        <ImageWithFallback
+          src={tournament.bannerImageUrl || ""}
+          fallbackSrc={`https://placehold.co/800x400.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
           layout="fill"
           objectFit="cover"
           className="transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports tournament banner"
-          onError={(e) => e.currentTarget.src = "https://placehold.co/800x400.png"}
+          unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
         <div className="absolute bottom-0 left-0 p-6">
@@ -49,12 +51,13 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
             <span>{tournament.participants.length} / {tournament.maxParticipants} Players</span>
           </div>
           <div className="flex items-center gap-2">
-            <Image 
-              src={tournament.gameIconUrl || `https://placehold.co/40x40.png`} 
+            <ImageWithFallback 
+              src={tournament.gameIconUrl || ""} 
+              fallbackSrc={`https://placehold.co/40x40.png?text=${tournament.gameName.substring(0,2)}`}
               alt={tournament.gameName} 
               width={20} height={20} 
               className="rounded" data-ai-hint="game icon"
-              onError={(e) => e.currentTarget.src = "https://placehold.co/40x40.png"}
+              unoptimized={tournament.gameIconUrl?.startsWith('data:image')}
             />
             <span>{tournament.gameName}</span>
           </div>
