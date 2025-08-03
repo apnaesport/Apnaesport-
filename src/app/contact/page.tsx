@@ -19,6 +19,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import type { Metadata } from 'next';
+
+// Note: Metadata in a client component is not directly supported for dynamic values,
+// but we can set a static one here. For full dynamic SEO, a server component wrapper would be needed.
+export const metadata: Metadata = {
+  title: "Contact Us",
+  description: "Get in touch with the Apna Esport team. Send us your questions, suggestions, or collaboration inquiries through our contact form.",
+};
+
 
 export default function ContactPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -21,6 +21,15 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import type { Metadata } from 'next';
+
+// Note: Metadata in a client component is not directly supported for dynamic values,
+// but we can set a static one here. For full dynamic SEO, a server component wrapper would be needed.
+export const metadata: Metadata = {
+  title: "Leaderboard",
+  description: "See the top players on Apna Esport. Check your rank, view points, and see who's dominating the competition in our official leaderboard.",
+};
+
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return "??";

@@ -1,7 +1,5 @@
 
-"use client"; 
-
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import type { Game, Tournament } from "@/lib/types";
@@ -10,64 +8,41 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { PlusCircle, AlertTriangle, Loader2 } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext"; 
 import { getGameDetails, getTournamentsForGame } from "@/lib/tournamentStore";
-import { useEffect, useState, use, useCallback } from "react"; 
-import { useToast } from "@/hooks/use-toast";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import GameTournamentsClient from "./GameTournamentsClient";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
 }
 
-// Removed generateMetadata as this is a Client Component
+export async function generateMetadata({ params }: GameTournamentsPageProps, parent: ResolvingMetadata): Promise<Metadata> {
+  const { gameId } = params;
+  const game = await getGameDetails(gameId);
+  const previousImages = (await parent).openGraph?.images || [];
 
-export default function GameTournamentsPage({ params }: GameTournamentsPageProps) {
-  const resolvedParams = use(params); 
-  const { gameId } = resolvedParams;
-
-  const { user } = useAuth(); 
-  const [game, setGame] = useState<Game | undefined>(undefined);
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const gameDetails = await getGameDetails(gameId);
-      setGame(gameDetails);
-      if (gameDetails) {
-        const gameTournaments = await getTournamentsForGame(gameId);
-        setTournaments(gameTournaments);
-      } else {
-        setTournaments([]); 
-        toast({ title: "Not Found", description: "Game not found.", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Error fetching game/tournament data:", error);
-      toast({ title: "Error", description: "Could not fetch data.", variant: "destructive" });
-      setGame(undefined);
-      setTournaments([]);
-    }
-    setIsLoading(false);
-  }, [gameId, toast]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <PageTitle title="Loading Game Tournaments..." className="mt-4 !mb-0" />
-      </div>
-    );
+  if (!game) {
+    return {
+      title: "Game Not Found",
+      description: "The game you are looking for does not exist on Apna Esport.",
+    };
   }
 
+  return {
+    title: `${game.name} Tournaments | Apna Esport`,
+    description: `Find, join, and compete in ${game.name} tournaments on Apna Esport. See upcoming, live, and completed events.`,
+    openGraph: {
+      title: `${game.name} Tournaments on Apna Esport`,
+      description: `Browse all available tournaments for ${game.name}.`,
+      images: [game.bannerUrl || game.iconUrl, ...previousImages],
+    },
+  };
+}
 
+export default async function GameTournamentsPage({ params }: GameTournamentsPageProps) {
+  const { gameId } = params;
+  const game = await getGameDetails(gameId);
+  
   if (!game) {
     return (
       <div className="text-center py-10">
@@ -81,9 +56,7 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
     );
   }
 
-  const upcomingTournaments = tournaments.filter(t => t.status === "Upcoming");
-  const liveTournaments = tournaments.filter(t => t.status === "Live" || t.status === "Ongoing");
-  const completedTournaments = tournaments.filter(t => t.status === "Completed");
+  const allTournaments = await getTournamentsForGame(gameId);
 
   return (
     <div className="space-y-8">
@@ -117,48 +90,14 @@ export default function GameTournamentsPage({ params }: GameTournamentsPageProps
         </div>
       </div>
       
-      {user && ( 
-        <div className="flex justify-end">
-          <Button asChild>
-            <Link href={`/tournaments/new?gameId=${game.id}`}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Create New Tournament
-            </Link>
-          </Button>
-        </div>
-      )}
-
-      <Tabs defaultValue="upcoming" className="w-full">
-        <ScrollArea className="w-full whitespace-nowrap pb-2">
-          <TabsList className="inline-flex w-auto">
-            <TabsTrigger value="upcoming">Upcoming ({upcomingTournaments.length})</TabsTrigger>
-            <TabsTrigger value="live">Live ({liveTournaments.length})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({completedTournaments.length})</TabsTrigger>
-          </TabsList>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
-        
-        <TabsContent value="upcoming" className="mt-6">
-          {upcomingTournaments.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {upcomingTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
-            </div>
-          ) : <p className="text-muted-foreground py-4 text-center">No upcoming tournaments for {game.name} right now.</p>}
-        </TabsContent>
-        <TabsContent value="live" className="mt-6">
-          {liveTournaments.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {liveTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
-            </div>
-          ) : <p className="text-muted-foreground py-4 text-center">No live tournaments for {game.name} at the moment.</p>}
-        </TabsContent>
-        <TabsContent value="completed" className="mt-6">
-          {completedTournaments.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {completedTournaments.map(tournament => <TournamentCard key={tournament.id} tournament={tournament} />)}
-            </div>
-          ) : <p className="text-muted-foreground py-4 text-center">No completed tournaments for {game.name} yet.</p>}
-        </TabsContent>
-      </Tabs>
+      <GameTournamentsClient game={game} initialTournaments={allTournaments} />
+      
     </div>
   );
 }
+
+// Create a new client component to handle client-side logic
+const GameTournamentsClientPage = ({ game, initialTournaments }: { game: Game, initialTournaments: Tournament[] }) => {
+    return null; // This is a placeholder. The actual client component logic is in GameTournamentsClient.tsx
+}
+

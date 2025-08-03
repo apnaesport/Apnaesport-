@@ -2,6 +2,13 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Gamepad2, Trophy, Target, Eye, Briefcase } from "lucide-react"; // Added icons
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "About Apna Esport",
+  description: "Learn about Apna Esport, India’s upcoming online esports platform. Discover our vision, what we offer, and how we are building a community for passionate gamers.",
+};
+
 
 export default function AboutUsPage() {
   return (
