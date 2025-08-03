@@ -9,6 +9,7 @@ import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, ChevronLeft, AlertTr
 import { format } from "date-fns";
 import { getTournamentByIdFromFirestore } from "@/lib/tournamentStore"; 
 import TournamentPageClient from "./TournamentPageClient";
+import type { Tournament } from "@/lib/types";
 
 interface TournamentPageProps {
   params: { tournamentId: string };
@@ -47,6 +48,27 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
   };
 }
 
+// Helper to convert Firestore Timestamps to ISO strings for serialization
+const serializeTournament = (tournament: Tournament): any => {
+  const newTournament = { ...tournament };
+  for (const key of Object.keys(newTournament)) {
+    const value = (newTournament as any)[key];
+    if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+      (newTournament as any)[key] = value.toDate().toISOString();
+    }
+  }
+   if (newTournament.matches) {
+    newTournament.matches = newTournament.matches.map(match => {
+      const newMatch = {...match};
+      if (newMatch.startTime && typeof newMatch.startTime === 'object' && 'toDate' in newMatch.startTime) {
+        (newMatch.startTime as any) = newMatch.startTime.toDate().toISOString();
+      }
+      return newMatch;
+    });
+  }
+  return newTournament;
+}
+
 export default async function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
   const tournament = await getTournamentByIdFromFirestore(tournamentId);
@@ -68,6 +90,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   
   const isPremium = tournament.entryFee && tournament.entryFee > 0;
   const formattedStartDate = format((tournament.startDate as Date), "PPPPp");
+
+  const serializableTournament = serializeTournament(tournament);
 
   return (
     <div className="space-y-8">
@@ -111,7 +135,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
       <TournamentPageClient 
         tournamentId={tournamentId} 
-        initialTournament={tournament} 
+        initialTournament={serializableTournament} 
         initialFormattedDate={formattedStartDate}
       />
     </div>

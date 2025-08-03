@@ -29,17 +29,40 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { differenceInMinutes, formatDistanceToNow } from "date-fns";
+import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
 
 
 interface TournamentPageClientProps {
   tournamentId: string;
-  initialTournament: Tournament;
+  initialTournament: any; // Using `any` because it's serialized.
   initialFormattedDate: string;
 }
 
+const deserializeTournament = (serializedTournament: any): Tournament => {
+  const newTournament = { ...serializedTournament };
+  for (const key of Object.keys(newTournament)) {
+    const value = newTournament[key];
+    if (typeof value === 'string') {
+      // Very basic ISO date string check
+      if (/\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z/.test(value)) {
+        newTournament[key] = new Date(value);
+      }
+    }
+  }
+   if (newTournament.matches) {
+    newTournament.matches = newTournament.matches.map((match: any) => {
+      const newMatch = {...match};
+      if (newMatch.startTime && typeof newMatch.startTime === 'string') {
+        newMatch.startTime = new Date(newMatch.startTime);
+      }
+      return newMatch;
+    });
+  }
+  return newTournament as Tournament;
+}
+
 export default function TournamentPageClient({ tournamentId, initialTournament, initialFormattedDate }: TournamentPageClientProps) {
-  const [tournament, setTournament] = useState<Tournament>(initialTournament);
+  const [tournament, setTournament] = useState<Tournament>(deserializeTournament(initialTournament));
   const [formattedStartDate, setFormattedStartDate] = useState<string>(initialFormattedDate);
   
   const { user, isAdmin, loading: authLoading } = useAuth(); 
@@ -60,13 +83,13 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   
   const canManageRoom = useMemo(() => {
     if (!tournament.startDate) return false;
-    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
     return differenceInMinutes(startDate, new Date()) <= 15;
   }, [tournament.startDate]);
 
 
   useEffect(() => {
-    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
     const calculateTime = () => {
         setTimeUntilStart(differenceInMinutes(startDate, new Date()));
     };
@@ -199,6 +222,10 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   }
 
   const isPremium = tournament.entryFee && tournament.entryFee > 0;
+
+  const getStartDate = () => {
+    return tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -377,7 +404,7 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
                         <h3 className="font-semibold text-lg">Room Management Locked</h3>
                         {timeUntilStart !== null && timeUntilStart > 0 ? (
                             <p className="text-muted-foreground">
-                                You can add room details {formatDistanceToNow(tournament.startDate as Date, { includeSeconds: false, addSuffix: true})}.
+                                You can add room details {formatDistanceToNow(getStartDate(), { includeSeconds: false, addSuffix: true})}.
                             </p>
                         ) : (
                              <p className="text-muted-foreground">The start time has passed, but management is still available.</p>
