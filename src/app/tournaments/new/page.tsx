@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import type { Game, Tournament, TournamentStatus, TournamentFormDataUI } from "@/lib/types";
+import type { Game, Tournament, TournamentFormDataUI } from "@/lib/types";
 import { CalendarIcon, PlusCircle, Loader2, LogIn, DollarSign, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
@@ -146,7 +146,7 @@ export default function CreateTournamentPage() {
         }
     }
 
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date } = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
@@ -162,7 +162,6 @@ export default function CreateTournamentPage() {
       organizerId: user.uid,
       organizer: user.displayName || user.email || "Unknown Organizer",
       participants: [], 
-      status: "Upcoming" as TournamentStatus,
       matches: [], 
       featured: data.featured || false,
       entryFee: data.entryFee || 0,

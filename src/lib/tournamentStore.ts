@@ -22,7 +22,7 @@ import {
   Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -33,6 +33,21 @@ const GLOBAL_SETTINGS_ID = "global";
 const TEAMS_COLLECTION = "teams";
 const CHATS_COLLECTION = "chats";
 const MESSAGES_SUBCOLLECTION = "messages";
+
+
+const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
+    const now = new Date();
+    const startTime = tournament.startDate.getTime();
+    const endTime = tournament.endDate ? tournament.endDate.getTime() : null;
+
+    if (endTime && now.getTime() > endTime) {
+        return "Completed";
+    }
+    if (now.getTime() >= startTime) {
+        return "Live";
+    }
+    return "Upcoming";
+};
 
 
 // --- Game Functions ---
@@ -96,11 +111,12 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 
 // --- Tournament Functions ---
 
-export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate'> & { startDate: Date }): Promise<string> => {
+export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status'> & { startDate: Date }): Promise<string> => {
   const { startDate, ...restData } = tournamentData;
   const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
     ...restData,
     startDate: Timestamp.fromDate(startDate),
+    status: "Upcoming", // Always set as upcoming on creation
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     matches: tournamentData.matches || [],
@@ -138,9 +154,11 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
   const tournamentsSnapshot = await getDocs(q);
 
-  return tournamentsSnapshot.docs.map(doc => {
+  const now = new Date();
+  const batch = writeBatch(db);
+  const tournaments = tournamentsSnapshot.docs.map(doc => {
     const data = doc.data();
-    return {
+    const tournament = {
       id: doc.id,
       ...data,
       bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
@@ -154,7 +172,22 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
+
+    // Auto-update status logic
+    const currentStatus = tournament.status;
+    const newStatus = getTournamentStatus(tournament);
+    
+    if (currentStatus !== newStatus && currentStatus !== "Cancelled") {
+        tournament.status = newStatus;
+        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
+        batch.update(tournamentRef, { status: newStatus, updatedAt: serverTimestamp() });
+    }
+    
+    return tournament;
   });
+
+  await batch.commit();
+  return tournaments;
 };
 
 
@@ -177,8 +210,8 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
             });
         }
     }
-
-    return {
+    
+    const tournament: Tournament = {
       id: docSnap.id,
       ...data,
       bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
@@ -193,6 +226,16 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
+    
+    // Check and update status if needed
+    const currentStatus = tournament.status;
+    const newStatus = getTournamentStatus(tournament);
+    if(currentStatus !== newStatus && currentStatus !== "Cancelled") {
+        tournament.status = newStatus;
+        await updateDoc(docRef, { status: newStatus, updatedAt: serverTimestamp() });
+    }
+
+    return tournament;
   }
   return undefined;
 };

@@ -105,7 +105,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           priority
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports event stage"
-          unoptimized={tournament.bannerImageUrl.startsWith('data:image')}
+          unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
@@ -126,7 +126,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               width={24} height={24} 
               className="rounded-sm mr-2 object-cover" 
               data-ai-hint="game icon mini"
-              unoptimized={tournament.gameIconUrl.startsWith('data:image')}
+              unoptimized={tournament.gameIconUrl?.startsWith('data:image')}
             />
             <span>{tournament.gameName}</span>
           </div>
