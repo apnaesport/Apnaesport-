@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   doc,
@@ -116,7 +117,7 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
   const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
     ...restData,
     startDate: Timestamp.fromDate(startDate),
-    status: "Upcoming", // Always set as upcoming on creation
+    status: getTournamentStatus({ ...restData, startDate }),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     matches: tournamentData.matches || [],
@@ -156,10 +157,10 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
   const now = new Date();
   const batch = writeBatch(db);
-  const tournaments = tournamentsSnapshot.docs.map(doc => {
-    const data = doc.data();
+  const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
+    const data = docSnapshot.data();
     const tournament = {
-      id: doc.id,
+      id: docSnapshot.id,
       ...data,
       bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
