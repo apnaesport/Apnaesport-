@@ -1,18 +1,13 @@
 
-"use client";
-
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import type { StatItem } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Line, LineChart } from "recharts";
-import { useEffect, useState, useCallback } from "react";
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
-import { Loader2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 
-// Placeholder data for charts - making these dynamic from store would be complex for now
+// Placeholder data for charts
 const userGrowthData = [
   { date: "2024-01-01", users: 100 }, { date: "2024-02-01", users: 150 },
   { date: "2024-03-01", users: 220 }, { date: "2024-04-01", users: 310 },
@@ -36,51 +31,25 @@ const chartConfigTournamentActivity = {
 } satisfies import("@/components/ui/chart").ChartConfig;
 
 
-export default function AdminAnalyticsPage() {
-  const [platformAnalytics, setPlatformAnalytics] = useState<StatItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
+export default async function AdminAnalyticsPage() {
+  const currentTournaments = await getTournamentsFromFirestore();
+  const totalMatchesPlayed = currentTournaments.reduce((acc, t) => {
+      const matchesCount = t.matches?.length || 0;
+      if (t.bracketType === "Round Robin" && t.participants.length > 1 && matchesCount === 0) {
+          return acc + (t.participants.length * (t.participants.length - 1) / 2);
+      }
+      return acc + matchesCount;
+  }, 0);
+  
+  const placeholderTotalUsers = "1,250"; 
+  const placeholderDailyActive = 230; 
 
-  const loadData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const currentTournaments = await getTournamentsFromFirestore();
-      const totalMatchesPlayed = currentTournaments.reduce((acc, t) => {
-          const matchesCount = t.matches?.length || 0;
-          if (t.bracketType === "Round Robin" && t.participants.length > 1 && matchesCount === 0) {
-              return acc + (t.participants.length * (t.participants.length - 1) / 2);
-          }
-          return acc + matchesCount;
-      }, 0);
-      
-      const placeholderTotalUsers = "1,250"; 
-      const placeholderDailyActive = 230; 
-
-      setPlatformAnalytics([
-        { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, 
-        { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, 
-        { title: "Total Matches Played (Est.)", value: totalMatchesPlayed, icon: "Gamepad2" }, 
-        { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, 
-      ]);
-    } catch (error) {
-      console.error("Error loading analytics data:", error);
-      toast({ title: "Error", description: "Could not load analytics data.", variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [toast]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  if (isLoading) {
-     return (
-      <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
-        <p className="mt-4 text-lg text-muted-foreground">Loading analytics...</p>
-      </div>
-    );
-  }
+  const platformAnalytics: StatItem[] = [
+    { title: "Total Registered Users", value: placeholderTotalUsers, icon: "Users" }, 
+    { title: "Total Tournaments Hosted", value: currentTournaments.length, icon: "Swords" }, 
+    { title: "Total Matches Played (Est.)", value: totalMatchesPlayed, icon: "Gamepad2" }, 
+    { title: "Daily Active Users (Avg)", value: placeholderDailyActive, icon: "Eye" }, 
+  ];
 
   return (
     <div className="space-y-8">
