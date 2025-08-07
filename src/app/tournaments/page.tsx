@@ -4,9 +4,33 @@ import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import TournamentsPageClient from './TournamentsPageClient';
+import type { Tournament } from "@/lib/types";
+
+// Helper to convert Firestore Timestamps to ISO strings for serialization
+const serializeTournament = (tournament: Tournament): any => {
+  const newTournament = { ...tournament };
+  for (const key of Object.keys(newTournament)) {
+    const value = (newTournament as any)[key];
+    if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
+      (newTournament as any)[key] = value.toDate().toISOString();
+    }
+  }
+   if (newTournament.matches) {
+    newTournament.matches = newTournament.matches.map((match: any) => {
+      const newMatch = {...match};
+      if (newMatch.startTime && typeof newMatch.startTime === 'object' && 'toDate' in newMatch.startTime) {
+        (newMatch.startTime as any) = newMatch.startTime.toDate().toISOString();
+      }
+      return newMatch;
+    });
+  }
+  return newTournament;
+}
+
 
 export default async function AllTournamentsPage() {
     const allTournaments = await getTournamentsFromFirestore();
+    const serializableTournaments = allTournaments.map(serializeTournament);
 
     return (
         <div className="space-y-8">
@@ -21,7 +45,7 @@ export default async function AllTournamentsPage() {
                     </Button>
                 }
             />
-            <TournamentsPageClient allTournaments={allTournaments} />
+            <TournamentsPageClient allTournaments={serializableTournaments} />
         </div>
     );
 }
