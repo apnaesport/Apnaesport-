@@ -31,18 +31,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <SidebarContent className="p-2">
           <SidebarNav />
         </SidebarContent>
-        <SidebarFooter className="p-2 text-xs text-muted-foreground/80 flex flex-col items-center gap-1">
-          <div>&copy; {new Date().getFullYear()} Apna Esport</div>
-          <div className="flex gap-2 text-xs">
-            <Link href="/about" className="hover:text-primary">About</Link>
-            <span className="text-muted-foreground/50">|</span>
-            <Link href="/contact" className="hover:text-primary">Contact</Link>
-            <span className="text-muted-foreground/50">|</span>
-            <Link href="/terms" className="hover:text-primary">Terms</Link>
-            <span className="text-muted-foreground/50">|</span>
-            <Link href="/privacy" className="hover:text-primary">Privacy</Link>
-          </div>
-        </SidebarFooter>
+        {/* The sidebar footer is removed from here to consolidate into a single main footer. */}
       </Sidebar>
       <SidebarInset>
         <Header />
@@ -51,8 +40,16 @@ export function MainLayout({ children }: MainLayoutProps) {
         </main>
         <footer className="bg-background border-t">
           <SponsorshipCTA />
-          <div className="container mx-auto py-4 px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
-             <p>Built with ❤️ by Jitender Prajapat</p>
+          <Separator />
+          <div className="container mx-auto py-6 px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
+             <div className="flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 mb-4">
+                <Link href="/about" className="hover:text-primary transition-colors">About</Link>
+                <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
+                <Link href="/terms" className="hover:text-primary transition-colors">Terms & Conditions</Link>
+                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link>
+             </div>
+             <p className="mb-2">Built with ❤️ by Jitender Prajapat</p>
+             <p>&copy; {new Date().getFullYear()} Apna Esport. All rights reserved.</p>
           </div>
         </footer>
       </SidebarInset>
