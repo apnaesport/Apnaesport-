@@ -10,13 +10,12 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarInset,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
 import { SponsorshipCTA } from "./SponsorshipCTA";
 import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram } from "lucide-react"; // Added social icons
+import { Youtube, Twitter, Instagram } from "lucide-react"; 
 import { Button } from "../ui/button";
 
 interface MainLayoutProps {
