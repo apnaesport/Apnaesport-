@@ -31,6 +31,21 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import type { Timestamp } from "firebase/firestore";
+
+// Helper function to convert Timestamp to a readable string or return a fallback
+const formatDateFromTimestamp = (timestamp: any) => {
+    if (timestamp && typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toLocaleDateString();
+    }
+    // Fallback for serialized dates or other formats
+    try {
+        return new Date(timestamp).toLocaleDateString();
+    } catch (e) {
+        return 'N/A';
+    }
+};
+
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
@@ -126,7 +141,7 @@ export default function AdminUsersClient({ initialUsers }: AdminUsersClientProps
                 )}
               </TableCell>
               <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                  {user.createdAt ? new Date((user.createdAt as any).seconds * 1000).toLocaleDateString() : 'N/A'}
+                  {formatDateFromTimestamp(user.createdAt)}
               </TableCell>
               <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap">
                 <Button variant="outline" size="icon" title="Edit User Details (Coming Soon)" disabled className="h-8 w-8 sm:h-9 sm:w-9">

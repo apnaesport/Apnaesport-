@@ -337,19 +337,6 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
       points: data.points || 0,
-      emailVerified: data.emailVerified || false,
-      isAnonymous: data.isAnonymous || false,
-      metadata: data.metadata || {},
-      providerData: data.providerData || [],
-      refreshToken: data.refreshToken || '',
-      tenantId: data.tenantId || null,
-      delete: async () => { console.warn("Delete not implemented on client-side UserProfile"); },
-      getIdToken: async () => { console.warn("getIdToken not implemented on client-side UserProfile"); return ""; },
-      getIdTokenResult: async () => { console.warn("getIdTokenResult not implemented on client-side UserProfile"); return ({} as any); },
-      reload: async () => { console.warn("reload not implemented on client-side UserProfile"); },
-      toJSON: () => ({ uid: docSnap.id, email: data.email, displayName: data.displayName }),
-      phoneNumber: data.phoneNumber || null,
-      providerId: data.providerId || '',
     } as UserProfile;
   }
   return null;
@@ -360,6 +347,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
   const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), orderBy("displayName", "asc")));
   return usersSnapshot.docs.map(doc => {
     const data = doc.data();
+    // This is the fix: return only serializable data
     return {
       uid: doc.id,
       displayName: data.displayName || "Unknown User",
@@ -375,20 +363,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
       points: data.points || 0,
-      emailVerified: data.emailVerified || false,
-      isAnonymous: data.isAnonymous || false,
-      metadata: data.metadata || {},
-      providerData: data.providerData || [],
-      refreshToken: data.refreshToken || '',
-      tenantId: data.tenantId || null,
-      delete: async () => { console.warn("Delete not implemented on client-side UserProfile"); },
-      getIdToken: async () => { console.warn("getIdToken not implemented on client-side UserProfile"); return ""; },
-      getIdTokenResult: async () => { console.warn("getIdTokenResult not implemented on client-side UserProfile"); return ({} as any); },
-      reload: async () => { console.warn("reload not implemented on client-side UserProfile"); },
-      toJSON: () => ({ uid: doc.id, email: data.email, displayName: data.displayName }),
-      phoneNumber: data.phoneNumber || null,
-      providerId: data.providerId || '',
-    } as UserProfile;
+    };
   });
 };
 

@@ -5,10 +5,25 @@ import { UserPlus } from "lucide-react";
 import Link from "next/link";
 import { getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import AdminUsersClient from "./AdminUsersClient";
+import type { UserProfile } from "@/lib/types";
+
+
+// Helper to convert Firestore Timestamps to serializable format
+const serializeUsers = (users: UserProfile[]): any[] => {
+  return users.map(user => {
+    const newUser = { ...user };
+    if (newUser.createdAt && typeof (newUser.createdAt as any).toDate === 'function') {
+      (newUser.createdAt as any) = (newUser.createdAt as any).toDate().toISOString();
+    }
+    return newUser;
+  });
+};
 
 
 export default async function AdminUsersPage() {
-  const users = await getAllUsersFromFirestore();
+  const rawUsers = await getAllUsersFromFirestore();
+  const users = serializeUsers(rawUsers);
+
 
   return (
     <div className="space-y-8">

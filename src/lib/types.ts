@@ -1,11 +1,12 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
 
 export type LucideIconName = keyof typeof icons;
 
-export interface UserProfile extends FirebaseUser {
+export interface UserProfile {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
