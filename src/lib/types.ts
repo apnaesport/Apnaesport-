@@ -166,3 +166,16 @@ export interface ChatMessage {
   text: string;
   timestamp: Timestamp;
 }
+
+export type SponsorshipRequestStatus = "New" | "Contacted" | "In Progress" | "Closed";
+
+export interface SponsorshipRequest {
+    id: string;
+    brandName: string;
+    contactName: string;
+    email: string;
+    sponsorshipType: 'tournament' | 'site-wide' | 'other';
+    message: string;
+    status: SponsorshipRequestStatus;
+    createdAt: Timestamp;
+}

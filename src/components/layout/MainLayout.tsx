@@ -13,7 +13,9 @@ import {
   SidebarFooter,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import Link from "next/link"; // Added Link for footer
+import Link from "next/link";
+import { SponsorshipCTA } from "./SponsorshipCTA";
+import { Separator } from "../ui/separator";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -47,6 +49,12 @@ export function MainLayout({ children }: MainLayoutProps) {
         <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
+        <footer className="bg-background border-t">
+          <SponsorshipCTA />
+          <div className="container mx-auto py-4 px-4 md:px-6 lg:px-8 text-center text-sm text-muted-foreground">
+             <p>Built with ❤️ by Jitender Prajapat</p>
+          </div>
+        </footer>
       </SidebarInset>
     </SidebarProvider>
   );

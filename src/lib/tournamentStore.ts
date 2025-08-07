@@ -23,7 +23,7 @@ import {
   Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -34,6 +34,7 @@ const GLOBAL_SETTINGS_ID = "global";
 const TEAMS_COLLECTION = "teams";
 const CHATS_COLLECTION = "chats";
 const MESSAGES_SUBCOLLECTION = "messages";
+const SPONSORSHIPS_COLLECTION = "sponsorships";
 
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
@@ -754,6 +755,31 @@ export const deleteMessageFromFirestore = async (chatId: string, messageId: stri
   } else {
     throw new Error("Message not found.");
   }
+};
+
+// --- Sponsorship Functions ---
+
+export const addSponsorshipRequestToFirestore = async (formData: Omit<SponsorshipRequest, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+    const docRef = await addDoc(collection(db, SPONSORSHIPS_COLLECTION), {
+        ...formData,
+        status: "New",
+        createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+};
+
+export const getSponsorshipRequestsFromFirestore = async (): Promise<SponsorshipRequest[]> => {
+    const snapshot = await getDocs(query(collection(db, SPONSORSHIPS_COLLECTION), orderBy("createdAt", "desc")));
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt as Timestamp,
+    } as SponsorshipRequest));
+};
+
+export const updateSponsorshipRequestStatusInFirestore = async (id: string, status: SponsorshipRequest['status']): Promise<void> => {
+    const docRef = doc(db, SPONSORSHIPS_COLLECTION, id);
+    await updateDoc(docRef, { status });
 };
 
 

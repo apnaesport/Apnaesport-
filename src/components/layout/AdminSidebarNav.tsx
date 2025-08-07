@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import {
@@ -10,7 +11,8 @@ import {
   LogOut,
   Bell,
   BarChartBig,
-  Loader2
+  Loader2,
+  Handshake,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,6 +32,7 @@ const adminNavItems = [
   { href: "/admin/games", label: "Games", icon: Gamepad2 },
   { href: "/admin/analytics", label: "Analytics", icon: BarChartBig },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/sponsorships", label: "Sponsorships", icon: Handshake },
   { href: "/admin/settings", label: "Site Settings", icon: Settings },
 ];
 
