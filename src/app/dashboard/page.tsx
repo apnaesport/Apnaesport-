@@ -10,12 +10,10 @@ import { Heart } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/lib/firebase"; // Assuming a way to get current user on server
-import { getUserProfileFromFirestore } from "@/lib/tournamentStore";
 
 // Helper to convert Firestore Timestamps to ISO strings for serialization
-const serializeTournament = (tournament: Tournament): any => {
-  const newTournament = { ...tournament };
+const serializeTournament = (tournament: Tournament): Tournament => {
+  const newTournament: any = { ...tournament };
   for (const key of Object.keys(newTournament)) {
     const value = (newTournament as any)[key];
     if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
@@ -31,7 +29,7 @@ const serializeTournament = (tournament: Tournament): any => {
       return newMatch;
     });
   }
-  return newTournament;
+  return newTournament as Tournament;
 }
 
 export default async function DashboardPage() {
@@ -46,12 +44,12 @@ export default async function DashboardPage() {
   
   let featuredTournament: Tournament | undefined = undefined;
   const explicitlyFeaturedAndActive = upcomingOrLiveTournaments.filter(t => t.featured);
-  explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate as Date).getTime() - new Date(b.startDate as Date).getTime());
+  explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate as any).getTime() - new Date(b.startDate as any).getTime());
 
   if (explicitlyFeaturedAndActive.length > 0) {
     featuredTournament = explicitlyFeaturedAndActive[0];
   } else if (upcomingOrLiveTournaments.length > 0) {
-    upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate as Date).getTime() - new Date(b.startDate as Date).getTime());
+    upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate as any).getTime() - new Date(b.startDate as any).getTime());
     featuredTournament = upcomingOrLiveTournaments[0];
   } else {
     const sortedByCreation = [...allTournaments].sort((a, b) => {
@@ -76,10 +74,7 @@ export default async function DashboardPage() {
     { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" },
   ];
   
-  // This part is tricky on the server. For now, let's assume no user or handle it in a client component if needed.
-  // const user = auth.currentUser ? await getUserProfileFromFirestore(auth.currentUser.uid) : null;
-  const recommendedTournaments: Tournament[] = []; // Placeholder as getting current user's favs on server is complex without a session provider
-  
+  const recommendedTournaments: Tournament[] = [];
 
   return (
     <div className="space-y-8">

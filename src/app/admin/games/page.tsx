@@ -1,8 +1,5 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
-import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
-import type { Game } from "@/lib/types";
 import { getGamesFromFirestore } from "@/lib/tournamentStore";
 import AdminGamesClient from "./AdminGamesClient";
 

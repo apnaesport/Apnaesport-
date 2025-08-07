@@ -1,7 +1,7 @@
 
 "use client";
 
-import { Loader2, Swords } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEffect, useState } from "react";
 import { Progress } from "@/components/ui/progress";
@@ -11,7 +11,7 @@ interface LoadingSpinnerProps {
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
   fullPage?: boolean;
-  text?: string; // This will be treated as the initial text
+  text?: string;
   showLogo?: boolean;
   showProgressBar?: boolean;
 }
@@ -44,11 +44,10 @@ export function LoadingSpinner({
   const [progress, setProgress] = useState(10);
 
   useEffect(() => {
-    setCurrentMessage(initialText); // Always set the initial message
+    setCurrentMessage(initialText);
 
     let progressInterval: NodeJS.Timeout | undefined;
     let messageInterval: NodeJS.Timeout | undefined;
-    let initialDisplayTimeout: NodeJS.Timeout | undefined;
 
     if (showProgressBar) {
       setProgress(10);
@@ -63,28 +62,37 @@ export function LoadingSpinner({
         });
       }, 800);
 
-      // Only cycle messages if not in fullPage mode, or if specifically desired later.
-      // For fullPage, stick to initialText unless showProgressBar is false.
-      if (!fullPage && showProgressBar) { 
-        initialDisplayTimeout = setTimeout(() => {
-          setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
-          messageInterval = setInterval(() => {
-            setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
-          }, 2000);
-        }, 750);
-      }
+      messageInterval = setInterval(() => {
+        setCurrentMessage(loadingMessages[Math.floor(Math.random() * loadingMessages.length)]);
+      }, 2000);
     }
 
     return () => {
       if (progressInterval) clearInterval(progressInterval);
       if (messageInterval) clearInterval(messageInterval);
-      if (initialDisplayTimeout) clearTimeout(initialDisplayTimeout);
     };
-  }, [initialText, showProgressBar, fullPage]);
+  }, [initialText, showProgressBar]);
 
   if (fullPage) {
-    // Returning null when fullPage is true to "remove" the full-page loading system as requested.
-    return null;
+    return (
+       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+        <div className={cn("flex flex-col items-center justify-center gap-6", className)}>
+          {showLogo ? (
+            <div className="animate-pulse">
+              <Logo size="lg" />
+            </div>
+          ) : (
+            <Loader2 className={cn("animate-spin text-primary", sizeMap[size])} />
+          )}
+          <p className="text-lg text-foreground text-center px-4">{currentMessage}</p>
+          {showProgressBar && (
+            <div className="w-1/2 max-w-md mt-2">
+              <Progress value={progress} className="h-2" />
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const spinnerContent = (
