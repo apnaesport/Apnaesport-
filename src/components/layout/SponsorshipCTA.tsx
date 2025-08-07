@@ -95,89 +95,90 @@ export function SponsorshipCTA() {
   const isFormDisabled = isSubmitting || !user;
 
   return (
-    <div className="bg-secondary/30 py-12 sm:py-16">
-      <div className="container mx-auto px-4 md:px-6 lg:px-8">
-        <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
-          <div className="space-y-4">
-            <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center">
-              <Handshake className="mr-3 h-10 w-10 text-primary" />
-              Partner With Us
-            </h2>
-            <p className="text-lg text-muted-foreground">
-              Amplify your brand's reach by partnering with Apna Esport. We offer unique sponsorship opportunities to connect with a passionate and engaged gaming community. Let's create something amazing together.
-            </p>
-          </div>
-          
-          <Card className="border-primary/20 shadow-xl">
-             <CardHeader>
-                <CardTitle>Sponsorship Inquiry</CardTitle>
-                <CardDescription>
-                  {user ? "Fill out the form below to get in touch." : "Please log in to send a sponsorship inquiry."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="brandName">Brand Name</Label>
-                      <Input id="brandName" {...form.register("brandName")} disabled={isFormDisabled} />
-                      {form.formState.errors.brandName && <p className="text-destructive text-xs mt-1">{form.formState.errors.brandName.message}</p>}
+    <div className="relative bg-secondary/30 py-12 sm:py-16 overflow-hidden">
+        <div className="absolute inset-0 -z-10 bg-gradient-to-br from-background via-secondary/50 to-background"></div>
+        <div className="container mx-auto px-4 md:px-6 lg:px-8">
+            <div className="grid md:grid-cols-2 gap-8 md:gap-12 items-center">
+            <div className="space-y-4">
+                <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground flex items-center">
+                <Handshake className="mr-3 h-10 w-10 text-primary" />
+                Partner With Us
+                </h2>
+                <p className="text-lg text-muted-foreground">
+                Amplify your brand's reach by partnering with Apna Esport. We offer unique sponsorship opportunities to connect with a passionate and engaged gaming community. Let's create something amazing together.
+                </p>
+            </div>
+            
+            <Card className="border-primary/20 shadow-xl bg-card/80 backdrop-blur-sm">
+                <CardHeader>
+                    <CardTitle>Sponsorship Inquiry</CardTitle>
+                    <CardDescription>
+                    {user ? "Fill out the form below to get in touch." : "Please log in to send a sponsorship inquiry."}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                        <Label htmlFor="brandName">Brand Name</Label>
+                        <Input id="brandName" {...form.register("brandName")} disabled={isFormDisabled} />
+                        {form.formState.errors.brandName && <p className="text-destructive text-xs mt-1">{form.formState.errors.brandName.message}</p>}
+                        </div>
+                        <div>
+                        <Label htmlFor="contactName">Your Name</Label>
+                        <Input id="contactName" {...form.register("contactName")} disabled={isFormDisabled} />
+                        {form.formState.errors.contactName && <p className="text-destructive text-xs mt-1">{form.formState.errors.contactName.message}</p>}
+                        </div>
                     </div>
                     <div>
-                      <Label htmlFor="contactName">Your Name</Label>
-                      <Input id="contactName" {...form.register("contactName")} disabled={isFormDisabled} />
-                      {form.formState.errors.contactName && <p className="text-destructive text-xs mt-1">{form.formState.errors.contactName.message}</p>}
+                        <Label htmlFor="email">Your Business Email</Label>
+                        <Input id="email" type="email" {...form.register("email")} disabled={isFormDisabled} />
+                        {form.formState.errors.email && <p className="text-destructive text-xs mt-1">{form.formState.errors.email.message}</p>}
                     </div>
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Your Business Email</Label>
-                    <Input id="email" type="email" {...form.register("email")} disabled={isFormDisabled} />
-                    {form.formState.errors.email && <p className="text-destructive text-xs mt-1">{form.formState.errors.email.message}</p>}
-                  </div>
-                  <div>
-                      <Label htmlFor="sponsorshipType">Sponsorship Type</Label>
-                      <Controller
-                          name="sponsorshipType"
-                          control={form.control}
-                          render={({ field }) => (
-                          <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isFormDisabled}>
-                              <SelectTrigger id="sponsorshipType">
-                                  <SelectValue placeholder="Select an option..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                  <SelectItem value="tournament">Tournament Sponsorship</SelectItem>
-                                  <SelectItem value="site-wide">Site-Wide Branding</SelectItem>
-                                  <SelectItem value="other">Other Inquiry</SelectItem>
-                              </SelectContent>
-                          </Select>
-                          )}
-                      />
-                      {form.formState.errors.sponsorshipType && <p className="text-destructive text-xs mt-1">{form.formState.errors.sponsorshipType.message}</p>}
+                    <div>
+                        <Label htmlFor="sponsorshipType">Sponsorship Type</Label>
+                        <Controller
+                            name="sponsorshipType"
+                            control={form.control}
+                            render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isFormDisabled}>
+                                <SelectTrigger id="sponsorshipType">
+                                    <SelectValue placeholder="Select an option..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="tournament">Tournament Sponsorship</SelectItem>
+                                    <SelectItem value="site-wide">Site-Wide Branding</SelectItem>
+                                    <SelectItem value="other">Other Inquiry</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            )}
+                        />
+                        {form.formState.errors.sponsorshipType && <p className="text-destructive text-xs mt-1">{form.formState.errors.sponsorshipType.message}</p>}
+                        </div>
+                    <div>
+                        <Label htmlFor="message">Message</Label>
+                        <Textarea id="message" {...form.register("message")} disabled={isFormDisabled} />
+                        {form.formState.errors.message && <p className="text-destructive text-xs mt-1">{form.formState.errors.message.message}</p>}
                     </div>
-                  <div>
-                    <Label htmlFor="message">Message</Label>
-                    <Textarea id="message" {...form.register("message")} disabled={isFormDisabled} />
-                    {form.formState.errors.message && <p className="text-destructive text-xs mt-1">{form.formState.errors.message.message}</p>}
-                  </div>
 
-                  {user ? (
-                      <Button type="submit" className="w-full" disabled={isFormDisabled}>
-                          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                          {isSubmitting ? "Sending Inquiry..." : "Send Inquiry"}
-                      </Button>
-                  ) : (
-                      <Button type="button" asChild className="w-full" disabled={authLoading}>
-                          <Link href="/auth/login?redirect=/dashboard">
-                              <LogIn className="mr-2 h-4 w-4"/>
-                              Login to Send Inquiry
-                          </Link>
-                      </Button>
-                  )}
-                </form>
-              </CardContent>
-          </Card>
+                    {user ? (
+                        <Button type="submit" className="w-full" disabled={isFormDisabled}>
+                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                            {isSubmitting ? "Sending Inquiry..." : "Send Inquiry"}
+                        </Button>
+                    ) : (
+                        <Button type="button" asChild className="w-full" disabled={authLoading}>
+                            <Link href="/auth/login?redirect=/dashboard">
+                                <LogIn className="mr-2 h-4 w-4"/>
+                                Login to Send Inquiry
+                            </Link>
+                        </Button>
+                    )}
+                    </form>
+                </CardContent>
+            </Card>
+            </div>
         </div>
-      </div>
     </div>
   );
 }
