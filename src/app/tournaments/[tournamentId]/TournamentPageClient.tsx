@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, DollarSign, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, DollarSign, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useMemo } from "react"; 
@@ -25,12 +25,35 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+const registrationSchema = z.object({
+  gameUsername: z.string().min(2, "In-game username is required."),
+  inGameId: z.string().min(2, "In-game ID is required."),
+  contactEmail: z.string().email("Please enter a valid email.").optional().or(z.literal('')),
+});
+
+type RegistrationFormData = z.infer<typeof registrationSchema>;
 
 
 interface TournamentPageClientProps {
@@ -44,7 +67,6 @@ const deserializeTournament = (serializedTournament: any): Tournament => {
   for (const key of Object.keys(newTournament)) {
     const value = newTournament[key];
     if (typeof value === 'string') {
-      // Very basic ISO date string check
       if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(value)) {
         newTournament[key] = new Date(value);
       }
@@ -77,6 +99,7 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   const [roomCode, setRoomCode] = useState(initialTournament.roomCode || "");
   const [roomPassword, setRoomPassword] = useState(initialTournament.roomPassword || "");
   const [showPassword, setShowPassword] = useState(false);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
   
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
 
@@ -88,6 +111,10 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
     return differenceInMinutes(startDate, new Date()) <= 15;
   }, [tournament.startDate]);
 
+  const registrationForm = useForm<RegistrationFormData>({
+    resolver: zodResolver(registrationSchema),
+    defaultValues: { gameUsername: "", inGameId: "", contactEmail: user?.email || "" }
+  });
 
   useEffect(() => {
     const startDate = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
@@ -122,12 +149,13 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   useEffect(() => {
     if(user) {
         setIsRegistered(tournament.participants.some(p => p.id === user.uid));
+        registrationForm.reset({ gameUsername: "", inGameId: "", contactEmail: user.email || "" });
     } else {
         setIsRegistered(false);
     }
-  }, [user, tournament.participants]); 
+  }, [user, tournament.participants, registrationForm]); 
 
-  const handleJoinTournament = async () => {
+  const handleJoinTournament: SubmitHandler<RegistrationFormData> = async (data) => {
     if (!user) {
       router.push(`/auth/login?redirect=/tournaments/${tournamentId}`);
       return;
@@ -162,7 +190,10 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
       const newParticipant: Participant = { 
         id: user.uid, 
         name: user.displayName || "Anonymous Player", 
-        avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`
+        avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`,
+        gameUsername: data.gameUsername,
+        inGameId: data.inGameId,
+        contactEmail: data.contactEmail || undefined,
       };
       
       const updatedParticipants = [...tournament.participants, newParticipant];
@@ -173,7 +204,9 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
         title: "Successfully Registered!",
         description: `You have joined ${tournament.name}.`,
       });
-      await fetchTournament(); 
+      await fetchTournament();
+      setIsRegistrationOpen(false); // Close dialog on success
+      registrationForm.reset();
     } catch (error: any) {
       console.error("Error joining tournament:", error);
       toast({ title: "Join Failed", description: error.message || "Could not join tournament.", variant: "destructive" });
@@ -227,6 +260,8 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
   const getStartDate = () => {
     return tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
   };
+
+  const canShowParticipantDetails = isAdmin || isTournamentCreator;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -346,6 +381,38 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
               </CardHeader>
               <CardContent>
               {tournament.participants.length > 0 ? (
+                canShowParticipantDetails ? (
+                   <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Player</TableHead>
+                          <TableHead>In-Game Name</TableHead>
+                          <TableHead>In-Game ID</TableHead>
+                          <TableHead>Contact Email</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {tournament.participants.map(p => (
+                          <TableRow key={p.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={p.avatarUrl || ''} />
+                                  <AvatarFallback>{p.name.substring(0,2)}</AvatarFallback>
+                                </Avatar>
+                                <span>{p.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{p.gameUsername}</TableCell>
+                            <TableCell>{p.inGameId}</TableCell>
+                            <TableCell>{p.contactEmail || 'Not provided'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
                   <ul className="space-y-2 max-h-96 overflow-y-auto">
                       {tournament.participants.map(p => (
                           <li key={p.id} className="flex items-center space-x-3 p-2 border rounded-md bg-secondary/30">
@@ -362,6 +429,7 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
                           </li>
                       ))}
                   </ul>
+                )
               ): (
                   <p className="text-muted-foreground">No participants registered yet, or participant list is private.</p>
               )}
@@ -430,6 +498,7 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
       </div>
 
       <div className="lg:col-span-1 space-y-6">
+        <Dialog open={isRegistrationOpen} onOpenChange={setIsRegistrationOpen}>
         <Card className="bg-gradient-to-br from-primary/80 to-accent/80 text-primary-foreground shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl sm:text-2xl">
@@ -452,18 +521,17 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
               {tournament.status === "Cancelled" && "This tournament has been cancelled."}
             </p>
             {(tournament.status === "Upcoming" || tournament.status === "Live") && (
-                <Button 
-                  size="lg" 
-                  className="w-full bg-background text-foreground hover:bg-background/90"
-                  onClick={handleJoinTournament}
-                  disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live") || isJoining}
-                >
-                  {isJoining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  {isJoining ? "Processing..." :
-                  isRegistered ? "You are Registered" : 
-                  (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
-                  tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
-                </Button>
+                <DialogTrigger asChild>
+                    <Button 
+                      size="lg" 
+                      className="w-full bg-background text-foreground hover:bg-background/90"
+                      disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
+                    >
+                      {isRegistered ? "You are Registered" : 
+                      (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
+                      tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
+                    </Button>
+                </DialogTrigger>
             )}
               {tournament.status === "Completed" && (
                 <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
@@ -475,6 +543,42 @@ export default function TournamentPageClient({ tournamentId, initialTournament, 
               )}
           </CardContent>
         </Card>
+        <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Register for {tournament.name}</DialogTitle>
+              <DialogDescription>Enter your in-game details to complete your registration.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
+              <div>
+                <Label htmlFor="gameUsername">In-Game Username *</Label>
+                <Input id="gameUsername" {...registrationForm.register("gameUsername")} disabled={isJoining}/>
+                 {registrationForm.formState.errors.gameUsername && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.gameUsername.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="inGameId">In-Game ID *</Label>
+                <Input id="inGameId" {...registrationForm.register("inGameId")} disabled={isJoining}/>
+                {registrationForm.formState.errors.inGameId && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.inGameId.message}</p>}
+              </div>
+               <div>
+                <Label htmlFor="contactEmail">Contact Email (Optional)</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="contactEmail" type="email" {...registrationForm.register("contactEmail")} className="pl-10" disabled={isJoining}/>
+                </div>
+                {registrationForm.formState.errors.contactEmail && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.contactEmail.message}</p>}
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={isJoining}>Cancel</Button>
+                </DialogClose>
+                <Button type="submit" disabled={isJoining}>
+                    {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isJoining ? "Submitting..." : "Confirm Registration"}
+                </Button>
+              </DialogFooter>
+            </form>
+        </DialogContent>
+        </Dialog>
 
         <Card>
           <CardHeader>

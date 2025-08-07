@@ -39,6 +39,9 @@ export type Participant = {
   id: string;
   name: string;
   avatarUrl?: string;
+  gameUsername: string;
+  inGameId: string;
+  contactEmail?: string;
 };
 
 export type Match = {
