@@ -313,21 +313,20 @@ export default function AdminGamesClient() {
                     height={40} 
                     className="rounded-md object-cover" 
                     data-ai-hint={game.dataAiHint || "game logo"}
-                    unoptimized={game.iconUrl.startsWith('data:image')}
                   />
                 </TableCell>
                 <TableCell className="font-medium">{game.name}</TableCell>
                 <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{game.dataAiHint}</TableCell>
                 <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap text-right">
                   <Button variant="outline" size="sm" onClick={() => handleEdit(game)} disabled={isSubmitting || isDeleting === game.id}>
-                    <Edit className="h-3 w-3 sm:mr-1 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline">Edit</span>
+                    <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                    <span className="sr-only sm:not-sr-only sm:ml-1">Edit</span>
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button variant="destructive" size="sm" disabled={isSubmitting || isDeleting === game.id}>
-                        {isDeleting === game.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:mr-1 sm:h-4 sm:w-4" />}
-                        <span className="hidden sm:inline">Delete</span>
+                        {isDeleting === game.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                        <span className="sr-only sm:not-sr-only sm:ml-1">Delete</span>
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>

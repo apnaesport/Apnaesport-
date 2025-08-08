@@ -6,25 +6,15 @@ import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import TournamentsPageClient from './TournamentsPageClient';
 import type { Tournament } from "@/lib/types";
 
-// Helper to convert Firestore Timestamps to ISO strings for serialization
+// Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeTournament = (tournament: Tournament): any => {
-  const newTournament = { ...tournament };
-  for (const key of Object.keys(newTournament)) {
-    const value = (newTournament as any)[key];
-    if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-      (newTournament as any)[key] = value.toDate().toISOString();
+  return JSON.parse(JSON.stringify(tournament, (key, value) => {
+    // Firestore Timestamps have a toDate method
+    if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+      return value.toDate().toISOString();
     }
-  }
-   if (newTournament.matches) {
-    newTournament.matches = newTournament.matches.map((match: any) => {
-      const newMatch = {...match};
-      if (newMatch.startTime && typeof newMatch.startTime === 'object' && 'toDate' in newMatch.startTime) {
-        (newMatch.startTime as any) = newMatch.startTime.toDate().toISOString();
-      }
-      return newMatch;
-    });
-  }
-  return newTournament;
+    return value;
+  }));
 }
 
 

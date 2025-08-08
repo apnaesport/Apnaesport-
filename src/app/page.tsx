@@ -1,18 +1,8 @@
 
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
 
+// This page is no longer directly used because of the redirect in next.config.js.
+// However, it's kept as a fallback during development or if the redirect is removed.
 export default function HomePage() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Directly redirect to the main content page, which is now public
-    router.replace("/dashboard");
-  }, [router]);
-
-  // Show a brief loading spinner during the redirection process
   return <LoadingSpinner fullPage showLogo showProgressBar text="Initializing Apna Esport..." />;
 }
