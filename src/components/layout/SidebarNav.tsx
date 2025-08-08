@@ -30,9 +30,9 @@ const mainNavItems = [
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
-  // { href: "/stats", label: "My Stats", icon: BarChart3 }, // Locked
+  { href: "/stats", label: "My Stats", icon: BarChart3 }, 
   { href: "/notifications", label: "Notifications", icon: Bell },
-  // { href: "/social", label: "Social", icon: Users }, // Locked
+  { href: "/social", label: "Social", icon: Users },
 ];
 
 const secondaryNavItems = [
