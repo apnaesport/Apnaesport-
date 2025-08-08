@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import {
@@ -30,7 +29,6 @@ const adminNavItems = [
   { href: "/admin/tournaments", label: "Tournaments", icon: Swords },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/games", label: "Games", icon: Gamepad2 },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChartBig },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/sponsorships", label: "Sponsorships", icon: Handshake },
   { href: "/admin/settings", label: "Site Settings", icon: Settings },
