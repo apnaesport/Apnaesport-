@@ -1,4 +1,6 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamentCard";
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
@@ -6,39 +8,60 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
 import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
-import { Heart } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useState, useEffect, useCallback } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// Helper to convert Firestore Timestamps to ISO strings for serialization
-const serializeTournament = (tournament: Tournament): Tournament => {
-  const newTournament: any = { ...tournament };
-  for (const key of Object.keys(newTournament)) {
-    const value = (newTournament as any)[key];
-    if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-      (newTournament as any)[key] = value.toDate().toISOString();
+export default function DashboardPage() {
+  const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
+  const [allGames, setAllGames] = useState<Game[]>([]);
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [tournaments, games, users, siteSettings] = await Promise.all([
+        getTournamentsFromFirestore(), 
+        getGamesFromFirestore(),
+        getAllUsersFromFirestore(),
+        getSiteSettingsFromFirestore(),
+      ]);
+      setAllTournaments(tournaments);
+      setAllGames(games);
+      setAllUsers(users);
+      setSettings(siteSettings);
+    } catch (error) {
+      console.error("Failed to fetch dashboard data", error);
+    } finally {
+      setIsLoading(false);
     }
-  }
-   if (newTournament.matches) {
-    newTournament.matches = newTournament.matches.map((match: any) => {
-      const newMatch = {...match};
-      if (newMatch.startTime && typeof newMatch.startTime === 'object' && 'toDate' in newMatch.startTime) {
-        (newMatch.startTime as any) = newMatch.startTime.toDate().toISOString();
-      }
-      return newMatch;
-    });
-  }
-  return newTournament as Tournament;
-}
+  }, []);
 
-export default async function DashboardPage() {
-  const [allTournaments, allGames, allUsers, settings] = await Promise.all([
-    getTournamentsFromFirestore(), 
-    getGamesFromFirestore(),
-    getAllUsersFromFirestore(),
-    getSiteSettingsFromFirestore(),
-  ]);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
+        <Skeleton className="h-96 w-full rounded-lg" />
+        <div className="space-y-4">
+            <Skeleton className="h-8 w-1/4" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <Skeleton className="h-64 w-full rounded-lg" />
+                <Skeleton className="h-64 w-full rounded-lg" />
+            </div>
+        </div>
+      </div>
+    );
+  }
 
   const upcomingOrLiveTournaments = allTournaments.filter(t => t.status === "Upcoming" || t.status === "Live" || t.status === "Ongoing");
   
@@ -53,8 +76,8 @@ export default async function DashboardPage() {
     featuredTournament = upcomingOrLiveTournaments[0];
   } else {
     const sortedByCreation = [...allTournaments].sort((a, b) => {
-        const dateA = a.createdAt ? (a.createdAt as any).toDate().getTime() : 0;
-        const dateB = b.createdAt ? (b.createdAt as any).toDate().getTime() : 0;
+        const dateA = a.createdAt ? (a.createdAt as any).toDate ? (a.createdAt as any).toDate().getTime() : 0 : 0;
+        const dateB = b.createdAt ? (b.createdAt as any).toDate ? (b.createdAt as any).toDate().getTime() : 0 : 0;
         return dateB - dateA;
     });
     featuredTournament = sortedByCreation[0];
@@ -82,7 +105,7 @@ export default async function DashboardPage() {
 
       {featuredTournament ? (
         <section>
-          <FeaturedTournamentCard tournament={serializeTournament(featuredTournament)} />
+          <FeaturedTournamentCard tournament={featuredTournament} />
         </section>
       ) : (
         <div className="bg-card p-8 rounded-lg shadow-md text-center">
@@ -98,7 +121,7 @@ export default async function DashboardPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recommendedTournaments.map((tournament) => (
-              <TournamentCard key={tournament.id} tournament={serializeTournament(tournament)} />
+              <TournamentCard key={tournament.id} tournament={tournament} />
             ))}
           </div>
         </section>
@@ -109,7 +132,7 @@ export default async function DashboardPage() {
         {liveTournaments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {liveTournaments.map((tournament) => (
-              <LiveTournamentCard key={tournament.id} tournament={serializeTournament(tournament)} />
+              <LiveTournamentCard key={tournament.id} tournament={tournament} />
             ))}
           </div>
         ) : (

@@ -1,12 +1,16 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { StatsCard } from "@/components/dashboard/StatsCard";
-import type { StatItem } from "@/lib/types";
+import type { StatItem, Game, Tournament, UserProfile } from "@/lib/types";
 import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { getGamesFromFirestore, getTournamentsFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
+import { useState, useEffect, useCallback } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const quickActions = [
     {label: "Create Tournament", href: "/tournaments/new", icon: PlusCircle},
@@ -15,13 +19,53 @@ const quickActions = [
     {label: "Send Notification", href: "/admin/notifications", icon: Bell},
 ];
 
-export default async function AdminDashboardPage() {
-  const [currentGames, currentTournaments, allUsers, settings] = await Promise.all([
-    getGamesFromFirestore(),
-    getTournamentsFromFirestore(),
-    getAllUsersFromFirestore(),
-    getSiteSettingsFromFirestore()
-  ]);
+export default function AdminDashboardPage() {
+  const [currentGames, setCurrentGames] = useState<Game[]>([]);
+  const [currentTournaments, setCurrentTournaments] = useState<Tournament[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [settings, setSettings] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [games, tournaments, users, siteSettings] = await Promise.all([
+        getGamesFromFirestore(),
+        getTournamentsFromFirestore(),
+        getAllUsersFromFirestore(),
+        getSiteSettingsFromFirestore()
+      ]);
+      setCurrentGames(games);
+      setCurrentTournaments(tournaments);
+      setAllUsers(users);
+      setSettings(siteSettings);
+    } catch (error) {
+        console.error("Failed to fetch admin dashboard data", error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-8">
+        <PageTitle title="Admin Dashboard" subtitle="Oversee and manage Apna Esport." />
+        <section>
+          <Skeleton className="h-8 w-1/4 mb-4" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-32 w-full" />
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   const activeTournaments = currentTournaments.filter(t => t.status === "Live" || t.status === "Ongoing" || t.status === "Upcoming").length;
   
