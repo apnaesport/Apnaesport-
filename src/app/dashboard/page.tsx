@@ -127,7 +127,7 @@ export default async function DashboardPage() {
       </section>
 
       <section>
-        <GamesListHorizontal games={allGames} />
+        <GamesListHorizontal games={allGames.map(g => ({...g, createdAt: (g.createdAt as any)?.toDate ? (g.createdAt as any).toDate().toISOString() : undefined, updatedAt: (g.updatedAt as any)?.toDate ? (g.updatedAt as any).toDate().toISOString() : undefined }))} />
       </section>
 
     </div>
