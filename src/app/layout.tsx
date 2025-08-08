@@ -12,25 +12,21 @@ const inter = Inter({
 });
 
 // Statically generate metadata if possible, but the app is dynamic
-// export async function generateMetadata(): Promise<Metadata> {
-//   const settings = await getSiteSettingsFromFirestore();
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettingsFromFirestore();
 
-//   return {
-//     title: settings?.siteName || "Apna Esport - Your Ultimate Gaming Platform",
-//     description: settings?.siteDescription || "Organize and participate in online gaming tournaments on Apna Esport.",
-//     icons: {
-//       icon: settings?.faviconUrl || "/favicon.ico", // Default fallback
-//     },
-//   };
-// }
-
-export const metadata: Metadata = {
-    title: "Apna Esport - Your Ultimate Gaming Platform",
-    description: "Organize and participate in online gaming tournaments on Apna Esport.",
-    icons: {
-      icon: "/favicon.ico",
+  return {
+    title: {
+      template: `%s | ${settings?.siteName || 'Apna Esport'}`,
+      default: settings?.siteName || "Apna Esport - Your Ultimate Gaming Platform",
     },
-};
+    description: settings?.siteDescription || "Organize and participate in online gaming tournaments on Apna Esport.",
+    icons: {
+      icon: settings?.faviconUrl || "/favicon.ico", // Default fallback
+    },
+  };
+}
+
 
 // This forces all pages to be dynamically rendered.
 // It's a broad-stroke solution to prevent prerendering errors on Vercel
