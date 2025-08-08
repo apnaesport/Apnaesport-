@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { SponsorshipRequest, SponsorshipRequestStatus } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,10 +13,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { updateSponsorshipRequestStatusInFirestore, getSponsorshipRequestsFromFirestore } from "@/lib/tournamentStore";
 import { cn } from "@/lib/utils";
-
-interface AdminSponsorshipsClientProps {
-  initialRequests: SponsorshipRequest[];
-}
+import { Skeleton } from "@/components/ui/skeleton";
 
 const statusColors: Record<SponsorshipRequestStatus, string> = {
     New: "bg-blue-500/20 text-blue-500 border-blue-500/30",
@@ -26,12 +23,14 @@ const statusColors: Record<SponsorshipRequestStatus, string> = {
 };
 
 
-export default function AdminSponsorshipsClient({ initialRequests }: AdminSponsorshipsClientProps) {
-  const [requests, setRequests] = useState<SponsorshipRequest[]>(initialRequests);
+export default function AdminSponsorshipsClient() {
+  const [requests, setRequests] = useState<SponsorshipRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchRequests = useCallback(async () => {
+    setIsLoading(true);
     try {
       const fetchedRequests = await getSponsorshipRequestsFromFirestore();
       setRequests(fetchedRequests.map(req => ({
@@ -41,8 +40,14 @@ export default function AdminSponsorshipsClient({ initialRequests }: AdminSponso
     } catch (error) {
       console.error("Error fetching sponsorship requests:", error);
       toast({ title: "Error", description: "Could not refresh requests.", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
     }
   }, [toast]);
+
+  useEffect(() => {
+    fetchRequests();
+  }, [fetchRequests]);
 
   const handleStatusChange = async (requestId: string, status: SponsorshipRequestStatus) => {
     setIsUpdating(requestId);
@@ -78,7 +83,18 @@ export default function AdminSponsorshipsClient({ initialRequests }: AdminSponso
                 </TableRow>
                 </TableHeader>
                 <TableBody>
-                {requests.length > 0 ? requests.map((request) => (
+                {isLoading ? (
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`skeleton-req-${i}`}>
+                        <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-32" /></TableCell>
+                        <TableCell className="hidden lg:table-cell"><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                        <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-20" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                    </TableRow>
+                  ))
+                ) : requests.length > 0 ? requests.map((request) => (
                     <TableRow key={request.id}>
                     <TableCell className="font-medium">{request.brandName}</TableCell>
                     <TableCell className="hidden md:table-cell">

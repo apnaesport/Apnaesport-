@@ -42,6 +42,7 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { getGamesFromFirestore, addGameToFirestore, updateGameInFirestore, deleteGameFromFirestore } from "@/lib/tournamentStore";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const gameSchema = z.object({
   id: z.string().optional(),
@@ -54,12 +55,9 @@ const gameSchema = z.object({
 });
 type GameFormData = z.infer<typeof gameSchema>;
 
-interface AdminGamesClientProps {
-  initialGames: Game[];
-}
-
-export default function AdminGamesClient({ initialGames }: AdminGamesClientProps) {
-  const [games, setGames] = useState<Game[]>(initialGames);
+export default function AdminGamesClient() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const { toast } = useToast();
@@ -69,6 +67,7 @@ export default function AdminGamesClient({ initialGames }: AdminGamesClientProps
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const fetchGames = useCallback(async () => {
+    setIsLoading(true);
     try {
       const fetchedGames = await getGamesFromFirestore();
       setGames(fetchedGames);
@@ -76,7 +75,12 @@ export default function AdminGamesClient({ initialGames }: AdminGamesClientProps
       console.error("Error fetching games:", error);
       toast({ title: "Error", description: "Could not refresh games list.", variant: "destructive" });
     }
+    setIsLoading(false);
   }, [toast]);
+
+  useEffect(() => {
+    fetchGames();
+  }, [fetchGames]);
 
   const form = useForm<GameFormData>({
     resolver: zodResolver(gameSchema),
@@ -289,7 +293,16 @@ export default function AdminGamesClient({ initialGames }: AdminGamesClientProps
             </TableRow>
           </TableHeader>
           <TableBody>
-            {games.length > 0 ? games.map((game) => (
+            {isLoading ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <TableRow key={`skeleton-game-${i}`}>
+                  <TableCell><Skeleton className="h-10 w-10 rounded-md" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-32" /></TableCell>
+                  <TableCell className="hidden sm:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                </TableRow>
+              ))
+            ) : games.length > 0 ? games.map((game) => (
               <TableRow key={game.id}>
                 <TableCell>
                   <ImageWithFallback 

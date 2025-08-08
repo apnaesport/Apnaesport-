@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import type { Timestamp } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Helper function to convert Timestamp to a readable string or return a fallback
 const formatDateFromTimestamp = (timestamp: any) => {
@@ -40,6 +41,7 @@ const formatDateFromTimestamp = (timestamp: any) => {
     }
     // Fallback for serialized dates or other formats
     try {
+        if (!timestamp) return 'N/A';
         return new Date(timestamp).toLocaleDateString();
     } catch (e) {
         return 'N/A';
@@ -52,17 +54,16 @@ const getInitials = (name: string | null | undefined) => {
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
 };
 
-interface AdminUsersClientProps {
-  initialUsers: UserProfile[];
-}
 
-export default function AdminUsersClient({ initialUsers }: AdminUsersClientProps) {
-  const [users, setUsers] = useState<UserProfile[]>(initialUsers);
+export default function AdminUsersClient() {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user: currentUser } = useAuth(); 
   const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
     try {
       const fetchedUsers = await getAllUsersFromFirestore();
       setUsers(fetchedUsers);
@@ -70,7 +71,12 @@ export default function AdminUsersClient({ initialUsers }: AdminUsersClientProps
       console.error("Error fetching users:", error);
       toast({ title: "Error", description: "Could not refresh users list.", variant: "destructive" });
     }
+    setIsLoading(false);
   }, [toast]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
 
   const handleToggleAdmin = async (userIdToUpdate: string, currentIsAdmin: boolean | undefined, displayName: string | null) => {
@@ -115,7 +121,22 @@ export default function AdminUsersClient({ initialUsers }: AdminUsersClientProps
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.length > 0 ? users.map((user) => (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={`skeleton-user-${i}`}>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <Skeleton className="h-5 w-24" />
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
+                <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-9 w-28" /></TableCell>
+              </TableRow>
+            ))
+          ) : users.length > 0 ? users.map((user) => (
             <TableRow key={user.uid}>
               <TableCell>
                 <div className="flex items-center gap-3">

@@ -19,18 +19,17 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { getTournamentsFromFirestore, deleteTournamentFromFirestore, updateTournamentInFirestore } from "@/lib/tournamentStore";
+import { Skeleton } from "@/components/ui/skeleton";
 
-interface AdminTournamentsClientProps {
-  initialTournaments: Tournament[];
-}
-
-export default function AdminTournamentsClient({ initialTournaments }: AdminTournamentsClientProps) {
-  const [tournaments, setTournaments] = useState<Tournament[]>(initialTournaments);
+export default function AdminTournamentsClient() {
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isTogglingFeature, setIsTogglingFeature] = useState<string | null>(null);
 
   const fetchTournaments = useCallback(async () => {
+    setIsLoading(true);
     try {
       const tournamentsFromDb = await getTournamentsFromFirestore();
       setTournaments(tournamentsFromDb);
@@ -38,7 +37,12 @@ export default function AdminTournamentsClient({ initialTournaments }: AdminTour
       console.error("Error fetching tournaments:", error);
       toast({ title: "Error", description: "Could not refresh tournaments.", variant: "destructive" });
     }
+    setIsLoading(false);
   }, [toast]);
+
+  useEffect(() => {
+    fetchTournaments();
+  }, [fetchTournaments]);
 
   const handleDeleteTournament = async (tournamentId: string, tournamentName: string) => {
     if (confirm(`Are you sure you want to delete the tournament: "${tournamentName}"? This action cannot be undone.`)) {
@@ -86,7 +90,19 @@ export default function AdminTournamentsClient({ initialTournaments }: AdminTour
           </TableRow>
         </TableHeader>
         <TableBody>
-          {tournaments.length > 0 ? tournaments.map((tournament) => (
+          {isLoading ? (
+            Array.from({ length: 5 }).map((_, i) => (
+              <TableRow key={`skeleton-tourney-${i}`}>
+                <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                <TableCell className="text-center"><Skeleton className="h-8 w-8 mx-auto" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+              </TableRow>
+            ))
+          ) : tournaments.length > 0 ? tournaments.map((tournament) => (
             <TableRow key={tournament.id}>
               <TableCell className="font-medium">{tournament.name}</TableCell>
               <TableCell>{tournament.gameName}</TableCell>

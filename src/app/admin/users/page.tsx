@@ -3,28 +3,9 @@ import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react"; 
 import Link from "next/link";
-import { getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import AdminUsersClient from "./AdminUsersClient";
-import type { UserProfile } from "@/lib/types";
 
-
-// Helper to convert Firestore Timestamps to serializable format
-const serializeUsers = (users: UserProfile[]): any[] => {
-  return users.map(user => {
-    const newUser = { ...user };
-    if (newUser.createdAt && typeof (newUser.createdAt as any).toDate === 'function') {
-      (newUser.createdAt as any) = (newUser.createdAt as any).toDate().toISOString();
-    }
-    return newUser;
-  });
-};
-
-
-export default async function AdminUsersPage() {
-  const rawUsers = await getAllUsersFromFirestore();
-  const users = serializeUsers(rawUsers);
-
-
+export default function AdminUsersPage() {
   return (
     <div className="space-y-8">
       <PageTitle
@@ -38,7 +19,7 @@ export default async function AdminUsersPage() {
           </Button>
         }
       />
-      <AdminUsersClient initialUsers={users} />
+      <AdminUsersClient />
     </div>
   );
 }

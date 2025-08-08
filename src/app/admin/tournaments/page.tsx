@@ -3,11 +3,9 @@ import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import AdminTournamentsClient from "./AdminTournamentsClient";
 
-export default async function AdminTournamentsPage() {
-  const tournaments = await getTournamentsFromFirestore();
+export default function AdminTournamentsPage() {
 
   return (
     <div className="space-y-8">
@@ -22,7 +20,7 @@ export default async function AdminTournamentsPage() {
           </Button>
         }
       />
-      <AdminTournamentsClient initialTournaments={tournaments} />
+      <AdminTournamentsClient />
     </div>
   );
 }

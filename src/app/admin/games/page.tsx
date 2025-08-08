@@ -1,10 +1,8 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
-import { getGamesFromFirestore } from "@/lib/tournamentStore";
 import AdminGamesClient from "./AdminGamesClient";
 
-export default async function AdminGamesPage() {
-  const games = await getGamesFromFirestore();
+export default function AdminGamesPage() {
 
   return (
     <div className="space-y-8">
@@ -12,7 +10,7 @@ export default async function AdminGamesPage() {
         title="Manage Games"
         subtitle="Add, edit, or remove games supported on the platform."
       />
-      <AdminGamesClient initialGames={games} />
+      <AdminGamesClient />
     </div>
   );
 }

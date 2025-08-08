@@ -12,10 +12,11 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { NotificationMessage, NotificationFormData, NotificationType } from "@/lib/types";
 import { sendNotificationToFirestore, getNotificationsFromFirestore } from "@/lib/tournamentStore";
 import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const notificationSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100, "Title too long."),
@@ -35,14 +36,11 @@ const NotificationIcon = ({ type }: { type: NotificationType }) => {
   }
 };
 
-interface AdminNotificationsClientProps {
-    initialNotifications: NotificationMessage[];
-}
-
-export default function AdminNotificationsClient({ initialNotifications }: AdminNotificationsClientProps) {
+export default function AdminNotificationsClient() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sentNotifications, setSentNotifications] = useState<NotificationMessage[]>(initialNotifications);
+  const [sentNotifications, setSentNotifications] = useState<NotificationMessage[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -55,6 +53,7 @@ export default function AdminNotificationsClient({ initialNotifications }: Admin
   });
 
   const fetchNotificationHistory = useCallback(async () => {
+    setIsLoadingHistory(true);
     try {
       const history = await getNotificationsFromFirestore();
       setSentNotifications(history);
@@ -62,7 +61,12 @@ export default function AdminNotificationsClient({ initialNotifications }: Admin
       console.error("Error fetching notification history:", error);
       toast({ title: "Error", description: "Could not load notification history.", variant: "destructive" });
     }
+    setIsLoadingHistory(false);
   }, [toast]);
+
+  useEffect(() => {
+    fetchNotificationHistory();
+  }, [fetchNotificationHistory]);
 
   const onSubmit: SubmitHandler<NotificationFormData> = async (data) => {
     setIsSubmitting(true);
@@ -164,7 +168,22 @@ export default function AdminNotificationsClient({ initialNotifications }: Admin
           <CardDescription>View previously sent notifications.</CardDescription>
         </CardHeader>
         <CardContent>
-          {sentNotifications.length > 0 ? (
+          {isLoadingHistory ? (
+            <div className="space-y-3 mt-4">
+              {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="p-4 border rounded-md bg-card shadow-sm">
+                      <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-2">
+                            <Skeleton className="h-4 w-4 rounded-full" />
+                            <Skeleton className="h-5 w-32" />
+                          </div>
+                          <Skeleton className="h-4 w-24" />
+                      </div>
+                      <Skeleton className="h-4 w-4/5 mt-2 ml-6" />
+                  </div>
+              ))}
+            </div>
+          ) : sentNotifications.length > 0 ? (
             <ul className="mt-4 space-y-3 max-h-96 overflow-y-auto">
               {sentNotifications.map(notif => (
                 <li key={notif.id} className="p-4 border rounded-md bg-card shadow-sm">
