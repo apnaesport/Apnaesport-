@@ -35,14 +35,14 @@ export function MainLayout({ children }: MainLayoutProps) {
       </Sidebar>
       <SidebarInset>
         <Header />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
           {children}
         </main>
         <footer className="bg-secondary/20 border-t">
             <div className="container mx-auto py-12 px-4 md:px-6 lg:px-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left">
                 {/* Branding Column */}
-                <div className="space-y-4 lg:col-span-1">
+                <div className="space-y-4 lg:col-span-1 flex flex-col items-center md:items-start">
                   <Logo size="lg"/>
                   <p className="text-muted-foreground text-sm max-w-xs">
                     The ultimate destination for competitive gaming. Join tournaments, climb the leaderboard, and become a champion.
@@ -50,7 +50,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
 
                 {/* Links Columns */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:col-span-3 gap-8">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:col-span-3 gap-8">
                     <div>
                         <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
                         <ul className="space-y-2 text-sm">
@@ -71,7 +71,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <div className="space-y-6">
                       <div>
                         <h4 className="font-semibold text-foreground mb-4">Connect With Us</h4>
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-3 justify-center md:justify-start">
                           <Button variant="outline" size="icon" asChild>
                               <a href="https://m.youtube.com/@apnaesport" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
                                   <Youtube className="h-5 w-5 text-red-600"/>
