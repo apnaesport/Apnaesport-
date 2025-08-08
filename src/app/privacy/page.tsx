@@ -1,10 +1,11 @@
 
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Privacy Policy",
+  title: "Privacy Policy - Apna Esport",
   description: "Read the Privacy Policy for Apna Esport. We are committed to protecting your data and privacy while you enjoy our gaming platform.",
 };
 

@@ -1,4 +1,5 @@
 
+
 import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import type { Game, Tournament } from "@/lib/types";
@@ -12,6 +13,9 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 interface GameTournamentsPageProps {
   params: { gameId: string };
 }
+
+// This forces the page to be dynamically rendered, ensuring metadata is fresh
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: GameTournamentsPageProps, parent: ResolvingMetadata): Promise<Metadata> {
   const { gameId } = params;

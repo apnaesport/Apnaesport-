@@ -17,38 +17,42 @@ interface TournamentPageProps {
   params: { tournamentId: string };
 }
 
-// export async function generateMetadata({ params }: TournamentPageProps, parent: ResolvingMetadata): Promise<Metadata> {
-//   const { tournamentId } = params;
-//   const tournament = await getTournamentByIdFromFirestore(tournamentId);
-//   const previousImages = (await parent).openGraph?.images || [];
+// This forces the page to be dynamically rendered, ensuring metadata is fresh
+export const dynamic = 'force-dynamic';
 
-//   if (!tournament) {
-//     return {
-//       title: "Tournament Not Found",
-//       description: "The tournament you are looking for does not exist on Apna Esport.",
-//     };
-//   }
+export async function generateMetadata({ params }: TournamentPageProps, parent: ResolvingMetadata): Promise<Metadata> {
+  const { tournamentId } = params;
+  const tournament = await getTournamentByIdFromFirestore(tournamentId);
+  const previousImages = (await parent).openGraph?.images || [];
 
-//   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
-//   const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${format(tournament.startDate as Date, "PPP")}. ${tournament.prizePool ? `Prize Pool: ${tournament.prizePool}.` : ''} Sign up now!`;
+  if (!tournament) {
+    return {
+      title: "Tournament Not Found",
+      description: "The tournament you are looking for does not exist on Apna Esport.",
+    };
+  }
 
-//   return {
-//     title,
-//     description,
-//     openGraph: {
-//       title: title,
-//       description: tournament.description,
-//       images: [tournament.bannerImageUrl, ...previousImages],
-//       type: 'website',
-//     },
-//     twitter: {
-//         card: 'summary_large_image',
-//         title: title,
-//         description: description,
-//         images: [tournament.bannerImageUrl],
-//     }
-//   };
-// }
+  const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+  const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${format(startDate, "PPP")}. ${tournament.prizePool ? `Prize Pool: ${tournament.prizePool}.` : ''} Sign up now!`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title: title,
+      description: tournament.description,
+      images: [tournament.bannerImageUrl, ...previousImages],
+      type: 'website',
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: title,
+        description: description,
+        images: [tournament.bannerImageUrl],
+    }
+  };
+}
 
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;

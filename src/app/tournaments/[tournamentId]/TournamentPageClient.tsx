@@ -1,4 +1,5 @@
 
+
 "use client"; 
 
 import type { Tournament, Participant } from "@/lib/types";
@@ -88,7 +89,10 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
       const fetchedTournament = await getTournamentByIdFromFirestore(tournamentId);
       if (fetchedTournament) {
         setTournament(fetchedTournament);
-        setFormattedStartDate(format((fetchedTournament.startDate as Date), "PPPPp"));
+        if (fetchedTournament.startDate) {
+           const startDate = fetchedTournament.startDate instanceof Date ? fetchedTournament.startDate : (fetchedTournament.startDate as any).toDate();
+           setFormattedStartDate(format(startDate, "PPPPp"));
+        }
         setRoomCode(fetchedTournament.roomCode || "");
         setRoomPassword(fetchedTournament.roomPassword || "");
         if (user) {
@@ -114,7 +118,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   
   const canManageRoom = useMemo(() => {
     if (!tournament?.startDate) return false;
-    const startDate = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
     return differenceInMinutes(startDate, new Date()) <= 15;
   }, [tournament]);
 
@@ -125,7 +129,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
   useEffect(() => {
     if (tournament?.startDate) {
-        const startDate = tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
+        const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
         const calculateTime = () => {
             setTimeUntilStart(differenceInMinutes(startDate, new Date()));
         };
@@ -281,7 +285,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const isPremium = tournament.entryFee && tournament.entryFee > 0;
 
   const getStartDate = () => {
-    return tournament.startDate instanceof Date ? tournament.startDate : new Date(tournament.startDate as any);
+    return tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
   };
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;

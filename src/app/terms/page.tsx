@@ -1,11 +1,12 @@
 
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions",
+  title: "Terms & Conditions - Apna Esport",
   description: "Read the Terms and Conditions for using Apna Esport. Your use of our platform constitutes your agreement to these terms.",
 };
 

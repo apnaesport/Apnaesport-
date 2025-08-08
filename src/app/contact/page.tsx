@@ -1,11 +1,12 @@
 
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { ContactForm } from "@/components/contact/ContactForm";
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: "Contact Us",
-  description: "Get in touch with the Apna Esport team. Send us your questions, suggestions, or collaboration inquiries through our contact form.",
+  title: "Contact Us - Apna Esport",
+  description: "Get in touch with the Apna Esport team. Send us your questions, suggestions, or collaboration inquiries through our official contact form.",
 };
 
 
