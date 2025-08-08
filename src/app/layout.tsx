@@ -5,6 +5,7 @@ import "./globals.css";
 import { AppProviders } from "@/components/layout/AppProviders";
 import { cn } from "@/lib/utils";
 import { getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -47,6 +48,7 @@ export default function RootLayout({
         )}
       >
         <AppProviders>{children}</AppProviders>
+        <Analytics />
       </body>
     </html>
   );
