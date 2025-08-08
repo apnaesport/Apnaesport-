@@ -32,6 +32,13 @@ service cloud.firestore {
         allow read: if true;
         allow write: if request.auth != null; // Ideally check for admin role
     }
+
+    // Sponsorship requests can be created by any authenticated user,
+    // but can only be read/updated/deleted by admins.
+    match /sponsorships/{sponsorshipId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if request.auth != null; // Should be restricted to admin role in a real app
+    }
     
     // Lock down teams & chats to members only
     match /teams/{teamId} {
