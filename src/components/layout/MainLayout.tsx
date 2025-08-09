@@ -47,6 +47,11 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <p className="text-muted-foreground text-sm max-w-xs">
                     The ultimate destination for competitive gaming. Join tournaments, climb the leaderboard, and become a champion.
                   </p>
+                  <div className="space-y-3 pt-4 w-full max-w-xs">
+                     <h4 className="font-semibold text-foreground text-center md:text-left">Promote Your Brand</h4>
+                     <p className="text-sm text-muted-foreground">Get your brand in front of passionate gamers. Partner with us for tournaments and site-wide visibility.</p>
+                     <SponsorshipCTA />
+                  </div>
                 </div>
 
                 {/* Links Columns */}
@@ -88,10 +93,6 @@ export function MainLayout({ children }: MainLayoutProps) {
                               </a>
                           </Button>
                         </div>
-                      </div>
-                       <div className="space-y-2 p-4 rounded-lg bg-primary/10 border border-primary/20">
-                        <h4 className="font-semibold text-foreground">Promote Your Brand</h4>
-                        <SponsorshipCTA />
                       </div>
                     </div>
                 </div>
