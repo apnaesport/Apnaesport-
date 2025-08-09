@@ -89,7 +89,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                           </Button>
                         </div>
                       </div>
-                      <div className="space-y-2">
+                       <div className="space-y-2 p-4 rounded-lg bg-primary/10 border border-primary/20">
                         <h4 className="font-semibold text-foreground">Promote Your Brand</h4>
                         <SponsorshipCTA />
                       </div>

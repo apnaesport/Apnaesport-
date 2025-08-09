@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import Link from "next/link";
-import { LogIn, Users, UserPlus, UserMinus, Search, Shield, Loader2, Users2, Trash2, LogOutIcon, UserPlus2, UserCheck, UserX, Send, Ban, CheckCircle, XCircle, MessageCircle, X, MessageSquare } from "lucide-react";
+import { LogIn, Users, UserPlus, UserMinus, Search, Shield, Loader2, Users2, Trash2, LogOutIcon, UserPlus2, UserCheck, UserX, Send, Ban, CheckCircle, XCircle, MessageCircle, X, MessageSquare, KeyRound } from "lucide-react";
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { UserProfile, Team, TeamFormData, ChatMessage } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +71,11 @@ interface ActiveChatContext {
 export default function SocialPage() {
   const { user, loading: authLoading, refreshUser } = useAuth();
   const { toast } = useToast();
+  
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
   const [playerSearchTerm, setPlayerSearchTerm] = useState("");
   const [playerSearchResults, setPlayerSearchResults] = useState<UserProfile[]>([]);
@@ -118,6 +123,22 @@ export default function SocialPage() {
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
+  };
+
+  const handlePasswordSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setIsAuthenticating(true);
+    setTimeout(() => {
+        if (passwordInput === '161161') {
+            setIsAuthenticated(true);
+            toast({ title: 'Access Granted', description: 'Welcome to the Social Hub!' });
+        } else {
+            toast({ title: 'Access Denied', description: 'Incorrect password.', variant: 'destructive' });
+            setPasswordInput('');
+            passwordRef.current?.focus();
+        }
+        setIsAuthenticating(false);
+    }, 500);
   };
 
   const fetchSocialData = useCallback(async () => {
@@ -184,11 +205,11 @@ export default function SocialPage() {
 
 
   useEffect(() => {
-    if (user) {
+    if (user && isAuthenticated) {
       fetchSocialData();
       fetchUserTeam();
     }
-  }, [user, fetchSocialData, fetchUserTeam]);
+  }, [user, isAuthenticated, fetchSocialData, fetchUserTeam]);
 
   useEffect(() => {
     if (!user || friends.length === 0) {
@@ -509,7 +530,6 @@ export default function SocialPage() {
     });
   };
 
-
   if (authLoading) {
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
@@ -530,6 +550,36 @@ export default function SocialPage() {
           </Button>
         </div>
     );
+  }
+  
+  if (!isAuthenticated) {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
+          <PageTitle title="Social Hub Access" subtitle="Please enter the password to continue." />
+          <Card className="w-full max-w-sm mt-6">
+            <CardHeader>
+                <CardTitle className="flex items-center justify-center"><KeyRound className="mr-2 h-5 w-5 text-primary"/>Enter Password</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                    <Input
+                        ref={passwordRef}
+                        type="password"
+                        placeholder="••••••"
+                        value={passwordInput}
+                        onChange={(e) => setPasswordInput(e.target.value)}
+                        disabled={isAuthenticating}
+                        autoFocus
+                    />
+                    <Button type="submit" className="w-full" disabled={isAuthenticating}>
+                        {isAuthenticating && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Unlock
+                    </Button>
+                </form>
+            </CardContent>
+          </Card>
+        </div>
+    )
   }
 
   return (

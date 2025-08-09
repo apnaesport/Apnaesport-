@@ -33,8 +33,10 @@ export function SponsorshipForm() {
 
     const requestData: Omit<SponsorshipRequest, 'id' | 'createdAt' | 'status'> = {
         brandName: data.brandName as string,
-        contactName: user.displayName || 'N/A',
-        email: user.email || 'N/A',
+        contactName: data.contactName as string,
+        email: user.email || 'N/A', // Primary email from auth
+        additionalEmail: data.additionalEmail as string | undefined,
+        phone: data.phone as string | undefined,
         sponsorshipType: data.sponsorshipType as any,
         message: data.message as string,
     };
@@ -79,17 +81,22 @@ export function SponsorshipForm() {
         <Label htmlFor="brandName">Brand / Company Name *</Label>
         <Input id="brandName" name="brandName" required disabled={isSubmitting} />
       </div>
-
-       <div>
-        <Label>Your Name</Label>
-        <Input value={user.displayName || ""} disabled />
+      <div>
+        <Label htmlFor="contactName">Your Name *</Label>
+        <Input id="contactName" name="contactName" defaultValue={user.displayName || ""} required disabled={isSubmitting} />
       </div>
-
-       <div>
-        <Label>Your Email</Label>
-        <Input value={user.email || ""} disabled />
+      <div>
+        <Label htmlFor="email">Primary Email</Label>
+        <Input id="email" name="email" value={user.email || ""} disabled />
       </div>
-      
+      <div>
+        <Label htmlFor="additionalEmail">Additional Email (Optional)</Label>
+        <Input id="additionalEmail" name="additionalEmail" type="email" disabled={isSubmitting} />
+      </div>
+      <div>
+        <Label htmlFor="phone">Phone Number (Optional)</Label>
+        <Input id="phone" name="phone" type="tel" disabled={isSubmitting} />
+      </div>
       <div>
         <Label htmlFor="sponsorshipType">Type of Sponsorship *</Label>
         <Select name="sponsorshipType" required disabled={isSubmitting}>
@@ -103,12 +110,10 @@ export function SponsorshipForm() {
           </SelectContent>
         </Select>
       </div>
-
       <div>
         <Label htmlFor="message">Message *</Label>
         <Textarea id="message" name="message" required disabled={isSubmitting} placeholder="Tell us about your brand and what you're looking for..."/>
       </div>
-      
       <div className="flex justify-end">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}

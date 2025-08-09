@@ -174,6 +174,8 @@ export interface SponsorshipRequest {
     brandName: string;
     contactName: string;
     email: string;
+    additionalEmail?: string;
+    phone?: string;
     sponsorshipType: 'tournament' | 'site-wide' | 'other';
     message: string;
     status: SponsorshipRequestStatus;
