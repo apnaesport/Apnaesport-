@@ -7,24 +7,26 @@ import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamen
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
-import type { Tournament, Game, StatItem, LucideIconName, SiteSettings } from "@/lib/types";
-import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
+import type { Tournament, Game, StatItem, LucideIconName, SiteSettings, UserProfile } from "@/lib/types";
+import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import { Heart, Loader2, Megaphone } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const { settings, loadingSettings } = useSiteSettings();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const adContainerRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +56,6 @@ export default function DashboardPage() {
     if (loadingSettings || !settings || !adContainerRef.current) return;
     
     if (settings.promotionDisplayMode === 'ad' && settings.promotionBoardAdKey) {
-        // Clear previous ad
         adContainerRef.current.innerHTML = '';
 
         const adKey = settings.promotionBoardAdKey;
@@ -84,6 +85,19 @@ export default function DashboardPage() {
         adContainerRef.current.appendChild(adsterraScript);
     }
   }, [settings, loadingSettings]);
+
+  const currentUserRanking = useMemo(() => {
+    if (!user || allUsers.length === 0) {
+      return { rank: 'N/A', points: 0 };
+    }
+    const sortedUsers = [...allUsers].sort((a, b) => (b.points || 0) - (a.points || 0));
+    const userIndex = sortedUsers.findIndex(p => p.uid === user.uid);
+    if (userIndex !== -1) {
+      return { rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 };
+    }
+    return { rank: 'N/A', points: user.points || 0 };
+  }, [user, allUsers]);
+
 
   if (isLoading || loadingSettings) {
     return (
@@ -133,7 +147,7 @@ export default function DashboardPage() {
     { title: "Active Tournaments", value: activeTournamentCount, icon: "Trophy" as LucideIconName },
     { title: "Total Players", value: totalUsers.toLocaleString(), icon: "Users" as LucideIconName },
     { title: "Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" as LucideIconName },
-    { title: "Your Rank (Overall)", value: "#42", icon: "BarChart3" as LucideIconName, change: "-2" },
+    { title: "Your Rank (Overall)", value: currentUserRanking.rank === 'N/A' ? 'N/A' : `#${currentUserRanking.rank}`, icon: "BarChart3" as LucideIconName, change: `${currentUserRanking.points} points` },
   ];
   
   const recommendedTournaments: Tournament[] = [];

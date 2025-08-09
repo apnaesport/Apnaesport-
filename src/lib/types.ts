@@ -6,7 +6,7 @@ import type { icons } from "lucide-react";
 
 export type LucideIconName = keyof typeof icons;
 
-export interface UserProfile {
+export interface UserProfile extends Partial<FirebaseUser> {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
