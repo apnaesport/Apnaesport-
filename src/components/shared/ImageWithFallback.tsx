@@ -12,7 +12,7 @@ interface ImageWithFallbackProps extends Omit<ImageProps, 'onError'> {
 }
 
 export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackProps>(
-  ({ src, fallbackSrc, onError, as: Comp = Image, unoptimized, ...props }, ref) => {
+  ({ src, fallbackSrc, alt, onError, as: Comp = Image, unoptimized, ...props }, ref) => {
     
     const isDataUri = useMemo(() => typeof src === 'string' && src.startsWith('data:'), [src]);
 
@@ -27,8 +27,9 @@ export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackP
     };
 
     const finalSrc = src || fallbackSrc;
+    const finalAlt = alt || 'Apna Esport placeholder image';
 
-    return <Comp ref={ref} src={finalSrc} onError={handleError} unoptimized={unoptimized || isDataUri} {...props} />;
+    return <Comp ref={ref} src={finalSrc} alt={finalAlt} onError={handleError} unoptimized={unoptimized || isDataUri} {...props} />;
   }
 );
 

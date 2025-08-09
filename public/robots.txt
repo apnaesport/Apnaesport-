@@ -1,9 +1,12 @@
-# Allow all friendly search engine crawlers
+# Allow all user agents
 User-agent: *
 Allow: /
 
-# Disallow crawlers from accessing admin and auth pages
+# Disallow admin and sensitive areas
 Disallow: /admin/
-Disallow: /auth/
+Disallow: /profile/
+Disallow: /settings/
+Disallow: /social/
 
+# Sitemap location
 Sitemap: https://www.apnaesport.com/sitemap.xml

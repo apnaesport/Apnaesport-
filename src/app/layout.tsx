@@ -18,21 +18,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsFromFirestore();
 
   const siteName = settings?.siteName || 'Apna Esport';
-  const description = settings?.siteDescription || 'The ultimate platform for competitive gaming tournaments in India. Join or host tournaments for popular games, climb the leaderboard, and become a champion with Apna Esport.';
+  const defaultTitle = "Apna Esport | Play, Compete & Win in Esports Tournaments";
+  const defaultDescription = "Join Apna Esport – the ultimate platform for gamers. Create tournaments, play online matches, and connect with the esports community.";
 
   return {
     title: {
       template: `%s | ${siteName}`,
-      default: `${siteName} - India's Online Esports Tournament Platform`,
+      default: defaultTitle,
     },
-    description: description,
-    keywords: ["esports", "tournaments", "gaming", "India", "Apna Esport", "online gaming", "competitive gaming", "Free Fire", "BGMI"],
+    description: defaultDescription,
+    keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI"],
     icons: {
       icon: settings?.faviconUrl || "/favicon.ico", 
     },
     openGraph: {
-        title: `${siteName} - Online Esports Tournaments`,
-        description: description,
+        title: defaultTitle,
+        description: defaultDescription,
         siteName: siteName,
         type: 'website',
         locale: 'en_IN',

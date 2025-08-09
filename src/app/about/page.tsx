@@ -22,7 +22,7 @@ export default function AboutUsPage() {
         </CardHeader>
         <CardContent className="prose dark:prose-invert max-w-none">
           <p>
-            Our vision at Apna Esport is to build the most engaging and competitive esports platform in India. We believe every gamer, regardless of age or location, deserves a chance to showcase their skills, compete in fair and exciting tournaments, and grow within a supportive community. We are dedicated to making Apna Esport the top destination for amateur and student gamers.
+            Our vision at Apna Esport is to build the most engaging and competitive esports platform in India. We believe every gamer, regardless of age or location, deserves a chance to showcase their skills, compete in fair and exciting tournaments, and grow within a supportive community. We are dedicated to making Apna Esport the top destination for amateur and student gamers looking for an online gaming platform.
           </p>
         </CardContent>
       </Card>
@@ -32,8 +32,9 @@ export default function AboutUsPage() {
             <CardTitle className="flex items-center"><Gamepad2 className="mr-2 h-6 w-6 text-primary"/>What We Offer for Gamers</CardTitle>
         </CardHeader>
         <CardContent>
+            <p className="text-muted-foreground mb-4">Apna Esport is a premier gaming competition site where you can play and win in your favorite esports titles.</p>
             <ul className="list-disc space-y-2 pl-5 text-muted-foreground">
-                <li>Open and student-focused tournaments for popular games.</li>
+                <li>Open and student-focused esports tournaments for popular games in India.</li>
                 <li>Competitive problem leagues with redeemable rewards and prizes.</li>
                 <li>The ability to host your own private tournaments with custom codes.</li>
                 <li>A prestigious Champions Board highlighting top-performing players on Apna Esport.</li>

@@ -15,7 +15,7 @@ export default function ContactPage() {
     <div className="space-y-8">
       <PageTitle 
         title="Contact Us" 
-        subtitle="Got questions or suggestions? Fill the form below, and we’ll get back to you soon!" 
+        subtitle="Got questions about our esports tournaments or suggestions for our online gaming platform? Fill the form below, and we’ll get back to you soon!" 
       />
       <ContactForm />
     </div>
