@@ -1,6 +1,5 @@
 
 
-
 import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import type { Game, Tournament } from "@/lib/types";
@@ -61,6 +60,14 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
 
   const allTournaments = await getTournamentsForGame(gameId);
 
+  // Serialize the game object to make it a plain object
+  const serializableGame = {
+    ...game,
+    createdAt: game.createdAt?.toDate ? game.createdAt.toDate().toISOString() : null,
+    updatedAt: game.updatedAt?.toDate ? game.updatedAt.toDate().toISOString() : null,
+  };
+
+
   return (
     <div className="space-y-8">
       <div className="relative h-48 md:h-64 rounded-lg overflow-hidden group mb-8 shadow-xl border border-border">
@@ -93,7 +100,7 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
         </div>
       </div>
       
-      <GameTournamentsClient game={game} initialTournaments={allTournaments} />
+      <GameTournamentsClient game={serializableGame as Game} initialTournaments={allTournaments} />
       
     </div>
   );
