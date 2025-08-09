@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,7 +32,8 @@ const settingsSchema = z.object({
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
   promotionImageUrl: z.string().url("Must be a valid URL for the image.").or(z.literal('')).optional(),
   promotionVideoUrl: z.string().url("Must be a valid YouTube/Vimeo embed URL.").or(z.literal('')).optional(),
-  promotionDisplayMode: z.enum(['image', 'video']).optional(),
+  promotionDisplayMode: z.enum(['image', 'video', 'ad']).optional(),
+  adsterraAdCode: z.string().optional(),
 });
 
 
@@ -47,6 +48,7 @@ const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> 
   promotionImageUrl: "",
   promotionVideoUrl: "",
   promotionDisplayMode: "image",
+  adsterraAdCode: "",
 };
 
 function AdminSettingsPageContent() {
@@ -108,6 +110,7 @@ function AdminSettingsPageContent() {
         promotionImageUrl: settingsToSave.promotionImageUrl || "",
         promotionVideoUrl: settingsToSave.promotionVideoUrl || "",
         promotionDisplayMode: settingsToSave.promotionDisplayMode || "image",
+        adsterraAdCode: settingsToSave.adsterraAdCode || "",
       };
 
       await saveSiteSettingsToFirestore(completeSettingsToSave as Omit<SiteSettings, 'id' | 'updatedAt'>);
@@ -211,10 +214,39 @@ function AdminSettingsPageContent() {
                     <RadioGroupItem value="video" id="mode-video" />
                     <Label htmlFor="mode-video">Video</Label>
                   </div>
+                   <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="ad" id="mode-ad" />
+                    <Label htmlFor="mode-ad">Ad</Label>
+                  </div>
                 </RadioGroup>
               )}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+            <CardTitle className="flex items-center">
+                <Receipt className="mr-2 h-5 w-5 text-primary" /> Ad Monetization
+            </CardTitle>
+            <CardDescription>Configure ad settings, like Adsterra.</CardDescription>
+        </CardHeader>
+        <CardContent>
+            <div className="space-y-2">
+                <Label htmlFor="adsterraAdCode">Adsterra Ad Code</Label>
+                <Textarea 
+                    id="adsterraAdCode" 
+                    {...form.register("adsterraAdCode")} 
+                    placeholder='e.g., {"key" : "...", "format" : "...", ...}'
+                    disabled={isSaving}
+                    rows={4}
+                />
+                <p className="text-xs text-muted-foreground">
+                    Paste your full Adsterra ad code (the JSON object part) here. This will be shown on the promotion board if "Ad" mode is selected.
+                </p>
+                {form.formState.errors.adsterraAdCode && <p className="text-destructive text-xs mt-1">{form.formState.errors.adsterraAdCode.message}</p>}
+            </div>
         </CardContent>
       </Card>
 

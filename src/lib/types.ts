@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -124,7 +125,8 @@ export interface SiteSettings {
   updatedAt?: Timestamp;
   promotionImageUrl?: string;
   promotionVideoUrl?: string;
-  promotionDisplayMode?: 'image' | 'video';
+  promotionDisplayMode?: 'image' | 'video' | 'ad';
+  adsterraAdCode?: string;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";

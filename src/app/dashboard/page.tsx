@@ -12,7 +12,7 @@ import { Heart, Loader2 } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const adContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -47,6 +48,29 @@ export default function DashboardPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+  
+  useEffect(() => {
+    if (settings?.promotionDisplayMode === 'ad' && settings.adsterraAdCode && adContainerRef.current) {
+        // Clear previous content
+        adContainerRef.current.innerHTML = '';
+
+        // Create a new script element
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        // The ad code logic is placed inside the script content
+        script.innerHTML = `
+            atOptions = ${JSON.stringify(JSON.parse(settings.adsterraAdCode))};
+        `;
+        
+        const adsterraScript = document.createElement('script');
+        adsterraScript.async = true;
+        adsterraScript.src = "//www.topcreativeformat.com/a62c7337f0b54432115024e55e51da34/invoke.js";
+
+        // Append the new script to the container
+        adContainerRef.current.appendChild(script);
+        adContainerRef.current.appendChild(adsterraScript);
+    }
+  }, [settings]);
 
   if (isLoading) {
     return (
@@ -101,7 +125,7 @@ export default function DashboardPage() {
   
   const recommendedTournaments: Tournament[] = [];
 
-  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl);
+  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.adsterraAdCode);
 
   return (
     <div className="space-y-8">
@@ -113,7 +137,11 @@ export default function DashboardPage() {
                 <CardTitle>Promotion Board</CardTitle>
             </CardHeader>
             <CardContent>
-                {settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
+                {settings?.promotionDisplayMode === 'ad' && settings.adsterraAdCode ? (
+                     <div ref={adContainerRef} className="w-full flex justify-center items-center min-h-[100px] bg-muted rounded-md">
+                        {/* Adsterra ad will be injected here */}
+                     </div>
+                ) : settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
                     <div className="aspect-video w-full">
                         <iframe
                             className="w-full h-full rounded-md"
