@@ -2,59 +2,142 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function getRole(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data.isAdmin;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && getRole(request.auth.uid) == true;
+    }
     
-    // Allow public read on games and tournaments for the dashboard
-    match /games/{gameId} {
-      allow read: if true;
-      allow write: if request.auth != null; // Only authenticated users can write
+    function isTeamMember(teamId, userId) {
+      return userId in get(/databases/$(database)/documents/teams/$(teamId)).data.memberUids;
     }
 
-    match /tournaments/{tournamentId} {
-      allow read: if true;
-      allow write: if request.auth != null; // Only authenticated users can write
+    function isTeamLeader(teamId, userId) {
+      return get(/databases/$(database)/documents/teams/$(teamId)).data.leaderUid == userId;
     }
 
-    // Users can only read their own profile, but public read for basic info is often needed.
-    // For simplicity, we allow reading all profiles but only let users write to their own.
+    // --- Default Security: Deny all access unless explicitly allowed ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- User Profiles (`users`) ---
     match /users/{userId} {
+      // Anyone can read public profile data (get) or list all users for leaderboards
+      allow get, list: if true;
+
+      // A user can create their own profile document
+      allow create: if isOwner(userId);
+      
+      // A user can only update their own profile, and cannot make themselves an admin
+      allow update: if isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin;
+      
+      // A user cannot delete their own profile through the app
+      allow delete: if false;
+    }
+
+    // --- Games (`games`) ---
+    match /games/{gameId} {
+      // Game data is public
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      // Only admins can create, update, or delete games
+      allow write: if isAdmin();
     }
     
-    // Notifications might be personal or public. This allows public reads.
+    // --- Tournaments (`tournaments`) ---
+    match /tournaments/{tournamentId} {
+        // Tournament data is public
+        allow read: if true;
+        
+        // Signed-in users can create tournaments
+        allow create: if isSignedIn();
+        
+        // Users can join a tournament (update the participants array)
+        // Admins or organizers can update other details
+        allow update: if isSignedIn();
+        
+        // Only admins or the organizer can delete
+        allow delete: if isAdmin() || isOwner(resource.data.organizerId);
+    }
+    
+    // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        allow read: if true;
-        allow write: if request.auth != null; // Ideally check for admin role
-    }
-
-    // Global site settings should be readable by everyone.
-    match /settings/{settingId} {
-        allow read: if true;
-        allow write: if request.auth != null; // Ideally check for admin role
-    }
-
-    // Sponsorship requests can be created by any authenticated user,
-    // but can only be read/updated/deleted by admins.
-    match /sponsorships/{sponsorshipId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if request.auth != null; // Should be restricted to admin role in a real app
+        // Any signed-in user can read notifications
+        allow read: if isSignedIn();
+        // Only admins can create/write notifications
+        allow write: if isAdmin();
     }
     
-    // Lock down teams & chats to members only
-    match /teams/{teamId} {
-        // Only members of the team can read team data.
-        allow read: if request.auth != null && resource.data.memberUids.hasAny([request.auth.uid]);
-        // Only the leader can update (add/remove members), creator can create.
-        allow create: if request.auth != null;
-        allow update: if request.auth != null && request.auth.uid == resource.data.leaderUid;
-        // Leader can delete
-        allow delete: if request.auth != null && request.auth.uid == resource.data.leaderUid;
+    // --- Site Settings (`settings`) ---
+    match /settings/global {
+        // Site settings are public
+        allow read: if true;
+        // Only admins can change site settings
+        allow write: if isAdmin();
     }
+    
+    // --- Sponsorships (`sponsorships`) ---
+    match /sponsorships/{sponsorshipId} {
+      // Any signed in user can create a request
+      allow create: if isSignedIn();
+      // Only admins can read, update status, or delete requests
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // --- Teams (`teams`) ---
+    match /teams/{teamId} {
+      allow get: if true; // Anyone can view a team's basic info
+      allow list: if isSignedIn(); // Allow listing teams
+      
+      // A signed-in user can create a team if they are not already in one
+      allow create: if isSignedIn() && request.resource.data.leaderUid == request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == null;
+      
+      // Only the team leader can update team details (e.g., adding/removing members)
+      // Members can't update directly, they must use the 'leave' logic
+      allow update: if isSignedIn() && isTeamLeader(teamId, request.auth.uid);
+      
+      // Only the team leader can delete the team
+      allow delete: if isSignedIn() && isTeamLeader(teamId, request.auth.uid);
+      
+      // --- Team Chat (`chats/{teamId}/messages`) ---
+      match /messages/{messageId} {
+        // Allow team members to read and write to their team's chat
+        allow read, create: if isSignedIn() && isTeamMember(teamId, request.auth.uid);
+        
+        // Users can only delete their own messages
+        allow delete: if isSignedIn() && isOwner(resource.data.senderId);
+      }
+    }
+    
+    // --- Direct Messages (`chats`) ---
+    // The document ID is a composite of two user IDs, e.g., "uid1_uid2"
+    match /chats/{chatId} {
+        // Allow access to the chat document if the user is one of the participants
+        allow get: if isSignedIn() && (request.auth.uid in chatId.split('_'));
 
-    match /chats/{chatId}/{message=**} {
-        // Users can only read/write to chats they are part of.
-        // The chatID is a composite of two sorted user UIDs: 'uid1_uid2'
-        allow read, write, delete: if request.auth != null && request.auth.uid in chatId.split('_');
+        // --- Private Chat Messages ---
+        match /messages/{messageId} {
+            // Allow participants of the chat to read messages
+            allow read: if isSignedIn() && (request.auth.uid in chatId.split('_'));
+
+            // Allow participants to create messages and ensure senderId is correct
+            allow create: if isSignedIn() && (request.auth.uid in chatId.split('_')) && request.resource.data.senderId == request.auth.uid;
+            
+            // Users can only delete their own messages
+            allow delete: if isSignedIn() && isOwner(resource.data.senderId);
+        }
     }
   }
 }
