@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -44,7 +45,7 @@ export function Header() {
           </Button>
         )}
          {!isMobile && <SidebarTrigger className="hidden md:flex" />}
-        <Logo size="md" className="flex" />
+        <Logo size={isMobile ? 'sm' : 'md'} className="flex" />
       </div>
       
       <div className="flex items-center gap-2 sm:gap-4">

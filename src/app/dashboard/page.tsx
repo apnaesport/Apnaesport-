@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -17,28 +18,27 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 export default function DashboardPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
+  const { settings, loadingSettings } = useSiteSettings();
   const [isLoading, setIsLoading] = useState(true);
   const adContainerRef = useRef<HTMLDivElement>(null);
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [tournaments, games, users, siteSettings] = await Promise.all([
+      const [tournaments, games, users] = await Promise.all([
         getTournamentsFromFirestore(), 
         getGamesFromFirestore(),
         getAllUsersFromFirestore(),
-        getSiteSettingsFromFirestore(),
       ]);
       setAllTournaments(tournaments);
       setAllGames(games);
       setAllUsers(users);
-      setSettings(siteSettings);
     } catch (error) {
       console.error("Failed to fetch dashboard data", error);
     } finally {
@@ -51,17 +51,18 @@ export default function DashboardPage() {
   }, [fetchData]);
   
   useEffect(() => {
-    if (settings?.promotionDisplayMode === 'ad' && settings.adsterraAdKey && adContainerRef.current) {
+    if (loadingSettings || !settings || !adContainerRef.current) return;
+    
+    if (settings.promotionDisplayMode === 'ad' && settings.promotionBoardAdKey) {
         // Clear previous ad
         adContainerRef.current.innerHTML = '';
 
-        const adKey = settings.adsterraAdKey;
-        
-        // Create the container div that the Adsterra script looks for
+        const adKey = settings.promotionBoardAdKey;
+        const containerId = `container-${adKey}-${Math.random().toString(36).substring(7)}`;
+
         const adContainerDiv = document.createElement('div');
-        adContainerDiv.id = `container-${adKey}`;
+        adContainerDiv.id = containerId;
         
-        // Create the script that calls the ad
         const adInvocationScript = document.createElement('script');
         adInvocationScript.type = 'text/javascript';
         adInvocationScript.innerHTML = `
@@ -74,19 +75,17 @@ export default function DashboardPage() {
             };
         `;
 
-        // Create the main Adsterra script tag
         const adsterraScript = document.createElement('script');
         adsterraScript.async = true;
-        adsterraScript.src = '//pl23429392.highcpmgate.com/' + adKey + '/invoke.js';
+        adsterraScript.src = `//pl23429392.highcpmgate.com/${adKey}/invoke.js`;
         
-        // Append all parts to the container
         adContainerRef.current.appendChild(adContainerDiv);
         adContainerRef.current.appendChild(adInvocationScript);
         adContainerRef.current.appendChild(adsterraScript);
     }
-  }, [settings]);
+  }, [settings, loadingSettings]);
 
-  if (isLoading) {
+  if (isLoading || loadingSettings) {
     return (
       <div className="space-y-8">
         <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
@@ -139,7 +138,7 @@ export default function DashboardPage() {
   
   const recommendedTournaments: Tournament[] = [];
 
-  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.adsterraAdKey);
+  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.promotionBoardAdKey);
 
   return (
     <div className="space-y-8">
@@ -147,24 +146,24 @@ export default function DashboardPage() {
       
       {showPromotion && (
          <Card className="overflow-hidden shadow-lg border-primary/20">
-            <CardHeader>
+            <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2">
                     <Megaphone className="h-6 w-6 text-primary" />
                     Promotion Board
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-2 sm:p-4">
+            <CardContent className="p-0">
                  <div className={cn(
                     "w-full bg-muted rounded-md flex items-center justify-center overflow-hidden",
-                    settings?.promotionDisplayMode === 'ad' ? "min-h-[90px] md:min-h-[100px]" : "aspect-video"
+                    settings?.promotionDisplayMode === 'ad' ? "min-h-[90px]" : "aspect-video"
                  )}>
-                    {settings?.promotionDisplayMode === 'ad' && settings.adsterraAdKey ? (
-                        <div ref={adContainerRef} className="w-full h-full flex justify-center items-center">
+                    {settings?.promotionDisplayMode === 'ad' && settings.promotionBoardAdKey ? (
+                        <div ref={adContainerRef} className="w-full flex justify-center items-center">
                             {/* Adsterra ad will be injected here */}
                         </div>
                     ) : settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
                         <iframe
-                            className="w-full h-full"
+                            className="w-full h-full aspect-video"
                             src={settings.promotionVideoUrl}
                             title="Promotional Video"
                             frameBorder="0"
@@ -172,7 +171,7 @@ export default function DashboardPage() {
                             allowFullScreen
                         ></iframe>
                     ) : settings?.promotionImageUrl ? (
-                        <div className="w-full h-full relative">
+                        <div className="w-full h-full relative aspect-video">
                             <ImageWithFallback
                                 src={settings.promotionImageUrl}
                                 fallbackSrc='https://placehold.co/1280x720.png'

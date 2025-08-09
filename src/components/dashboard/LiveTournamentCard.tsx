@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import Image from "next/image";
@@ -44,7 +45,7 @@ export function LiveTournamentCard({ tournament }: LiveTournamentCardProps) {
             data-ai-hint="game logo small"
             unoptimized={tournament.gameIconUrl?.startsWith('data:image')}
           />
-          <CardTitle className="text-xl font-semibold text-white drop-shadow-md line-clamp-1">
+          <CardTitle className="text-lg font-semibold text-white drop-shadow-md line-clamp-1">
             {tournament.name}
           </CardTitle>
         </div>
