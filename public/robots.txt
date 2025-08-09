@@ -1,0 +1,9 @@
+# Allow all friendly search engine crawlers
+User-agent: *
+Allow: /
+
+# Disallow crawlers from accessing admin and auth pages
+Disallow: /admin/
+Disallow: /auth/
+
+Sitemap: https://www.apnaesport.com/sitemap.xml
