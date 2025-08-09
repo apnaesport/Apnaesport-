@@ -1,5 +1,6 @@
 
 
+
 import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import type { Game, Tournament } from "@/lib/types";
@@ -32,6 +33,7 @@ export async function generateMetadata({ params }: GameTournamentsPageProps, par
   return {
     title: `${game.name} Tournaments | Apna Esport`,
     description: `Find, join, and compete in ${game.name} tournaments on Apna Esport. See upcoming, live, and completed events.`,
+    keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", `${game.name} tournaments`, "gaming competition site", "Free Fire", "BGMI"],
     openGraph: {
       title: `${game.name} Tournaments on Apna Esport`,
       description: `Browse all available tournaments for ${game.name}.`,

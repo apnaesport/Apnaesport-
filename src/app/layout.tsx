@@ -27,7 +27,7 @@ export async function generateMetadata(): Promise<Metadata> {
       default: defaultTitle,
     },
     description: defaultDescription,
-    keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI"],
+    keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments"],
     icons: {
       icon: settings?.faviconUrl || "/favicon.ico", 
     },
