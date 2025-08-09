@@ -138,12 +138,14 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   if (queryParams?.status) {
     qConstraints.push(where("status", "==", queryParams.status));
   }
+  
+  // This logic is adjusted to avoid needing a composite index for gameId + startDate.
+  // We query by gameId only and then sort the results in the application code.
   if (queryParams?.gameId) {
-    // Index needed: gameId (ASC), startDate (DESC) on tournaments collection.
-    // https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClRwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90b3VybmFtZW50cy9pbmRleGVzL18QARoKCgZnYW1lSWQQARoNCglzdGFydERhdGUQAhoMCghfX25hbWVfXxAC
-    qConstraints = [where("gameId", "==", queryParams.gameId), orderBy("startDate", "desc")]
+    qConstraints = [where("gameId", "==", queryParams.gameId)];
   }
-   if (queryParams?.featured !== undefined) {
+
+  if (queryParams?.featured !== undefined) {
     qConstraints.push(where("featured", "==", queryParams.featured));
   }
   if (queryParams?.participantId) {
@@ -158,7 +160,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
   const now = new Date();
   const batch = writeBatch(db);
-  const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
+  let tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data();
     const tournament = {
       id: docSnapshot.id,
@@ -187,6 +189,11 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     
     return tournament;
   });
+  
+  // If we queried by gameId, we need to sort manually now.
+  if(queryParams?.gameId) {
+    tournaments = tournaments.sort((a,b) => b.startDate.getTime() - a.startDate.getTime());
+  }
 
   await batch.commit();
   return tournaments;
