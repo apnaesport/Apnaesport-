@@ -51,24 +51,7 @@ export default function DashboardPage() {
   
   useEffect(() => {
     if (settings?.promotionDisplayMode === 'ad' && settings.adsterraAdCode && adContainerRef.current) {
-        // Clear previous content
-        adContainerRef.current.innerHTML = '';
-
-        // Create a new script element for the options
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
-        // The ad code logic is placed inside the script content
-        // Treat adsterraAdCode as a string, not JSON
-        script.innerHTML = `atOptions = ${settings.adsterraAdCode};`;
-        
-        // Create the script element for the ad invocation
-        const adsterraScript = document.createElement('script');
-        adsterraScript.async = true;
-        adsterraScript.src = "//www.topcreativeformat.com/a62c7337f0b54432115024e55e51da34/invoke.js";
-
-        // Append the new scripts to the container
-        adContainerRef.current.appendChild(script);
-        adContainerRef.current.appendChild(adsterraScript);
+        adContainerRef.current.innerHTML = settings.adsterraAdCode;
     }
   }, [settings]);
 
