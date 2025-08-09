@@ -54,19 +54,19 @@ export default function DashboardPage() {
         // Clear previous content
         adContainerRef.current.innerHTML = '';
 
-        // Create a new script element
+        // Create a new script element for the options
         const script = document.createElement('script');
         script.type = 'text/javascript';
         // The ad code logic is placed inside the script content
-        script.innerHTML = `
-            atOptions = ${JSON.stringify(JSON.parse(settings.adsterraAdCode))};
-        `;
+        // Treat adsterraAdCode as a string, not JSON
+        script.innerHTML = `atOptions = ${settings.adsterraAdCode};`;
         
+        // Create the script element for the ad invocation
         const adsterraScript = document.createElement('script');
         adsterraScript.async = true;
         adsterraScript.src = "//www.topcreativeformat.com/a62c7337f0b54432115024e55e51da34/invoke.js";
 
-        // Append the new script to the container
+        // Append the new scripts to the container
         adContainerRef.current.appendChild(script);
         adContainerRef.current.appendChild(adsterraScript);
     }
