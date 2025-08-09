@@ -33,7 +33,7 @@ const settingsSchema = z.object({
   promotionImageUrl: z.string().url("Must be a valid URL for the image.").or(z.literal('')).optional(),
   promotionVideoUrl: z.string().url("Must be a valid YouTube/Vimeo embed URL.").or(z.literal('')).optional(),
   promotionDisplayMode: z.enum(['image', 'video', 'ad']).optional(),
-  adsterraAdCode: z.string().optional(),
+  adsterraAdKey: z.string().optional(),
 });
 
 
@@ -48,7 +48,7 @@ const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> 
   promotionImageUrl: "",
   promotionVideoUrl: "",
   promotionDisplayMode: "image",
-  adsterraAdCode: "",
+  adsterraAdKey: "",
 };
 
 function AdminSettingsPageContent() {
@@ -110,7 +110,7 @@ function AdminSettingsPageContent() {
         promotionImageUrl: settingsToSave.promotionImageUrl || "",
         promotionVideoUrl: settingsToSave.promotionVideoUrl || "",
         promotionDisplayMode: settingsToSave.promotionDisplayMode || "image",
-        adsterraAdCode: settingsToSave.adsterraAdCode || "",
+        adsterraAdKey: settingsToSave.adsterraAdKey || "",
       };
 
       await saveSiteSettingsToFirestore(completeSettingsToSave as Omit<SiteSettings, 'id' | 'updatedAt'>);
@@ -234,18 +234,17 @@ function AdminSettingsPageContent() {
         </CardHeader>
         <CardContent>
             <div className="space-y-2">
-                <Label htmlFor="adsterraAdCode">Adsterra Ad Code</Label>
-                <Textarea 
-                    id="adsterraAdCode" 
-                    {...form.register("adsterraAdCode")} 
-                    placeholder='e.g., {"key" : "...", "format" : "...", ...}'
+                <Label htmlFor="adsterraAdKey">Adsterra Ad Key</Label>
+                <Input 
+                    id="adsterraAdKey" 
+                    {...form.register("adsterraAdKey")} 
+                    placeholder='e.g., ab2e77969b2315321528a2a7516e8321'
                     disabled={isSaving}
-                    rows={4}
                 />
                 <p className="text-xs text-muted-foreground">
-                    Paste your full Adsterra ad code (the JSON object part) here. This will be shown on the promotion board if "Ad" mode is selected.
+                    Paste your unique Adsterra Ad Key here. This is the alphanumeric string found in your ad code from Adsterra.
                 </p>
-                {form.formState.errors.adsterraAdCode && <p className="text-destructive text-xs mt-1">{form.formState.errors.adsterraAdCode.message}</p>}
+                {form.formState.errors.adsterraAdKey && <p className="text-destructive text-xs mt-1">{form.formState.errors.adsterraAdKey.message}</p>}
             </div>
         </CardContent>
       </Card>

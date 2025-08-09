@@ -126,7 +126,7 @@ export interface SiteSettings {
   promotionImageUrl?: string;
   promotionVideoUrl?: string;
   promotionDisplayMode?: 'image' | 'video' | 'ad';
-  adsterraAdCode?: string;
+  adsterraAdKey?: string;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";

@@ -8,7 +8,7 @@ import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName, SiteSettings } from "@/lib/types";
 import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
-import { Heart, Loader2 } from "lucide-react";
+import { Heart, Loader2, Megaphone } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { cn } from "@/lib/utils";
 
 export default function DashboardPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
@@ -50,8 +51,38 @@ export default function DashboardPage() {
   }, [fetchData]);
   
   useEffect(() => {
-    if (settings?.promotionDisplayMode === 'ad' && settings.adsterraAdCode && adContainerRef.current) {
-        adContainerRef.current.innerHTML = settings.adsterraAdCode;
+    if (settings?.promotionDisplayMode === 'ad' && settings.adsterraAdKey && adContainerRef.current) {
+        // Clear previous ad
+        adContainerRef.current.innerHTML = '';
+
+        const adKey = settings.adsterraAdKey;
+        
+        // Create the container div that the Adsterra script looks for
+        const adContainerDiv = document.createElement('div');
+        adContainerDiv.id = `container-${adKey}`;
+        
+        // Create the script that calls the ad
+        const adInvocationScript = document.createElement('script');
+        adInvocationScript.type = 'text/javascript';
+        adInvocationScript.innerHTML = `
+            atOptions = {
+                'key' : '${adKey}',
+                'format' : 'iframe',
+                'height' : 90,
+                'width' : 728,
+                'params' : {}
+            };
+        `;
+
+        // Create the main Adsterra script tag
+        const adsterraScript = document.createElement('script');
+        adsterraScript.async = true;
+        adsterraScript.src = '//pl23429392.highcpmgate.com/' + adKey + '/invoke.js';
+        
+        // Append all parts to the container
+        adContainerRef.current.appendChild(adContainerDiv);
+        adContainerRef.current.appendChild(adInvocationScript);
+        adContainerRef.current.appendChild(adsterraScript);
     }
   }, [settings]);
 
@@ -108,7 +139,7 @@ export default function DashboardPage() {
   
   const recommendedTournaments: Tournament[] = [];
 
-  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.adsterraAdCode);
+  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.adsterraAdKey);
 
   return (
     <div className="space-y-8">
@@ -117,35 +148,41 @@ export default function DashboardPage() {
       {showPromotion && (
          <Card className="overflow-hidden shadow-lg border-primary/20">
             <CardHeader>
-                <CardTitle>Promotion Board</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                    <Megaphone className="h-6 w-6 text-primary" />
+                    Promotion Board
+                </CardTitle>
             </CardHeader>
-            <CardContent>
-                {settings?.promotionDisplayMode === 'ad' && settings.adsterraAdCode ? (
-                     <div ref={adContainerRef} className="w-full flex justify-center items-center min-h-[100px] bg-muted rounded-md">
-                        {/* Adsterra ad will be injected here */}
-                     </div>
-                ) : settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
-                    <div className="aspect-video w-full">
+            <CardContent className="p-2 sm:p-4">
+                 <div className={cn(
+                    "w-full bg-muted rounded-md flex items-center justify-center overflow-hidden",
+                    settings?.promotionDisplayMode === 'ad' ? "min-h-[90px] md:min-h-[100px]" : "aspect-video"
+                 )}>
+                    {settings?.promotionDisplayMode === 'ad' && settings.adsterraAdKey ? (
+                        <div ref={adContainerRef} className="w-full h-full flex justify-center items-center">
+                            {/* Adsterra ad will be injected here */}
+                        </div>
+                    ) : settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
                         <iframe
-                            className="w-full h-full rounded-md"
+                            className="w-full h-full"
                             src={settings.promotionVideoUrl}
                             title="Promotional Video"
                             frameBorder="0"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                         ></iframe>
-                    </div>
-                ) : settings?.promotionImageUrl ? (
-                    <div className="aspect-video w-full relative rounded-md overflow-hidden">
-                        <ImageWithFallback
-                            src={settings.promotionImageUrl}
-                            fallbackSrc='https://placehold.co/1280x720.png'
-                            alt="Promotion"
-                            layout="fill"
-                            objectFit="cover"
-                        />
-                    </div>
-                ) : null}
+                    ) : settings?.promotionImageUrl ? (
+                        <div className="w-full h-full relative">
+                            <ImageWithFallback
+                                src={settings.promotionImageUrl}
+                                fallbackSrc='https://placehold.co/1280x720.png'
+                                alt="Promotion"
+                                layout="fill"
+                                objectFit="cover"
+                            />
+                        </div>
+                    ) : null}
+                 </div>
             </CardContent>
         </Card>
       )}
