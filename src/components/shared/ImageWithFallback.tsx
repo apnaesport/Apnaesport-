@@ -27,6 +27,11 @@ export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackP
     };
 
     const finalSrc = src || fallbackSrc;
+    if (!finalSrc) {
+        // If both src and fallbackSrc are missing, render a placeholder or nothing
+        return <div className="w-full h-full bg-muted" />; // Simple placeholder
+    }
+    
     const finalAlt = alt || 'Apna Esport placeholder image';
 
     return <Comp ref={ref} src={finalSrc} alt={finalAlt} onError={handleError} unoptimized={unoptimized || isDataUri} {...props} />;

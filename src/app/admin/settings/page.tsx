@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -20,6 +20,7 @@ import { getSiteSettingsFromFirestore, saveSiteSettingsToFirestore } from "@/lib
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSiteSettings as useGlobalSiteSettings, SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { cn } from "@/lib/utils";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
@@ -29,7 +30,11 @@ const settingsSchema = z.object({
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
+  promotionImageUrl: z.string().url("Must be a valid URL for the image.").or(z.literal('')).optional(),
+  promotionVideoUrl: z.string().url("Must be a valid YouTube/Vimeo embed URL.").or(z.literal('')).optional(),
+  promotionDisplayMode: z.enum(['image', 'video']).optional(),
 });
+
 
 const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> = {
   siteName: "Apna Esport",
@@ -39,6 +44,9 @@ const defaultSettingsValues: Omit<SiteSettings, 'id' | 'updatedAt' | 'logoUrl'> 
   faviconUrl: "",
   defaultTheme: "system",
   basePlayerCount: 0,
+  promotionImageUrl: "",
+  promotionVideoUrl: "",
+  promotionDisplayMode: "image",
 };
 
 function AdminSettingsPageContent() {
@@ -58,6 +66,7 @@ function AdminSettingsPageContent() {
     if (globalSettings) {
       const { logoUrl, ...relevantGlobalSettings } = globalSettings;
       form.reset({
+        ...defaultSettingsValues, // Ensure all defaults are present
         ...relevantGlobalSettings,
         basePlayerCount: relevantGlobalSettings.basePlayerCount || 0,
       });
@@ -69,6 +78,7 @@ function AdminSettingsPageContent() {
       if (loadedSettings) {
         const { logoUrl, ...relevantLoadedSettings } = loadedSettings;
         form.reset({
+            ...defaultSettingsValues, // Ensure all defaults are present
             ...relevantLoadedSettings,
             basePlayerCount: loadedSettings.basePlayerCount || 0,
         });
@@ -95,6 +105,9 @@ function AdminSettingsPageContent() {
         basePlayerCount: Number(settingsToSave.basePlayerCount) || 0,
         logoUrl: currentLogoUrl,
         defaultTheme: theme,
+        promotionImageUrl: settingsToSave.promotionImageUrl || "",
+        promotionVideoUrl: settingsToSave.promotionVideoUrl || "",
+        promotionDisplayMode: settingsToSave.promotionDisplayMode || "image",
       };
 
       await saveSiteSettingsToFirestore(completeSettingsToSave as Omit<SiteSettings, 'id' | 'updatedAt'>);
@@ -155,6 +168,53 @@ function AdminSettingsPageContent() {
               </div>
             )}
           />
+        </CardContent>
+      </Card>
+      
+       <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Megaphone className="mr-2 h-5 w-5 text-primary" /> Promotion Board Settings
+          </CardTitle>
+          <CardDescription>Configure the promotion board on the homepage.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+           <div className="space-y-2">
+            <Label htmlFor="promotionImageUrl">Promotion Image URL</Label>
+            <Input id="promotionImageUrl" {...form.register("promotionImageUrl")} placeholder="https://example.com/promo.png" disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">URL for the promotional image. Recommended aspect ratio 16:9.</p>
+            {form.formState.errors.promotionImageUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.promotionImageUrl.message}</p>}
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="promotionVideoUrl">Promotion Video URL</Label>
+            <Input id="promotionVideoUrl" {...form.register("promotionVideoUrl")} placeholder="https://www.youtube.com/embed/your-video-id" disabled={isSaving}/>
+             <p className="text-xs text-muted-foreground">Full embed URL for a YouTube or Vimeo video.</p>
+            {form.formState.errors.promotionVideoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.promotionVideoUrl.message}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label>Display Mode</Label>
+            <Controller
+              name="promotionDisplayMode"
+              control={form.control}
+              render={({ field }) => (
+                <RadioGroup
+                  onValueChange={field.onChange}
+                  value={field.value || 'image'}
+                  className="flex space-x-4"
+                  disabled={isSaving}
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="image" id="mode-image" />
+                    <Label htmlFor="mode-image">Image</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="video" id="mode-video" />
+                    <Label htmlFor="mode-video">Video</Label>
+                  </div>
+                </RadioGroup>
+              )}
+            />
+          </div>
         </CardContent>
       </Card>
 

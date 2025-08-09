@@ -6,7 +6,7 @@ import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamen
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
-import type { Tournament, Game, StatItem, LucideIconName } from "@/lib/types";
+import type { Tournament, Game, StatItem, LucideIconName, SiteSettings } from "@/lib/types";
 import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
 import { Heart, Loader2 } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
@@ -14,12 +14,14 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 export default function DashboardPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
   const [allGames, setAllGames] = useState<Game[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>(null);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -99,9 +101,44 @@ export default function DashboardPage() {
   
   const recommendedTournaments: Tournament[] = [];
 
+  const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl);
+
   return (
     <div className="space-y-8">
       <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
+      
+      {showPromotion && (
+         <Card className="overflow-hidden shadow-lg border-primary/20">
+            <CardHeader>
+                <CardTitle>Promotion Board</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
+                    <div className="aspect-video w-full">
+                        <iframe
+                            className="w-full h-full rounded-md"
+                            src={settings.promotionVideoUrl}
+                            title="Promotional Video"
+                            frameBorder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                        ></iframe>
+                    </div>
+                ) : settings?.promotionImageUrl ? (
+                    <div className="aspect-video w-full relative rounded-md overflow-hidden">
+                        <ImageWithFallback
+                            src={settings.promotionImageUrl}
+                            fallbackSrc='https://placehold.co/1280x720.png'
+                            alt="Promotion"
+                            layout="fill"
+                            objectFit="cover"
+                        />
+                    </div>
+                ) : null}
+            </CardContent>
+        </Card>
+      )}
+
 
       {featuredTournament ? (
         <section>

@@ -44,7 +44,7 @@ export function Header() {
           </Button>
         )}
          {!isMobile && <SidebarTrigger className="hidden md:flex" />}
-        <Logo size="md" className="hidden sm:flex" />
+        <Logo size="md" className="flex" />
       </div>
       
       <div className="flex items-center gap-2 sm:gap-4">
