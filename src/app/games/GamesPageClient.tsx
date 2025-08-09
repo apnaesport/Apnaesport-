@@ -1,11 +1,13 @@
 
 "use client";
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import type { Game } from '@/lib/types';
 import { GameCard } from '@/components/games/GameCard';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import { AdPlacement } from '@/components/shared/AdPlacement';
 
 interface GamesPageClientProps {
   allGames: Game[];
@@ -13,6 +15,7 @@ interface GamesPageClientProps {
 
 export default function GamesPageClient({ allGames }: GamesPageClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { settings } = useSiteSettings();
 
   const filteredGames = useMemo(() => {
     if (!searchTerm) {
@@ -22,6 +25,18 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
       game.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, allGames]);
+
+  // Create an array that includes the ad
+  const itemsWithAd: (Game | { isAd: true })[] = [...filteredGames];
+  if (settings?.gamesPageAdKey) {
+    // Insert ad at the 4th position (index 3)
+    if (itemsWithAd.length >= 3) {
+      itemsWithAd.splice(3, 0, { isAd: true });
+    } else {
+      itemsWithAd.push({ isAd: true }); // Add at the end if not enough items
+    }
+  }
+
 
   return (
     <>
@@ -35,11 +50,14 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
         />
       </div>
 
-      {filteredGames.length > 0 ? (
+      {itemsWithAd.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredGames.map((game) => (
-            <GameCard key={game.id} game={game} />
-          ))}
+          {itemsWithAd.map((item, index) => {
+            if ('isAd' in item) {
+                return <AdPlacement key="ad-games" adKey={settings.gamesPageAdKey!} type="video" className="sm:col-span-2 lg:col-span-1" />;
+            }
+            return <GameCard key={item.id} game={item} />;
+          })}
         </div>
       ) : (
         <p className="text-muted-foreground text-center py-10">

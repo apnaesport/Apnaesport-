@@ -126,7 +126,10 @@ export interface SiteSettings {
   promotionImageUrl?: string;
   promotionVideoUrl?: string;
   promotionDisplayMode?: 'image' | 'video' | 'ad';
-  adsterraAdKey?: string;
+  promotionBoardAdKey?: string;
+  leaderboardAdKey?: string;
+  tournamentsPageAdKey?: string;
+  gamesPageAdKey?: string;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";

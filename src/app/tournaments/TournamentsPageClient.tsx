@@ -15,6 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { AdPlacement } from "@/components/shared/AdPlacement";
 
 interface TournamentsPageClientProps {
     allTournaments: Tournament[];
@@ -22,6 +24,7 @@ interface TournamentsPageClientProps {
 
 export default function TournamentsPageClient({ allTournaments }: TournamentsPageClientProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const { settings } = useSiteSettings();
   const [statusFilter, setStatusFilter] = useState<Record<Tournament["status"] | "all", boolean>>({
     "all": true,
     "Upcoming": false,
@@ -67,6 +70,21 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     
     return newFilteredTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [searchTerm, statusFilter, allTournaments]);
+
+  // Create a new array that includes the ad placements
+  const itemsWithAds: (Tournament | { isAd: true })[] = [];
+  if (settings?.tournamentsPageAdKey) {
+    for (let i = 0; i < filteredTournaments.length; i++) {
+        itemsWithAds.push(filteredTournaments[i]);
+        // Insert an ad after every 6th tournament
+        if ((i + 1) % 6 === 0) {
+            itemsWithAds.push({ isAd: true });
+        }
+    }
+  } else {
+    // If no ad key, just use the original array
+    itemsWithAds.push(...filteredTournaments);
+  }
 
 
   const handleStatusFilterChange = (status: Tournament["status"] | "all") => {
@@ -123,11 +141,14 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
         </DropdownMenu>
       </div>
 
-      {filteredTournaments.length > 0 ? (
+      {itemsWithAds.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTournaments.map((tournament) => (
-            <TournamentCard key={tournament.id} tournament={tournament} />
-          ))}
+          {itemsWithAds.map((item, index) => {
+            if ('isAd' in item) {
+                return <AdPlacement key={`ad-${index}`} adKey={settings.tournamentsPageAdKey!} type="mediumRectangle" className="md:col-span-1" />;
+            }
+            return <TournamentCard key={item.id} tournament={item} />;
+          })}
         </div>
       ) : (
         <p className="text-muted-foreground text-center py-10">

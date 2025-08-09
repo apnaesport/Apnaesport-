@@ -14,6 +14,25 @@ interface SiteSettingsContextType {
 
 const SiteSettingsContext = createContext<SiteSettingsContextType | undefined>(undefined);
 
+const defaultSettings: SiteSettings = {
+    siteName: "Apna Esport",
+    siteDescription: "Your Ultimate Gaming Tournament Platform",
+    maintenanceMode: false,
+    allowRegistrations: true,
+    logoUrl: "",
+    faviconUrl: "",
+    defaultTheme: "system",
+    basePlayerCount: 0,
+    promotionImageUrl: "",
+    promotionVideoUrl: "",
+    promotionDisplayMode: "image",
+    promotionBoardAdKey: "",
+    leaderboardAdKey: "",
+    tournamentsPageAdKey: "",
+    gamesPageAdKey: "",
+};
+
+
 export function SiteSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -24,33 +43,15 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     try {
       const loadedSettings = await getSiteSettingsFromFirestore();
       if (loadedSettings) {
-        setSettings(loadedSettings);
+        setSettings({ ...defaultSettings, ...loadedSettings });
       } else {
         // Set default settings if none are found in Firestore
-        setSettings({
-          siteName: "Apna Esport",
-          siteDescription: "Your Ultimate Gaming Tournament Platform",
-          maintenanceMode: false,
-          allowRegistrations: true,
-          logoUrl: "",
-          faviconUrl: "",
-          defaultTheme: "system",
-          basePlayerCount: 0,
-        });
+        setSettings(defaultSettings);
       }
     } catch (error) {
       console.error("Error fetching site settings:", error);
       toast({ title: "Error", description: "Could not load site settings.", variant: "destructive" });
-       setSettings({ // Fallback default settings on error
-          siteName: "Apna Esport",
-          siteDescription: "Your Ultimate Gaming Tournament Platform",
-          maintenanceMode: false,
-          allowRegistrations: true,
-          logoUrl: "",
-          faviconUrl: "",
-          defaultTheme: "system",
-          basePlayerCount: 0,
-        });
+       setSettings(defaultSettings); // Fallback default settings on error
     } finally {
       setLoadingSettings(false);
     }

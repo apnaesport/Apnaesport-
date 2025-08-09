@@ -12,6 +12,7 @@ import {
   BarChartBig,
   Loader2,
   Handshake,
+  DollarSign, // Added
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -31,6 +32,7 @@ const adminNavItems = [
   { href: "/admin/games", label: "Games", icon: Gamepad2 },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/sponsorships", label: "Sponsorships", icon: Handshake },
+  { href: "/admin/monetization", label: "Monetization", icon: DollarSign }, // Added
   { href: "/admin/settings", label: "Site Settings", icon: Settings },
 ];
 

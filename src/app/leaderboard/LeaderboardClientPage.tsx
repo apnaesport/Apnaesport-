@@ -2,9 +2,9 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import type { UserProfile } from "@/lib/types";
+import type { UserProfile, SiteSettings } from "@/lib/types";
 import { getAllUsersFromFirestore } from "@/lib/tournamentStore";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Loader2, Trophy, Crown, Medal, BarChartHorizontal, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { PageTitle } from "@/components/shared/PageTitle";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { AdPlacement } from "@/components/shared/AdPlacement";
 
 
 const getInitials = (name: string | null | undefined) => {
@@ -42,6 +43,8 @@ export function LeaderboardClientPage() {
   const [currentUserRanking, setCurrentUserRanking] = useState<{ rank: number; points: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { settings } = useSiteSettings();
+
 
   const fetchLeaderboard = useCallback(async () => {
     setIsLoading(true);
@@ -89,6 +92,9 @@ export function LeaderboardClientPage() {
 
   return (
     <>
+      {settings?.leaderboardAdKey && (
+          <AdPlacement adKey={settings.leaderboardAdKey} type="leaderboard" className="mb-6"/>
+      )}
       <Card className="shadow-xl border-border hover:shadow-primary/10 transition-shadow duration-300">
         <CardHeader>
           <CardTitle className="flex items-center text-xl sm:text-2xl">
