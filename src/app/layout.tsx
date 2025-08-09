@@ -28,6 +28,9 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     description: defaultDescription,
     keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments"],
+    verification: {
+      google: "TSL2LK5j2gIj78fs8OcZ-GlswqLrFURzzeFiV88pYho",
+    },
     icons: {
       icon: settings?.faviconUrl || "/favicon.ico", 
     },
