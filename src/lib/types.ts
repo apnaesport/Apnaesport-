@@ -189,3 +189,5 @@ export interface SponsorshipRequest {
     status: SponsorshipRequestStatus;
     createdAt: Timestamp;
 }
+
+    
