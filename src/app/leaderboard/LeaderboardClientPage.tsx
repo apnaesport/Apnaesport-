@@ -32,42 +32,50 @@ const getInitials = (name: string | null | undefined) => {
 const PodiumCard = ({ player, rank }: { player: UserProfile; rank: 1 | 2 | 3 }) => {
     const rankStyles = {
         1: {
-            card: "border-yellow-400/50 bg-yellow-400/10 order-first md:order-2 md:-translate-y-8 shadow-2xl z-10",
+            card: "border-yellow-400/50 bg-yellow-900/20 order-first md:order-2 md:-translate-y-8 shadow-2xl z-10",
             icon: "text-yellow-400",
-            iconBg: "bg-yellow-400/20",
+            iconBg: "bg-yellow-400/10",
             avatar: "border-yellow-400",
             rankText: "text-yellow-400",
+            glow: "shadow-[0_0_15px_theme(colors.yellow.400),0_0_5px_theme(colors.yellow.300)]",
         },
         2: {
-            card: "border-slate-400/50 bg-slate-400/10 order-2 md:order-1",
+            card: "border-slate-400/50 bg-slate-800/20 order-2 md:order-1",
             icon: "text-slate-400",
-            iconBg: "bg-slate-400/20",
+            iconBg: "bg-slate-400/10",
             avatar: "border-slate-400",
             rankText: "text-slate-400",
+            glow: "shadow-[0_0_10px_theme(colors.slate.400)]",
         },
         3: {
-            card: "border-amber-600/50 bg-amber-600/10 order-3 md:order-3",
+            card: "border-amber-600/50 bg-amber-900/20 order-3 md:order-3",
             icon: "text-amber-600",
-            iconBg: "bg-amber-600/20",
+            iconBg: "bg-amber-600/10",
             avatar: "border-amber-600",
             rankText: "text-amber-600",
+            glow: "shadow-[0_0_10px_theme(colors.amber.600)]",
         },
     };
 
     const RankIcon = rank === 1 ? Crown : Medal;
 
     return (
-        <div className={cn("flex-1 transition-transform duration-300 hover:scale-105", rankStyles[rank].card)}>
-            <Card className="h-full w-full bg-transparent border-0 shadow-none flex flex-col items-center p-4 sm:p-6 text-center">
-                <div className={cn("p-2 rounded-full mb-3", rankStyles[rank].iconBg)}>
+        <div className={cn("flex-1 transition-all duration-300 hover:scale-105 hover:z-20", rankStyles[rank].card)}>
+            <Card className={cn(
+                "h-full w-full bg-transparent border-0 shadow-none flex flex-col items-center p-4 sm:p-6 text-center group",
+                 rankStyles[rank].glow
+            )}>
+                <div className={cn("p-2 rounded-full mb-3 transition-transform duration-300 group-hover:scale-110", rankStyles[rank].iconBg)}>
                    <RankIcon className={cn("h-8 w-8", rankStyles[rank].icon)} />
                 </div>
-                <Avatar className={cn("h-20 w-20 sm:h-24 sm:h-24 border-4", rankStyles[rank].avatar)}>
+                <Avatar className={cn("h-20 w-20 sm:h-24 sm:h-24 border-4 transition-transform duration-300 group-hover:scale-110", rankStyles[rank].avatar)}>
                     <AvatarImage src={player.photoURL || ""} alt={player.displayName || "Player"} data-ai-hint="user avatar" />
                     <AvatarFallback className="text-2xl">{getInitials(player.displayName)}</AvatarFallback>
                 </Avatar>
-                <CardTitle className="mt-4 text-base sm:text-lg font-bold truncate w-full">{player.displayName}</CardTitle>
-                <CardDescription className={cn("text-xl sm:text-2xl font-bold", rankStyles[rank].rankText)}>
+                <CardTitle className="mt-4 text-base sm:text-lg font-bold truncate w-full group-hover:text-primary transition-colors">
+                    {player.displayName}
+                </CardTitle>
+                <CardDescription className={cn("text-xl sm:text-2xl font-bold transition-all", rankStyles[rank].rankText)} style={{ textShadow: `0 0 8px hsl(var(--primary) / 0.5)`}}>
                     {player.points || 0} pts
                 </CardDescription>
             </Card>
@@ -138,7 +146,7 @@ export function LeaderboardClientPage() {
       
       {top3Players.length > 0 && (
         <div className="mb-8">
-            <h2 className="text-2xl font-bold text-center mb-6">Top Champions</h2>
+            <h2 className="text-3xl font-bold text-center mb-6 text-shadow" style={{ textShadow: `0 0 10px hsl(var(--primary) / 0.7)`}}>Top Champions</h2>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-end max-w-4xl mx-auto">
                 {top3Players[1] && <PodiumCard player={top3Players[1]} rank={2} />}
                 {top3Players[0] && <PodiumCard player={top3Players[0]} rank={1} />}
@@ -147,7 +155,7 @@ export function LeaderboardClientPage() {
         </div>
       )}
 
-      <Card className="shadow-xl border-border hover:shadow-primary/10 transition-shadow duration-300">
+      <Card className="shadow-xl border-border/50 hover:shadow-primary/10 transition-shadow duration-300 bg-card/50 backdrop-blur-sm">
         <CardHeader>
           <CardTitle className="flex items-center text-xl sm:text-2xl">
             <Trophy className="mr-3 h-6 w-6 sm:h-7 sm:w-7 text-primary" />
@@ -162,7 +170,7 @@ export function LeaderboardClientPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="border-b-border/50">
                     <TableHead className="w-[60px] sm:w-[80px] text-center text-base">Rank</TableHead>
                     <TableHead className="text-base">Player</TableHead>
                     <TableHead className="text-right text-base">Points</TableHead>
@@ -173,11 +181,11 @@ export function LeaderboardClientPage() {
                     <TableRow 
                       key={player.uid}
                       className={cn(
-                        "transition-colors hover:bg-muted/50",
-                        user && player.uid === user.uid && "bg-primary/10 hover:bg-primary/20 border-l-2 border-r-2 border-primary",
+                        "transition-colors hover:bg-muted/50 border-b-border/20 last:border-b-0",
+                        user && player.uid === user.uid && "bg-primary/10 hover:bg-primary/20 border-l-2 border-r-2 border-primary animate-pulse",
                       )}
                     >
-                      <TableCell className="text-center font-semibold text-sm sm:text-base">
+                      <TableCell className="text-center font-bold text-lg sm:text-xl text-primary">
                         {index + 4}
                       </TableCell>
                       <TableCell>
@@ -189,7 +197,7 @@ export function LeaderboardClientPage() {
                           <span className="truncate text-sm sm:text-base font-medium">{player.displayName || "Anonymous Player"}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-mono text-sm sm:text-base">{player.points || 0}</TableCell>
+                      <TableCell className="text-right font-mono text-sm sm:text-base font-bold text-foreground">{player.points || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -238,5 +246,7 @@ export function LeaderboardClientPage() {
     </>
   );
 }
+
+    
 
     
