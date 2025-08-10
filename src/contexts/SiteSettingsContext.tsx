@@ -21,6 +21,7 @@ const defaultSettings: SiteSettings = {
     allowRegistrations: true,
     logoUrl: "",
     faviconUrl: "",
+    downloadAppLink: "",
     defaultTheme: "system",
     basePlayerCount: 0,
     promotionImageUrl: "",

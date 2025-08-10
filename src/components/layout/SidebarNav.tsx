@@ -12,11 +12,13 @@ import {
   Loader2,
   Bell,
   Users,
-  TrendingUp
+  TrendingUp,
+  Download,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -24,6 +26,7 @@ import {
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { Separator } from "../ui/separator";
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,6 +45,7 @@ const secondaryNavItems = [
 export function SidebarNav() {
   const pathname = usePathname();
   const { logout, isAdmin } = useAuth();
+  const { settings, loadingSettings } = useSiteSettings();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
   const isActive = (href: string) => {
@@ -84,7 +88,20 @@ export function SidebarNav() {
         ))}
       </SidebarMenu>
       
-      <div className="mt-auto"> 
+      <div className="mt-auto flex flex-col gap-2">
+        {!loadingSettings && settings?.downloadAppLink && (
+          <SidebarMenu className="p-2">
+             <SidebarMenuItem>
+                <a href={settings.downloadAppLink} target="_blank" rel="noopener noreferrer" className="w-full">
+                    <SidebarMenuButton as="div" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                        <Download />
+                        <span>Download App</span>
+                    </SidebarMenuButton>
+                </a>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        )}
+        <Separator className="my-1 bg-sidebar-border" />
         <SidebarMenu>
           {isAdmin && (
              <SidebarMenuItem>

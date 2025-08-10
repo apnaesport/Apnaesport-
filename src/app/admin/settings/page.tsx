@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,6 +29,7 @@ const settingsSchema = z.object({
   maintenanceMode: z.boolean(),
   allowRegistrations: z.boolean(),
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
+  downloadAppLink: z.string().url("Must be a valid URL for the app download.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
 });
@@ -40,6 +41,7 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   maintenanceMode: false,
   allowRegistrations: true,
   faviconUrl: "",
+  downloadAppLink: "",
   defaultTheme: "system",
   basePlayerCount: 0,
 };
@@ -96,6 +98,7 @@ function AdminSettingsPageContent() {
         maintenanceMode: data.maintenanceMode,
         allowRegistrations: data.allowRegistrations,
         faviconUrl: data.faviconUrl,
+        downloadAppLink: data.downloadAppLink,
         defaultTheme: theme,
         basePlayerCount: Number(data.basePlayerCount) || 0,
       };
@@ -143,6 +146,11 @@ function AdminSettingsPageContent() {
             <Label htmlFor="siteDescription">Site Description / Motto</Label>
             <Textarea id="siteDescription" {...form.register("siteDescription")} disabled={isSaving}/>
             {form.formState.errors.siteDescription && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteDescription.message as string}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="downloadAppLink">App Download Link</Label>
+            <Input id="downloadAppLink" {...form.register("downloadAppLink")} placeholder="https://play.google.com/store/apps/..." disabled={isSaving}/>
+            {form.formState.errors.downloadAppLink && <p className="text-destructive text-xs mt-1">{form.formState.errors.downloadAppLink.message as string}</p>}
           </div>
           <Separator />
           <Controller

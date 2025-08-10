@@ -119,6 +119,7 @@ export interface SiteSettings {
   allowRegistrations: boolean;
   logoUrl?: string;
   faviconUrl?: string;
+  downloadAppLink?: string;
   defaultTheme?: string;
   basePlayerCount?: number;
   updatedAt?: Timestamp;

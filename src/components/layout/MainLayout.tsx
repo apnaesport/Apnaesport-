@@ -15,14 +15,17 @@ import {
 import Link from "next/link";
 import { SponsorshipCTA } from "./SponsorshipCTA";
 import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram, Facebook } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Facebook, Download } from "lucide-react"; 
 import { Button } from "../ui/button";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 interface MainLayoutProps {
   children: ReactNode;
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
+  const { settings } = useSiteSettings();
+  
   return (
     <SidebarProvider defaultOpen={true}>
       <Sidebar variant="sidebar" collapsible="icon" className="border-r border-sidebar-border">
@@ -94,6 +97,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                           </Button>
                         </div>
                       </div>
+                      {settings?.downloadAppLink && (
+                        <div>
+                          <h4 className="font-semibold text-foreground mb-4">Get our App</h4>
+                          <Button asChild className="w-full">
+                            <a href={settings.downloadAppLink} target="_blank" rel="noopener noreferrer">
+                              <Download className="mr-2 h-4 w-4" /> Download App
+                            </a>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                 </div>
               </div>
