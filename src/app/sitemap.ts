@@ -2,7 +2,7 @@
 import { MetadataRoute } from 'next'
 import { getTournamentsFromFirestore, getGamesFromFirestore } from '@/lib/tournamentStore';
 
-const BASE_URL = 'https://www.apnaesport.com'; // Replace with your actual domain
+const BASE_URL = 'https://apnaesport.vercel.app'; // Corrected domain
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static Routes
