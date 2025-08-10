@@ -30,6 +30,7 @@ const defaultSettings: SiteSettings = {
     leaderboardAdKey: "",
     tournamentsPageAdKey: "",
     gamesPageAdKey: "",
+    tournamentsPageAdFrequency: 6,
 };
 
 

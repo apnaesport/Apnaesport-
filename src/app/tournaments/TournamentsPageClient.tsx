@@ -71,18 +71,17 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     return newFilteredTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [searchTerm, statusFilter, allTournaments]);
 
-  // Create a new array that includes the ad placements
   const itemsWithAds: (Tournament | { isAd: true })[] = [];
-  if (settings?.tournamentsPageAdKey) {
+  const adFrequency = settings?.tournamentsPageAdFrequency || 6;
+
+  if (settings?.tournamentsPageAdKey && adFrequency > 0) {
     for (let i = 0; i < filteredTournaments.length; i++) {
         itemsWithAds.push(filteredTournaments[i]);
-        // Insert an ad after every 6th tournament
-        if ((i + 1) % 6 === 0) {
+        if ((i + 1) % adFrequency === 0) {
             itemsWithAds.push({ isAd: true });
         }
     }
   } else {
-    // If no ad key, just use the original array
     itemsWithAds.push(...filteredTournaments);
   }
 

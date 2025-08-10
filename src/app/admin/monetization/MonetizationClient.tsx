@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Save, Loader2, Megaphone, ReceiptText, Gamepad, Trophy } from "lucide-react";
+import { Save, Loader2, Megaphone, ReceiptText, Gamepad, Trophy, Wand, Repeat } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,6 +25,7 @@ const monetizationSchema = z.object({
   leaderboardAdKey: z.string().optional(),
   tournamentsPageAdKey: z.string().optional(),
   gamesPageAdKey: z.string().optional(),
+  tournamentsPageAdFrequency: z.coerce.number().min(1, "Frequency must be at least 1.").optional(),
 });
 
 
@@ -36,6 +37,7 @@ const defaultValues: Partial<SiteSettings> = {
     leaderboardAdKey: "",
     tournamentsPageAdKey: "",
     gamesPageAdKey: "",
+    tournamentsPageAdFrequency: 6,
 };
 
 
@@ -80,6 +82,7 @@ export default function MonetizationClient() {
         leaderboardAdKey: data.leaderboardAdKey || "",
         tournamentsPageAdKey: data.tournamentsPageAdKey || "",
         gamesPageAdKey: data.gamesPageAdKey || "",
+        tournamentsPageAdFrequency: Number(data.tournamentsPageAdFrequency) || 6,
       };
 
       await saveSiteSettingsToFirestore(settingsToSave);
@@ -189,18 +192,33 @@ export default function MonetizationClient() {
                 />
                 <p className="text-xs text-muted-foreground">Recommended size: 728x90 (Leaderboard). Displayed at the top of the leaderboard page.</p>
             </div>
-             <div className="space-y-2">
-                <Label htmlFor="tournamentsPageAdKey" className="flex items-center gap-2"><Gamepad className="h-4 w-4"/> Tournaments Page Ad</Label>
-                <Input 
-                    id="tournamentsPageAdKey" 
-                    {...form.register("tournamentsPageAdKey")} 
-                    placeholder='Enter 300x250 Medium Rectangle ad key'
-                    disabled={isSaving}
-                />
-                <p className="text-xs text-muted-foreground">Recommended size: 300x250 (Medium Rectangle). Displayed between tournament cards.</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-t pt-6 border-dashed">
+                 <div className="space-y-2">
+                    <Label htmlFor="tournamentsPageAdKey" className="flex items-center gap-2"><Gamepad className="h-4 w-4"/> Tournaments Page Ad</Label>
+                    <Input 
+                        id="tournamentsPageAdKey" 
+                        {...form.register("tournamentsPageAdKey")} 
+                        placeholder='Enter 300x250 Medium Rectangle ad key'
+                        disabled={isSaving}
+                    />
+                    <p className="text-xs text-muted-foreground">Recommended size: 300x250 (Medium Rectangle). Displayed between tournament cards.</p>
+                </div>
+                 <div className="space-y-2">
+                    <Label htmlFor="tournamentsPageAdFrequency" className="flex items-center gap-2"><Repeat className="h-4 w-4"/> Tournament Ad Frequency</Label>
+                    <Input 
+                        id="tournamentsPageAdFrequency" 
+                        type="number"
+                        {...form.register("tournamentsPageAdFrequency")} 
+                        placeholder='e.g., 6'
+                        disabled={isSaving}
+                    />
+                     <p className="text-xs text-muted-foreground">Show an ad after every X tournament cards. Default is 6.</p>
+                     {form.formState.errors.tournamentsPageAdFrequency && <p className="text-destructive text-xs mt-1">{form.formState.errors.tournamentsPageAdFrequency.message as string}</p>}
+                </div>
             </div>
              <div className="space-y-2">
-                <Label htmlFor="gamesPageAdKey" className="flex items-center gap-2"><Gamepad className="h-4 w-4"/> Games Page Ad</Label>
+                <Label htmlFor="gamesPageAdKey" className="flex items-center gap-2"><Wand className="h-4 w-4"/> Games Page Ad</Label>
                 <Input 
                     id="gamesPageAdKey" 
                     {...form.register("gamesPageAdKey")} 
