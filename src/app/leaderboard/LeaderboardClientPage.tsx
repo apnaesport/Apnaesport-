@@ -29,17 +29,58 @@ const getInitials = (name: string | null | undefined) => {
   return name.split(" ").map((n) => n[0]).join("").toUpperCase();
 };
 
-const RankIcon = ({ rank }: { rank: number }) => {
-  if (rank === 1) return <Crown className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-400" />;
-  if (rank === 2) return <Medal className="h-5 w-5 sm:h-6 sm:w-6 text-slate-400" />; // Silver
-  if (rank === 3) return <Medal className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600" />; // Bronze-ish
-  return <span className="font-semibold text-sm sm:text-base">{rank}</span>;
+const PodiumCard = ({ player, rank }: { player: UserProfile; rank: 1 | 2 | 3 }) => {
+    const rankStyles = {
+        1: {
+            card: "border-yellow-400/50 bg-yellow-400/10 order-first md:order-2 md:-translate-y-8 shadow-2xl z-10",
+            icon: "text-yellow-400",
+            iconBg: "bg-yellow-400/20",
+            avatar: "border-yellow-400",
+            rankText: "text-yellow-400",
+        },
+        2: {
+            card: "border-slate-400/50 bg-slate-400/10 order-2 md:order-1",
+            icon: "text-slate-400",
+            iconBg: "bg-slate-400/20",
+            avatar: "border-slate-400",
+            rankText: "text-slate-400",
+        },
+        3: {
+            card: "border-amber-600/50 bg-amber-600/10 order-3 md:order-3",
+            icon: "text-amber-600",
+            iconBg: "bg-amber-600/20",
+            avatar: "border-amber-600",
+            rankText: "text-amber-600",
+        },
+    };
+
+    const RankIcon = rank === 1 ? Crown : Medal;
+
+    return (
+        <div className={cn("flex-1 transition-transform duration-300 hover:scale-105", rankStyles[rank].card)}>
+            <Card className="h-full w-full bg-transparent border-0 shadow-none flex flex-col items-center p-4 sm:p-6 text-center">
+                <div className={cn("p-2 rounded-full mb-3", rankStyles[rank].iconBg)}>
+                   <RankIcon className={cn("h-8 w-8", rankStyles[rank].icon)} />
+                </div>
+                <Avatar className={cn("h-20 w-20 sm:h-24 sm:h-24 border-4", rankStyles[rank].avatar)}>
+                    <AvatarImage src={player.photoURL || ""} alt={player.displayName || "Player"} data-ai-hint="user avatar" />
+                    <AvatarFallback className="text-2xl">{getInitials(player.displayName)}</AvatarFallback>
+                </Avatar>
+                <CardTitle className="mt-4 text-base sm:text-lg font-bold truncate w-full">{player.displayName}</CardTitle>
+                <CardDescription className={cn("text-xl sm:text-2xl font-bold", rankStyles[rank].rankText)}>
+                    {player.points || 0} pts
+                </CardDescription>
+            </Card>
+        </div>
+    );
 };
+
 
 export function LeaderboardClientPage() {
   const { user, loading: authLoading } = useAuth();
   const [fullLeaderboard, setFullLeaderboard] = useState<UserProfile[]>([]);
-  const [top10Players, setTop10Players] = useState<UserProfile[]>([]);
+  const [top3Players, setTop3Players] = useState<UserProfile[]>([]);
+  const [otherPlayers, setOtherPlayers] = useState<UserProfile[]>([]);
   const [currentUserRanking, setCurrentUserRanking] = useState<{ rank: number; points: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -50,18 +91,17 @@ export function LeaderboardClientPage() {
     setIsLoading(true);
     try {
       const allUsers = await getAllUsersFromFirestore();
-      // Sort all users by points, including those with 0 points
       const sortedUsers = allUsers.sort((a, b) => (b.points || 0) - (a.points || 0));
       
       setFullLeaderboard(sortedUsers);
-      setTop10Players(sortedUsers.slice(0, 10));
+      setTop3Players(sortedUsers.slice(0, 3));
+      setOtherPlayers(sortedUsers.slice(3));
 
       if (user) {
         const userIndex = sortedUsers.findIndex(p => p.uid === user.uid);
         if (userIndex !== -1) {
           setCurrentUserRanking({ rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 });
         } else {
-          // This case should ideally not happen if the user exists in 'allUsers'
           setCurrentUserRanking(null); 
         }
       }
@@ -95,6 +135,18 @@ export function LeaderboardClientPage() {
       {settings?.leaderboardAdKey && (
           <AdPlacement adKey={settings.leaderboardAdKey} type="leaderboard" className="mb-6"/>
       )}
+      
+      {top3Players.length > 0 && (
+        <div className="mb-8">
+            <h2 className="text-2xl font-bold text-center mb-6">Top Champions</h2>
+            <div className="flex flex-col md:flex-row gap-4 justify-center items-end max-w-4xl mx-auto">
+                {top3Players[1] && <PodiumCard player={top3Players[1]} rank={2} />}
+                {top3Players[0] && <PodiumCard player={top3Players[0]} rank={1} />}
+                {top3Players[2] && <PodiumCard player={top3Players[2]} rank={3} />}
+            </div>
+        </div>
+      )}
+
       <Card className="shadow-xl border-border hover:shadow-primary/10 transition-shadow duration-300">
         <CardHeader>
           <CardTitle className="flex items-center text-xl sm:text-2xl">
@@ -102,11 +154,11 @@ export function LeaderboardClientPage() {
             Player Rankings
           </CardTitle>
           <CardDescription>
-            See who's dominating the charts! Rankings are based on total points earned.
+             {otherPlayers.length > 0 ? "See who's climbing the charts in the top player rankings." : "The competition is just getting started!"}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {top10Players.length > 0 ? (
+          {otherPlayers.length > 0 ? (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -117,46 +169,38 @@ export function LeaderboardClientPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {top10Players.map((player, index) => (
+                  {otherPlayers.map((player, index) => (
                     <TableRow 
                       key={player.uid}
                       className={cn(
                         "transition-colors hover:bg-muted/50",
                         user && player.uid === user.uid && "bg-primary/10 hover:bg-primary/20 border-l-2 border-r-2 border-primary",
-                        index === 0 && "bg-yellow-400/10 hover:bg-yellow-400/20", // Gold accent for 1st
-                        index === 1 && "bg-slate-400/10 hover:bg-slate-400/20", // Silver accent for 2nd
-                        index === 2 && "bg-amber-600/10 hover:bg-amber-600/20"  // Bronze accent for 3rd
                       )}
                     >
-                      <TableCell className="text-center">
-                        <RankIcon rank={index + 1} />
+                      <TableCell className="text-center font-semibold text-sm sm:text-base">
+                        {index + 4}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 sm:gap-3">
                           <Avatar className="h-8 w-8 sm:h-10 sm:w-10 border-2 border-muted">
                             <AvatarImage src={player.photoURL || ""} alt={player.displayName || "Player"} data-ai-hint="user avatar" />
-                            <AvatarFallback className={cn(
-                              "text-xs sm:text-sm", 
-                              index === 0 && "bg-yellow-400 text-background",
-                              index === 1 && "bg-slate-400 text-background",
-                              index === 2 && "bg-amber-700 text-background"
-                              )}>{getInitials(player.displayName)}</AvatarFallback>
+                            <AvatarFallback className="text-xs sm:text-sm">{getInitials(player.displayName)}</AvatarFallback>
                           </Avatar>
-                          <span className={cn("truncate text-sm sm:text-base", index < 3 && "font-semibold")}>{player.displayName || "Anonymous Player"}</span>
+                          <span className="truncate text-sm sm:text-base font-medium">{player.displayName || "Anonymous Player"}</span>
                         </div>
                       </TableCell>
-                      <TableCell className={cn("text-right font-mono text-sm sm:text-base", index < 3 && "font-bold")}>{player.points || 0}</TableCell>
+                      <TableCell className="text-right font-mono text-sm sm:text-base">{player.points || 0}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           ) : (
-            <div className="text-center py-10 px-4 space-y-4">
+             <div className="text-center py-10 px-4 space-y-4">
               <BarChartHorizontal className="mx-auto h-16 w-16 text-muted-foreground" />
-              <h3 className="text-xl font-semibold text-foreground">The Leaderboard is Shaping Up!</h3>
+              <h3 className="text-xl font-semibold text-foreground">The Leaderboard is Wide Open!</h3>
               <p className="text-muted-foreground">
-                It looks like the competition is just getting started. Participate in tournaments, showcase your skills, and climb the ranks to be featured here!
+                Compete in tournaments to earn your spot among the champions.
               </p>
               <Button asChild>
                 <Link href="/tournaments">Browse Tournaments</Link>
@@ -166,7 +210,7 @@ export function LeaderboardClientPage() {
         </CardContent>
       </Card>
       
-      {currentUserRanking && currentUserRanking.rank > 10 && (
+      {currentUserRanking && currentUserRanking.rank > top3Players.length + otherPlayers.length && (
         <Card className="mt-6 bg-card/80 backdrop-blur-sm shadow-lg border-primary/50">
           <CardContent className="p-4 text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
@@ -179,7 +223,7 @@ export function LeaderboardClientPage() {
           </CardContent>
         </Card>
       )}
-       {currentUserRanking === null && user && ( // User is logged in but not found on leaderboard (e.g., error state or never got points)
+       {currentUserRanking === null && user && ( 
         <Card className="mt-6">
           <CardContent className="p-4 text-center">
             <p className="text-muted-foreground">
@@ -194,3 +238,5 @@ export function LeaderboardClientPage() {
     </>
   );
 }
+
+    
