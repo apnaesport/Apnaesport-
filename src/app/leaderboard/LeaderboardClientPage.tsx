@@ -3,8 +3,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import type { UserProfile, SiteSettings } from "@/lib/types";
-import { getAllUsersFromFirestore } from "@/lib/tournamentStore";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Loader2, Trophy, Crown, Medal, BarChartHorizontal, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -23,6 +22,10 @@ import Link from "next/link";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { AdPlacement } from "@/components/shared/AdPlacement";
 
+
+interface LeaderboardClientPageProps {
+  allUsers: UserProfile[];
+}
 
 const getInitials = (name: string | null | undefined) => {
   if (!name) return "??";
@@ -84,52 +87,26 @@ const PodiumCard = ({ player, rank }: { player: UserProfile; rank: 1 | 2 | 3 }) 
 };
 
 
-export function LeaderboardClientPage() {
+export function LeaderboardClientPage({ allUsers }: LeaderboardClientPageProps) {
   const { user, loading: authLoading } = useAuth();
-  const [fullLeaderboard, setFullLeaderboard] = useState<UserProfile[]>([]);
-  const [top3Players, setTop3Players] = useState<UserProfile[]>([]);
-  const [otherPlayers, setOtherPlayers] = useState<UserProfile[]>([]);
-  const [currentUserRanking, setCurrentUserRanking] = useState<{ rank: number; points: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { settings } = useSiteSettings();
 
+  const [top3Players, otherPlayers] = useMemo(() => {
+    return [allUsers.slice(0, 3), allUsers.slice(3)];
+  }, [allUsers]);
 
-  const fetchLeaderboard = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const allUsers = await getAllUsersFromFirestore();
-      const sortedUsers = allUsers.sort((a, b) => (b.points || 0) - (a.points || 0));
-      
-      setFullLeaderboard(sortedUsers);
-      setTop3Players(sortedUsers.slice(0, 3));
-      setOtherPlayers(sortedUsers.slice(3));
-
-      if (user) {
-        const userIndex = sortedUsers.findIndex(p => p.uid === user.uid);
-        if (userIndex !== -1) {
-          setCurrentUserRanking({ rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 });
-        } else {
-          setCurrentUserRanking(null); 
-        }
+  const currentUserRanking = useMemo(() => {
+    if (user) {
+      const userIndex = allUsers.findIndex(p => p.uid === user.uid);
+      if (userIndex !== -1) {
+        return { rank: userIndex + 1, points: allUsers[userIndex].points || 0 };
       }
-
-    } catch (error) {
-      console.error("Error fetching leaderboard data:", error);
-      toast({
-        title: "Error Loading Leaderboard",
-        description: "Could not load player rankings. Please try again later.",
-        variant: "destructive",
-      });
     }
-    setIsLoading(false);
-  }, [toast, user]);
+    return null;
+  }, [user, allUsers]);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, [fetchLeaderboard]);
-
-  if (authLoading || isLoading) {
+  if (authLoading) {
     return (
         <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)]">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -218,7 +195,7 @@ export function LeaderboardClientPage() {
         </CardContent>
       </Card>
       
-      {currentUserRanking && currentUserRanking.rank > top3Players.length + otherPlayers.length && (
+      {currentUserRanking && currentUserRanking.rank > allUsers.length && (
         <Card className="mt-6 bg-card/80 backdrop-blur-sm shadow-lg border-primary/50">
           <CardContent className="p-4 text-center">
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2">
@@ -246,7 +223,3 @@ export function LeaderboardClientPage() {
     </>
   );
 }
-
-    
-
-    

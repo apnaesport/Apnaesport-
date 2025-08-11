@@ -78,7 +78,6 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint={game.dataAiHint || "game background art"}
-          unoptimized={game.bannerUrl?.startsWith('data:image')}
           priority
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-transparent" />
@@ -92,7 +91,6 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
                 fill
                 className="rounded-lg border-2 border-background shadow-md object-cover" 
                 data-ai-hint={game.dataAiHint || "game logo large"}
-                unoptimized={game.iconUrl?.startsWith('data:image')}
               />
             </div>
             <PageTitle title={`${game.name} Tournaments`} className="mb-0 text-white text-shadow !text-2xl md:!text-3xl" />
