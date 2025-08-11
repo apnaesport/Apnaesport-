@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
   const siteName = settings?.siteName || 'Apna Esport';
   const defaultTitle = "Apna Esport | Play, Compete & Win in Esports Tournaments";
-  const defaultDescription = "Join Apna Esport – the ultimate platform for gamers. Create tournaments, play online matches, and connect with the esports community.";
+  const defaultDescription = "Join Apna Esport (or Apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games, play online matches, and connect with the esports community.";
 
   return {
     title: {
@@ -28,7 +28,7 @@ export async function generateMetadata(): Promise<Metadata> {
       default: defaultTitle,
     },
     description: defaultDescription,
-    keywords: ["Apna Esport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments"],
+    keywords: ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments"],
     verification: {
       google: "TSL2LK5j2gIj78fs8OcZ-GlswqLrFURzzeFiV88pYho",
       other: {

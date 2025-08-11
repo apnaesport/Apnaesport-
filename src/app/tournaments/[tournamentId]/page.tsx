@@ -34,11 +34,12 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
 
   const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
-  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${format(startDate, "PPP")}. ${tournament.prizePool ? `Prize Pool: ${tournament.prizePool}.` : ''} Sign up now!`;
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport (apnasport). Starts on ${format(startDate, "PPP")}. ${tournament.prizePool ? `Prize Pool: ${tournament.prizePool}.` : ''} Sign up now!`;
 
   return {
     title,
     description,
+    keywords: ["Apna Esport", "apnasport", tournament.name, `${tournament.gameName} tournament`, "online tournament", "gaming competition"],
     openGraph: {
       title: title,
       description: tournament.description,

@@ -6,7 +6,8 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: "Contact Us - Apna Esport",
-  description: "Get in touch with the Apna Esport team. Send us your questions, suggestions, or collaboration inquiries through our official contact form.",
+  description: "Get in touch with the Apna Esport (apnasport) team. Send us your questions, suggestions, or collaboration inquiries through our official contact form.",
+  keywords: ["Apna Esport contact", "apnasport contact", "gaming support", "esports collaboration", "contact Apna Esport"],
 };
 
 

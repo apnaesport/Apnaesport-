@@ -7,7 +7,8 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: "About Apna Esport - India's Gaming Community",
-  description: "Learn about Apna Esport, India’s premier online esports platform. Discover our vision for competitive gaming, what tournaments we offer, and how we're building a top community for passionate gamers.",
+  description: "Learn about Apna Esport (apnasport), India’s premier online esports platform. Discover our vision for competitive gaming, what tournaments we offer, and how we're building a top community for passionate gamers.",
+  keywords: ["Apna Esport", "apnasport", "about Apna Esport", "esports vision", "Indian gaming community", "student gamers"],
 };
 
 
