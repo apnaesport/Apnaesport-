@@ -18,7 +18,7 @@ interface FeaturedTournamentCardProps {
 export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardProps) {
   return (
     <Card className="overflow-hidden shadow-xl hover:shadow-primary/30 transition-shadow duration-300 group bg-card/80 backdrop-blur-sm">
-      <CardHeader className="relative p-0 h-64 md:h-80">
+      <CardHeader className="relative p-0 h-56 sm:h-64 md:h-80">
         <ImageWithFallback
           src={tournament.bannerImageUrl || ""}
           fallbackSrc={`https://placehold.co/800x400.png?text=${encodeURIComponent(tournament.name)}`}
@@ -30,16 +30,16 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
           unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-        <div className="absolute bottom-0 left-0 p-6">
+        <div className="absolute bottom-0 left-0 p-4 md:p-6">
           <Badge variant={tournament.status === "Live" ? "destructive" : "secondary"} className="mb-2 uppercase tracking-wider">
             {tournament.status}
           </Badge>
-          <CardTitle className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+          <CardTitle className="text-2xl sm:text-3xl md:text-4xl font-bold text-white drop-shadow-lg line-clamp-2">
             {tournament.name}
           </CardTitle>
         </div>
       </CardHeader>
-      <CardContent className="p-6">
+      <CardContent className="p-4 md:p-6">
         <p className="text-muted-foreground mb-4 line-clamp-2">{tournament.description}</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
@@ -69,8 +69,8 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
           )}
         </div>
       </CardContent>
-      <CardFooter className="p-6 bg-secondary/30">
-        <Button asChild size="lg" className="w-full text-lg">
+      <CardFooter className="p-4 md:p-6 bg-secondary/30">
+        <Button asChild size="lg" className="w-full text-base sm:text-lg">
           <Link href={`/tournaments/${tournament.id}`}>
             View Tournament & Join
           </Link>
