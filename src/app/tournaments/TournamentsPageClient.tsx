@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo } from "react";
@@ -71,19 +72,21 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     return newFilteredTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [searchTerm, statusFilter, allTournaments]);
 
-  const itemsWithAds: (Tournament | { isAd: true })[] = [];
-  const adFrequency = settings?.tournamentsPageAdFrequency || 6;
+  const itemsWithAds: (Tournament | { isAd: true })[] = useMemo(() => {
+    const adFrequency = settings?.tournamentsPageAdFrequency;
+    if (!settings?.tournamentsPageAdKey || !adFrequency || adFrequency <= 0) {
+      return filteredTournaments;
+    }
 
-  if (settings?.tournamentsPageAdKey && adFrequency > 0) {
+    const result: (Tournament | { isAd: true })[] = [];
     for (let i = 0; i < filteredTournaments.length; i++) {
-        itemsWithAds.push(filteredTournaments[i]);
+        result.push(filteredTournaments[i]);
         if ((i + 1) % adFrequency === 0) {
-            itemsWithAds.push({ isAd: true });
+            result.push({ isAd: true });
         }
     }
-  } else {
-    itemsWithAds.push(...filteredTournaments);
-  }
+    return result;
+  }, [filteredTournaments, settings]);
 
 
   const handleStatusFilterChange = (status: Tournament["status"] | "all") => {
@@ -144,7 +147,7 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {itemsWithAds.map((item, index) => {
             if ('isAd' in item) {
-                return <AdPlacement key={`ad-${index}`} adKey={settings.tournamentsPageAdKey!} type="mediumRectangle" className="md:col-span-1" />;
+                return <AdPlacement key={`ad-${index}`} adKey={settings!.tournamentsPageAdKey!} type="mediumRectangle" className="md:col-span-1" />;
             }
             return <TournamentCard key={item.id} tournament={item} />;
           })}

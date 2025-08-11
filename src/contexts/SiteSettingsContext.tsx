@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
@@ -29,6 +30,7 @@ const defaultSettings: SiteSettings = {
     promotionDisplayMode: "image",
     promotionBoardAdKey: "",
     leaderboardAdKey: "",
+    dashboardAdKey: "",
     tournamentsPageAdKey: "",
     gamesPageAdKey: "",
     tournamentsPageAdFrequency: 6,

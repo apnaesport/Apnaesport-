@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -7,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Save, Loader2, Megaphone, ReceiptText, Gamepad, Trophy, Wand, Repeat } from "lucide-react";
+import { Save, Loader2, Megaphone, ReceiptText, Gamepad, Trophy, Wand, Repeat, LayoutDashboard } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -23,6 +24,7 @@ const monetizationSchema = z.object({
   promotionDisplayMode: z.enum(['image', 'video', 'ad']).optional(),
   promotionBoardAdKey: z.string().optional(),
   leaderboardAdKey: z.string().optional(),
+  dashboardAdKey: z.string().optional(),
   tournamentsPageAdKey: z.string().optional(),
   gamesPageAdKey: z.string().optional(),
   tournamentsPageAdFrequency: z.coerce.number().min(1, "Frequency must be at least 1.").optional(),
@@ -35,6 +37,7 @@ const defaultValues: Partial<SiteSettings> = {
     promotionDisplayMode: "image",
     promotionBoardAdKey: "",
     leaderboardAdKey: "",
+    dashboardAdKey: "",
     tournamentsPageAdKey: "",
     gamesPageAdKey: "",
     tournamentsPageAdFrequency: 6,
@@ -80,6 +83,7 @@ export default function MonetizationClient() {
         promotionDisplayMode: data.promotionDisplayMode || "image",
         promotionBoardAdKey: data.promotionBoardAdKey || "",
         leaderboardAdKey: data.leaderboardAdKey || "",
+        dashboardAdKey: data.dashboardAdKey || "",
         tournamentsPageAdKey: data.tournamentsPageAdKey || "",
         gamesPageAdKey: data.gamesPageAdKey || "",
         tournamentsPageAdFrequency: Number(data.tournamentsPageAdFrequency) || 6,
@@ -191,6 +195,17 @@ export default function MonetizationClient() {
                     disabled={isSaving}
                 />
                 <p className="text-xs text-muted-foreground">Recommended size: 728x90 (Leaderboard). Displayed at the top of the leaderboard page.</p>
+            </div>
+
+            <div className="space-y-2">
+                <Label htmlFor="dashboardAdKey" className="flex items-center gap-2"><LayoutDashboard className="h-4 w-4"/> Dashboard Page Ad</Label>
+                <Input 
+                    id="dashboardAdKey" 
+                    {...form.register("dashboardAdKey")} 
+                    placeholder='Enter 728x90 Leaderboard ad key'
+                    disabled={isSaving}
+                />
+                <p className="text-xs text-muted-foreground">Recommended size: 728x90 (Leaderboard). Displayed mid-page on the dashboard.</p>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 border-t pt-6 border-dashed">

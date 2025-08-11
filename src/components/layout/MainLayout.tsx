@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { ReactNode } from "react";
@@ -115,7 +116,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               
               <div className="flex flex-col sm:flex-row justify-between items-center text-xs text-muted-foreground">
                 <p>&copy; {new Date().getFullYear()} Apna Esport. All rights reserved.</p>
-                <p className="mt-2 sm:mt-0">Built with ❤️ by Jitender Prajapat</p>
+                <p className="mt-2 sm:mt-0">Created by Jitender Prajapat</p>
               </div>
             </div>
         </footer>

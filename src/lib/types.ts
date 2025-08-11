@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -128,6 +129,7 @@ export interface SiteSettings {
   promotionDisplayMode?: 'image' | 'video' | 'ad';
   promotionBoardAdKey?: string;
   leaderboardAdKey?: string;
+  dashboardAdKey?: string;
   tournamentsPageAdKey?: string;
   gamesPageAdKey?: string;
   tournamentsPageAdFrequency?: number;

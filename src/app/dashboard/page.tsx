@@ -20,6 +20,7 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { AdPlacement } from "@/components/shared/AdPlacement";
 
 export default function DashboardPage() {
   const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
@@ -226,6 +227,21 @@ export default function DashboardPage() {
       )}
 
       <section>
+        <h2 className="text-2xl font-semibold mb-4 text-foreground">Stats Overview</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.map((stat) => (
+            <StatsCard key={stat.title} item={stat} />
+          ))}
+        </div>
+      </section>
+
+      {settings?.dashboardAdKey && (
+          <section>
+            <AdPlacement adKey={settings.dashboardAdKey} type="leaderboard" />
+          </section>
+      )}
+
+      <section>
         <h2 className="text-2xl font-semibold mb-4 text-foreground">Live Now</h2>
         {liveTournaments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -236,15 +252,6 @@ export default function DashboardPage() {
         ) : (
            <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
         )}
-      </section>
-
-      <section>
-        <h2 className="text-2xl font-semibold mb-4 text-foreground">Stats Overview</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {stats.map((stat) => (
-            <StatsCard key={stat.title} item={stat} />
-          ))}
-        </div>
       </section>
 
       <section>
