@@ -13,6 +13,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DashboardPageClient from "./DashboardPageClient";
 
 
+// Helper to convert Firestore Timestamps to a serializable format for Client Components
+const serializeObjectWithTimestamps = (obj: any): any => {
+    if (!obj) return obj;
+    // Create a new object to avoid mutating the original
+    const newObj = { ...obj };
+    for (const key in newObj) {
+        if (newObj[key] && typeof newObj[key] === 'object' && typeof newObj[key].toDate === 'function') {
+            newObj[key] = newObj[key].toDate().toISOString();
+        }
+    }
+    return newObj;
+};
+
+
 export default async function DashboardPage() {
   const [tournaments, games, users, settings] = await Promise.all([
     getTournamentsFromFirestore(),
@@ -54,18 +68,18 @@ export default async function DashboardPage() {
     { title: "Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" as LucideIconName },
   ];
   
-  const serializableGames = games.map(g => ({
-    ...g, 
-    createdAt: (g.createdAt as any)?.toDate ? (g.createdAt as any).toDate().toISOString() : undefined, 
-    updatedAt: (g.updatedAt as any)?.toDate ? (g.updatedAt as any).toDate().toISOString() : undefined 
-  }));
+  const serializableGames = games.map(serializeObjectWithTimestamps);
+  const serializableUsers = users.map(serializeObjectWithTimestamps);
+  const serializableFeaturedTournament = featuredTournament ? serializeObjectWithTimestamps(featuredTournament) : undefined;
+  const serializableLiveTournaments = liveTournaments.map(serializeObjectWithTimestamps);
+
 
   return (
      <DashboardPageClient 
         stats={stats}
-        allUsers={users}
-        featuredTournament={featuredTournament}
-        liveTournaments={liveTournaments}
+        allUsers={serializableUsers}
+        featuredTournament={serializableFeaturedTournament}
+        liveTournaments={serializableLiveTournaments}
         allGames={serializableGames}
      />
   );
