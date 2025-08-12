@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile, sendEmailVerification } from "firebase/auth";
 import { doc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -56,6 +56,13 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
+      // Send verification email
+      const actionCodeSettings = {
+        url: `${window.location.origin}/auth/login`,
+        handleCodeInApp: true,
+      };
+      await sendEmailVerification(user, actionCodeSettings);
+
       await updateFirebaseProfile(user, { displayName: values.name });
 
       const userIsAdmin = values.email === ADMIN_EMAIL;
@@ -65,6 +72,7 @@ export function RegisterForm() {
         email: values.email,
         photoURL: null,
         isAdmin: userIsAdmin,
+        emailVerified: user.emailVerified,
         createdAt: serverTimestamp() as Timestamp,
         updatedAt: serverTimestamp() as Timestamp,
         bio: "",
@@ -78,10 +86,12 @@ export function RegisterForm() {
       });
 
       toast({
-        title: "Registration Successful",
-        description: "Your account has been created.",
+        title: "Registration Successful!",
+        description: "Your account has been created. Please check your email to verify your account before logging in.",
+        duration: 8000,
       });
-      router.push("/dashboard");
+      await auth.signOut();
+      router.push("/auth/login");
     } catch (error: any) {
       let errorMessage = "An unexpected error occurred. Please try again.";
        if (error.code === "auth/email-already-in-use") {

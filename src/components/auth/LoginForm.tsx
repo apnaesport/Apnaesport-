@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -41,15 +41,57 @@ export function LoginForm() {
     },
   });
 
+  const handleResendVerification = async (email: string) => {
+    try {
+        // This is a bit of a workaround. We create a temporary user object
+        // to pass to sendEmailVerification.
+        const actionCodeSettings = {
+            url: `${window.location.origin}/auth/login`,
+            handleCodeInApp: true,
+        };
+        await sendEmailVerification(auth.currentUser!, actionCodeSettings);
+        toast({
+            title: "Verification Email Sent",
+            description: "A new verification link has been sent to your email address.",
+        });
+    } catch (error) {
+        console.error("Error resending verification email:", error);
+        toast({
+            title: "Error",
+            description: "Failed to resend verification email. Please try again later.",
+            variant: "destructive",
+        });
+    }
+  };
+
+
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, values.email, values.password);
+      const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+      
+      if (!userCredential.user.emailVerified) {
+        toast({
+            title: "Email Not Verified",
+            description: "Please verify your email before logging in. A verification link was sent to your inbox.",
+            variant: "destructive",
+            action: (
+                 <Button variant="secondary" size="sm" onClick={() => handleResendVerification(values.email)}>
+                    Resend Link
+                </Button>
+            ),
+        });
+        await auth.signOut(); // Log the user out
+        setIsLoading(false);
+        return;
+      }
+
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
       router.push("/dashboard");
+
     } catch (error: any) {
       let errorMessage = "An unexpected error occurred. Please try again.";
       if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password" || error.code === "auth/invalid-credential") {

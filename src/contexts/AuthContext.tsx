@@ -28,6 +28,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
+      // Don't allow login if email is not verified
+      if (!firebaseUser.emailVerified) {
+        setUserState(null);
+        setIsAdmin(false);
+        setLoading(false);
+        // Do not automatically sign out here, let login form handle it
+        return;
+      }
+
       const userDocRef = doc(db, "users", firebaseUser.uid);
       let userDocSnap = await getDoc(userDocRef);
 
@@ -39,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: firebaseUser.email,
           photoURL: null,
           isAdmin: userIsAdmin,
+          emailVerified: firebaseUser.emailVerified,
           createdAt: serverTimestamp() as Timestamp,
           updatedAt: serverTimestamp() as Timestamp,
           bio: "",

@@ -11,6 +11,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
+  emailVerified: boolean;
   createdAt?: Timestamp;
   bio?: string;
   favoriteGameIds?: string[];
