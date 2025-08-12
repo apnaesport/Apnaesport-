@@ -250,6 +250,33 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
   return undefined;
 };
 
+export const listenToTournamentById = (
+  tournamentId: string,
+  callback: (tournament: Tournament | null) => void
+): (() => void) => {
+  if (!tournamentId) {
+    callback(null);
+    return () => {}; // Return an empty unsubscribe function
+  }
+  const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+  const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+       const tournament: Tournament = {
+        id: docSnap.id,
+        ...data,
+        startDate: (data.startDate as Timestamp).toDate(),
+        endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
+      } as Tournament;
+       callback(tournament);
+    } else {
+      callback(null);
+    }
+  });
+
+  return unsubscribe;
+};
+
 export const updateTournamentInFirestore = async (tournamentId: string, tournamentData: Partial<Omit<Tournament, 'id' | 'createdAt' | 'startDate' | 'endDate'> & { startDate?: Date, endDate?: Date | null }>): Promise<void> => {
   const { startDate, endDate, ...restData } = tournamentData;
   const updateData: any = { ...restData, updatedAt: serverTimestamp() };

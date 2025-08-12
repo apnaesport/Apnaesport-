@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useState, useEffect, useCallback, useMemo } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { getTournamentByIdFromFirestore, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
+import { listenToTournamentById, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -65,7 +65,6 @@ interface TournamentPageClientProps {
 
 export default function TournamentPageClient({ tournamentId }: TournamentPageClientProps) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [formattedStartDate, setFormattedStartDate] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   
   const { user, isAdmin, loading: authLoading } = useAuth(); 
@@ -83,36 +82,28 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
 
-  const fetchTournament = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedTournament = await getTournamentByIdFromFirestore(tournamentId);
-      if (fetchedTournament) {
-        setTournament(fetchedTournament);
-        if (fetchedTournament.startDate) {
-           const startDate = fetchedTournament.startDate instanceof Date ? fetchedTournament.startDate : (fetchedTournament.startDate as any).toDate();
-           setFormattedStartDate(format(startDate, "PPPPp"));
-        }
-        setRoomCode(fetchedTournament.roomCode || "");
-        setRoomPassword(fetchedTournament.roomPassword || "");
-        if (user) {
-          setIsRegistered(fetchedTournament.participants.some(p => p.id === user.uid));
-        }
-      } else {
-        setTournament(null);
-        toast({ title: "Not Found", description: "Tournament not found.", variant: "destructive" });
-      }
-    } catch (error) {
-      console.error("Error fetching tournament:", error);
-      toast({ title: "Error", description: "Could not fetch tournament details.", variant: "destructive" });
-    } finally {
-        setIsLoading(false);
-    }
-  }, [tournamentId, user, toast]);
-
   useEffect(() => {
-    fetchTournament();
-  }, [fetchTournament]);
+    if (!tournamentId) {
+        setIsLoading(false);
+        return;
+    }
+    
+    setIsLoading(true);
+    const unsubscribe = listenToTournamentById(tournamentId, (liveTournament) => {
+        if (liveTournament) {
+            setTournament(liveTournament);
+            if (user) {
+                setIsRegistered(liveTournament.participants.some(p => p.id === user.uid));
+            }
+        } else {
+            setTournament(null);
+            toast({ title: "Not Found", description: "Tournament not found or has been removed.", variant: "destructive" });
+        }
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on component unmount
+  }, [tournamentId, user, toast]);
 
   const isTournamentCreator = useMemo(() => user && tournament && tournament.organizerId === user.uid, [user, tournament]);
   
@@ -198,7 +189,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         title: "Successfully Registered!",
         description: `You have joined ${tournament.name}.`,
       });
-      await fetchTournament();
       setIsRegistrationOpen(false); // Close dialog on success
       registrationForm.reset();
     } catch (error: any) {
@@ -236,7 +226,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         if (tournament) {
             await updateTournamentInFirestore(tournament.id, { roomCode, roomPassword });
             toast({ title: "Room Details Updated", description: "Participants can now see the room information." });
-            await fetchTournament();
         }
     } catch (error) {
       console.error("Error updating room details:", error);
@@ -250,6 +239,17 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     navigator.clipboard.writeText(text);
     toast({ title: "Copied!", description: "Password copied to clipboard." });
   }
+
+  const getStartDate = (): Date => {
+    if (!tournament?.startDate) return new Date();
+    return tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+  };
+  
+  const formattedStartDate = useMemo(() => {
+    if (!tournament?.startDate) return "Loading date...";
+    return format(getStartDate(), "PPPPp");
+  }, [tournament?.startDate]);
+
 
   if (isLoading) {
     return (
@@ -283,10 +283,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   }
 
   const isPremium = tournament.entryFee && tournament.entryFee > 0;
-
-  const getStartDate = () => {
-    return tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
-  };
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;
 
@@ -390,7 +386,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                         <CalendarDays className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <p className="font-medium">Date & Time</p>
-                            <p className="text-muted-foreground">{formattedStartDate || "Loading date..."}</p>
+                            <p className="text-muted-foreground">{formattedStartDate}</p>
                         </div>
                     </div>
                     <div className="flex items-start space-x-3">

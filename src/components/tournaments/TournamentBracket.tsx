@@ -1,10 +1,17 @@
 
+
 "use client";
 
 import type { Tournament, Match } from "@/lib/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ShieldQuestion } from "lucide-react";
+import { ShieldQuestion, Info } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface TournamentBracketProps {
   tournament: Tournament;
@@ -38,33 +45,46 @@ export function TournamentBracket({ tournament }: TournamentBracketProps) {
   });
 
   return (
-    <ScrollArea className="w-full h-[500px] p-1"> {/* Added padding for scrollbar */}
-      <div className="flex space-x-8 min-w-max">
-        {Object.entries(rounds).map(([roundNumber, roundMatches]) => (
-          <div key={roundNumber} className="flex flex-col space-y-4 min-w-[250px]">
-            <h4 className="text-lg font-semibold text-center text-primary">Round {roundNumber}</h4>
-            {roundMatches.map((match) => (
-              <Card key={match.id} className="bg-card border-border shadow-sm hover:shadow-md transition-shadow">
-                <CardHeader className="p-3">
-                  <CardTitle className="text-sm">Match {match.id.slice(-4)}</CardTitle>
-                  <CardDescription className="text-xs">{match.status} {match.score ? `(${match.score})`: ''}</CardDescription>
-                </CardHeader>
-                <CardContent className="p-3 space-y-2">
-                  <div className={`flex justify-between items-center p-2 rounded ${match.winner === match.participants[0] && match.participants[0] !== null ? 'bg-green-500/20 font-bold' : 'bg-secondary/50'}`}>
-                    <span>{match.participants[0]?.name || "BYE / TBD"}</span>
-                    {/* Placeholder for score part if needed */}
-                  </div>
-                  <div className="text-center text-xs text-muted-foreground">vs</div>
-                  <div className={`flex justify-between items-center p-2 rounded ${match.winner === match.participants[1] && match.participants[1] !== null ? 'bg-green-500/20 font-bold' : 'bg-secondary/50'}`}>
-                    <span>{match.participants[1]?.name || "BYE / TBD"}</span>
-                     {/* Placeholder for score part if needed */}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ))}
-      </div>
-    </ScrollArea>
+    <TooltipProvider>
+      <ScrollArea className="w-full h-[500px] p-1"> {/* Added padding for scrollbar */}
+        <div className="flex space-x-8 min-w-max">
+          {Object.entries(rounds).map(([roundNumber, roundMatches]) => (
+            <div key={roundNumber} className="flex flex-col space-y-4 min-w-[250px]">
+              <h4 className="text-lg font-semibold text-center text-primary">Round {roundNumber}</h4>
+              {roundMatches.map((match) => (
+                <Tooltip key={match.id} delayDuration={100}>
+                  <TooltipTrigger asChild>
+                    <Card className="bg-card border-border shadow-sm hover:shadow-md transition-shadow cursor-help">
+                      <CardHeader className="p-3">
+                        <CardTitle className="text-sm">Match {match.id.slice(-4)}</CardTitle>
+                        <CardDescription className="text-xs">{match.status} {match.score ? `(${match.score})`: ''}</CardDescription>
+                      </CardHeader>
+                      <CardContent className="p-3 space-y-2">
+                        <div className={`flex justify-between items-center p-2 rounded ${match.winner === match.participants[0] && match.participants[0] !== null ? 'bg-green-500/20 font-bold' : 'bg-secondary/50'}`}>
+                          <span>{match.participants[0]?.name || "BYE / TBD"}</span>
+                        </div>
+                        <div className="text-center text-xs text-muted-foreground">vs</div>
+                        <div className={`flex justify-between items-center p-2 rounded ${match.winner === match.participants[1] && match.participants[1] !== null ? 'bg-green-500/20 font-bold' : 'bg-secondary/50'}`}>
+                          <span>{match.participants[1]?.name || "BYE / TBD"}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="bg-popover text-popover-foreground border-border shadow-lg">
+                    <div className="p-2 space-y-2">
+                        <p className="font-bold text-base">Match Details</p>
+                        <p className="text-sm"><span className="font-semibold">Player 1:</span> {match.participants[0]?.name || "TBD"}</p>
+                        <p className="text-sm"><span className="font-semibold">Player 2:</span> {match.participants[1]?.name || "TBD"}</p>
+                        <p className="text-sm"><span className="font-semibold">Status:</span> {match.status}</p>
+                        {match.score && <p className="text-sm"><span className="font-semibold">Score:</span> {match.score}</p>}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </TooltipProvider>
   );
 }
