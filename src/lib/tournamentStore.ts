@@ -135,7 +135,11 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [];
   
-  qConstraints.push(orderBy("startDate", "desc"));
+  if (!queryParams || Object.keys(queryParams).length === 0) {
+      // No specific filters, no specific order to avoid index issues.
+  } else {
+      qConstraints.push(orderBy("startDate", "desc"));
+  }
 
   if (queryParams?.status) {
     qConstraints.push(where("status", "==", queryParams.status));
@@ -367,6 +371,9 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
       points: data.points || 0,
+      wins: data.wins || 0,
+      kills: data.kills || 0,
+      deaths: data.deaths || 0,
     } as UserProfile;
   }
   return null;
@@ -393,6 +400,9 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
       points: data.points || 0,
+      wins: data.wins || 0,
+      kills: data.kills || 0,
+      deaths: data.deaths || 0,
     };
   });
 };

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import {
@@ -32,7 +33,8 @@ const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
+  { href: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
+  { href: "/live-stats", label: "Live Stats Arena", icon: TrendingUp },
   // { href: "/stats", label: "My Stats", icon: BarChart3 }, 
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/social", label: "Social", icon: Users },
@@ -156,5 +158,3 @@ export function SidebarNav() {
     </>
   );
 }
-
-    

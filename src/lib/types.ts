@@ -20,6 +20,9 @@ export interface UserProfile extends Partial<FirebaseUser> {
   points?: number;
   sentFriendRequests?: string[];
   receivedFriendRequests?: string[];
+  wins?: number;
+  kills?: number;
+  deaths?: number;
 }
 
 export type Game = {
