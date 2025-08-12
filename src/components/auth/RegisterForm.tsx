@@ -57,7 +57,7 @@ export function RegisterForm() {
       const user = userCredential.user;
 
       // Send verification email
-      await sendEmailVerification(user, { handleCodeInApp: true });
+      await sendEmailVerification(user);
 
       await updateFirebaseProfile(user, { displayName: values.name });
 
