@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signInWithEmailAndPassword, sendEmailVerification } from "firebase/auth";
+import { signInWithEmailAndPassword, sendEmailVerification, type User } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -41,15 +41,14 @@ export function LoginForm() {
     },
   });
 
-  const handleResendVerification = async (email: string) => {
+  const handleResendVerification = async (user: User) => {
+    setIsLoading(true);
     try {
-        // This is a bit of a workaround. We create a temporary user object
-        // to pass to sendEmailVerification.
         const actionCodeSettings = {
             url: `${window.location.origin}/auth/login`,
             handleCodeInApp: true,
         };
-        await sendEmailVerification(auth.currentUser!, actionCodeSettings);
+        await sendEmailVerification(user, actionCodeSettings);
         toast({
             title: "Verification Email Sent",
             description: "A new verification link has been sent to your email address.",
@@ -61,6 +60,10 @@ export function LoginForm() {
             description: "Failed to resend verification email. Please try again later.",
             variant: "destructive",
         });
+    } finally {
+      // We sign out here AFTER resending the email.
+      await auth.signOut();
+      setIsLoading(false);
     }
   };
 
@@ -76,12 +79,14 @@ export function LoginForm() {
             description: "Please verify your email before logging in. A verification link was sent to your inbox.",
             variant: "destructive",
             action: (
-                 <Button variant="secondary" size="sm" onClick={() => handleResendVerification(values.email)}>
+                 <Button variant="secondary" size="sm" onClick={() => handleResendVerification(userCredential.user)}>
                     Resend Link
                 </Button>
             ),
+            duration: 10000,
         });
-        await auth.signOut(); // Log the user out
+        // We do NOT sign out here immediately. We let handleResendVerification do it.
+        // If the user doesn't click resend, they will be signed out by the session timeout or next action.
         setIsLoading(false);
         return;
       }
@@ -103,7 +108,10 @@ export function LoginForm() {
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      // Don't set loading to false here if we are showing the toast for unverified email
+      if (auth.currentUser?.emailVerified) {
+         setIsLoading(false);
+      }
     }
   }
 
