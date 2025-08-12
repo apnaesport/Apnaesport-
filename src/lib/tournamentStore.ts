@@ -135,9 +135,7 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [];
   
-  if (queryParams && Object.keys(queryParams).length > 0) {
-      qConstraints.push(orderBy("startDate", "desc"));
-  }
+  qConstraints.push(orderBy("startDate", "desc"));
 
   if (queryParams?.status) {
     qConstraints.push(where("status", "==", queryParams.status));
@@ -162,7 +160,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
   const now = new Date();
   const batch = writeBatch(db);
-  let tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
+  const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data();
     const tournament = {
       id: docSnapshot.id,
@@ -191,10 +189,6 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     
     return tournament;
   });
-  
-  if(!queryParams || Object.keys(queryParams).length === 0) {
-    tournaments = tournaments.sort((a,b) => b.startDate.getTime() - a.startDate.getTime());
-  }
 
   await batch.commit();
   return tournaments;

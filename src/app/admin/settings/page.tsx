@@ -171,23 +171,6 @@ function AdminSettingsPageContent() {
 
       <Card>
         <CardHeader>
-            <CardTitle className="flex items-center">
-                <DollarSign className="mr-2 h-5 w-5 text-primary" /> Monetization Settings
-            </CardTitle>
-            <CardDescription>To manage ads and the promotion board, go to the new Monetization section.</CardDescription>
-        </CardHeader>
-        <CardContent>
-           <Button asChild>
-                <Link href="/admin/monetization">
-                    <DollarSign className="mr-2 h-4 w-4" /> Go to Monetization
-                </Link>
-           </Button>
-        </CardContent>
-      </Card>
-
-
-      <Card>
-        <CardHeader>
           <CardTitle className="flex items-center">
             <UsersRound className="mr-2 h-5 w-5 text-primary" /> User &amp; Registration Settings
           </CardTitle>

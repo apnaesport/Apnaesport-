@@ -125,15 +125,6 @@ export interface SiteSettings {
   defaultTheme?: string;
   basePlayerCount?: number;
   updatedAt?: Timestamp;
-  promotionImageUrl?: string;
-  promotionVideoUrl?: string;
-  promotionDisplayMode?: 'image' | 'video' | 'ad';
-  promotionBoardAdKey?: string;
-  leaderboardAdKey?: string;
-  dashboardAdKey?: string;
-  tournamentsPageAdKey?: string;
-  gamesPageAdKey?: string;
-  tournamentsPageAdFrequency?: number;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";

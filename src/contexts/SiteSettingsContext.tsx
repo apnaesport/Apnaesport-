@@ -25,15 +25,6 @@ const defaultSettings: SiteSettings = {
     downloadAppLink: "",
     defaultTheme: "system",
     basePlayerCount: 0,
-    promotionImageUrl: "",
-    promotionVideoUrl: "",
-    promotionDisplayMode: "image",
-    promotionBoardAdKey: "",
-    leaderboardAdKey: "",
-    dashboardAdKey: "",
-    tournamentsPageAdKey: "",
-    gamesPageAdKey: "",
-    tournamentsPageAdFrequency: 6,
 };
 
 

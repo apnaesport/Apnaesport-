@@ -3,7 +3,6 @@
 
 import { MainLayout } from "@/components/layout/MainLayout";
 import { PageTitle } from "@/components/shared/PageTitle";
-import { StatsCard } from "@/components/dashboard/StatsCard"; 
 import type { StatItem, Tournament } from "@/lib/types";
 import { Activity, LogIn, Loader2, Swords, Trophy, Percent, Zap, ListChecks, Lock } from "lucide-react"; 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

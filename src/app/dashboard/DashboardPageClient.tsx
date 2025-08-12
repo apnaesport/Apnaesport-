@@ -15,7 +15,6 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AdPlacement } from "@/components/shared/AdPlacement";
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -52,89 +51,13 @@ export default function DashboardPageClient({ stats: initialStats, allUsers, fea
         return [...initialStats, userRankStat];
     }, [initialStats, currentUserRanking]);
     
-    useEffect(() => {
-        if (loadingSettings || !settings || !adContainerRef.current) return;
-        
-        if (settings.promotionDisplayMode === 'ad' && settings.promotionBoardAdKey) {
-            adContainerRef.current.innerHTML = '';
-
-            const adKey = settings.promotionBoardAdKey;
-            const containerId = `container-${adKey}-${Math.random().toString(36).substring(7)}`;
-
-            const adContainerDiv = document.createElement('div');
-            adContainerDiv.id = containerId;
-            
-            const adInvocationScript = document.createElement('script');
-            adInvocationScript.type = 'text/javascript';
-            adInvocationScript.innerHTML = `
-                atOptions = {
-                    'key' : '${adKey}',
-                    'format' : 'iframe',
-                    'height' : 90,
-                    'width' : 728,
-                    'params' : {}
-                };
-            `;
-
-            const adsterraScript = document.createElement('script');
-            adsterraScript.async = true;
-            adsterraScript.src = `//pl23429392.highcpmgate.com/${adKey}/invoke.js`;
-            
-            adContainerRef.current.appendChild(adContainerDiv);
-            adContainerRef.current.appendChild(adInvocationScript);
-            adContainerRef.current.appendChild(adsterraScript);
-        }
-    }, [settings, loadingSettings]);
     
     const recommendedTournaments: Tournament[] = [];
-    const showPromotion = settings && settings.promotionDisplayMode && (settings.promotionImageUrl || settings.promotionVideoUrl || settings.promotionBoardAdKey);
 
     return (
         <div className="space-y-8">
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
             
-            {showPromotion && (
-                <Card className="overflow-hidden shadow-lg border-primary/20">
-                    <CardHeader className="p-4 sm:p-6">
-                        <CardTitle className="flex items-center gap-2">
-                            <Megaphone className="h-6 w-6 text-primary" />
-                            Promotion Board
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <div className={cn(
-                            "w-full bg-muted rounded-md flex items-center justify-center overflow-hidden",
-                            settings?.promotionDisplayMode === 'ad' ? "min-h-[90px]" : "aspect-video"
-                        )}>
-                            {settings?.promotionDisplayMode === 'ad' && settings.promotionBoardAdKey ? (
-                                <div ref={adContainerRef} className="w-full flex justify-center items-center">
-                                    {/* Adsterra ad will be injected here */}
-                                </div>
-                            ) : settings?.promotionDisplayMode === 'video' && settings.promotionVideoUrl ? (
-                                <iframe
-                                    className="w-full h-full aspect-video"
-                                    src={settings.promotionVideoUrl}
-                                    title="Promotional Video"
-                                    frameBorder="0"
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                    allowFullScreen
-                                ></iframe>
-                            ) : settings?.promotionImageUrl ? (
-                                <div className="w-full h-full relative aspect-video">
-                                    <ImageWithFallback
-                                        src={settings.promotionImageUrl}
-                                        fallbackSrc='https://placehold.co/1280x720.png'
-                                        alt="Promotion"
-                                        layout="fill"
-                                        objectFit="cover"
-                                    />
-                                </div>
-                            ) : null}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
             {featuredTournament ? (
                 <section>
                     <FeaturedTournamentCard tournament={featuredTournament} />
@@ -167,12 +90,6 @@ export default function DashboardPageClient({ stats: initialStats, allUsers, fea
                 ))}
                 </div>
             </section>
-
-            {settings?.dashboardAdKey && (
-                <section>
-                    <AdPlacement adKey={settings.dashboardAdKey} type="leaderboard" />
-                </section>
-            )}
 
             <section>
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">Live Now</h2>

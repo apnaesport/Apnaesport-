@@ -20,7 +20,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
-import { AdPlacement } from "@/components/shared/AdPlacement";
 
 
 interface LeaderboardClientPageProps {
@@ -117,9 +116,6 @@ export function LeaderboardClientPage({ allUsers }: LeaderboardClientPageProps) 
 
   return (
     <>
-      {settings?.leaderboardAdKey && (
-          <AdPlacement adKey={settings.leaderboardAdKey} type="leaderboard" className="mb-6"/>
-      )}
       
       {top3Players.length > 0 && (
         <div className="mb-8">

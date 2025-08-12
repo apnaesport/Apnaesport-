@@ -7,7 +7,6 @@ import { GameCard } from '@/components/games/GameCard';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
-import { AdPlacement } from '@/components/shared/AdPlacement';
 
 interface GamesPageClientProps {
   allGames: Game[];
@@ -26,18 +25,6 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
     );
   }, [searchTerm, allGames]);
 
-  // Create an array that includes the ad
-  const itemsWithAd: (Game | { isAd: true })[] = [...filteredGames];
-  if (settings?.gamesPageAdKey) {
-    // Insert ad at the 4th position (index 3)
-    if (itemsWithAd.length >= 3) {
-      itemsWithAd.splice(3, 0, { isAd: true });
-    } else {
-      itemsWithAd.push({ isAd: true }); // Add at the end if not enough items
-    }
-  }
-
-
   return (
     <>
       <div className="relative max-w-md mb-6">
@@ -50,12 +37,9 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
         />
       </div>
 
-      {itemsWithAd.length > 0 ? (
+      {filteredGames.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {itemsWithAd.map((item, index) => {
-            if ('isAd' in item) {
-                return <AdPlacement key="ad-games" adKey={settings.gamesPageAdKey!} type="video" className="sm:col-span-2 lg:col-span-1" />;
-            }
+          {filteredGames.map((item, index) => {
             return <GameCard key={item.id} game={item} />;
           })}
         </div>

@@ -17,7 +17,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
-import { AdPlacement } from "@/components/shared/AdPlacement";
 
 interface TournamentsPageClientProps {
     allTournaments: Tournament[];
@@ -71,22 +70,6 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     
     return newFilteredTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
   }, [searchTerm, statusFilter, allTournaments]);
-
-  const itemsWithAds: (Tournament | { isAd: true })[] = useMemo(() => {
-    const adFrequency = settings?.tournamentsPageAdFrequency;
-    if (!settings?.tournamentsPageAdKey || !adFrequency || adFrequency <= 0) {
-      return filteredTournaments;
-    }
-
-    const result: (Tournament | { isAd: true })[] = [];
-    for (let i = 0; i < filteredTournaments.length; i++) {
-        result.push(filteredTournaments[i]);
-        if ((i + 1) % adFrequency === 0) {
-            result.push({ isAd: true });
-        }
-    }
-    return result;
-  }, [filteredTournaments, settings]);
 
 
   const handleStatusFilterChange = (status: Tournament["status"] | "all") => {
@@ -143,12 +126,9 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
         </DropdownMenu>
       </div>
 
-      {itemsWithAds.length > 0 ? (
+      {filteredTournaments.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {itemsWithAds.map((item, index) => {
-            if ('isAd' in item) {
-                return <AdPlacement key={`ad-${index}`} adKey={settings!.tournamentsPageAdKey!} type="mediumRectangle" className="md:col-span-1" />;
-            }
+          {filteredTournaments.map((item, index) => {
             return <TournamentCard key={item.id} tournament={item} />;
           })}
         </div>
