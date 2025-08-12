@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from "react";
 import type { Game, UserProfile, StatItem } from "@/lib/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
-import { Search, Trophy, User, Crosshair, BarChart, Crown } from "lucide-react";
+import { Search, Trophy, User, Crosshair, BarChart, Crown, Loader2, Server, Database, Info } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -15,11 +15,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { StatsCard } from "@/components/dashboard/StatsCard";
+import { fetchLivePlayerStats, type PlayerStatsOutput } from "@/ai/flows/player-stats-flow";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 
 interface LiveStatsPageClientProps {
   allGames: Game[];
@@ -35,6 +38,10 @@ export default function LiveStatsPageClient({ allGames, allUsers }: LiveStatsPag
   const [activeGameId, setActiveGameId] = useState<string | null>(allGames[0]?.id || null);
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  const [isLoadingApi, setIsLoadingApi] = useState(false);
+  const [apiResult, setApiResult] = useState<PlayerStatsOutput | null>(null);
 
   // Simulate loading
   useEffect(() => {
@@ -43,8 +50,6 @@ export default function LiveStatsPageClient({ allGames, allUsers }: LiveStatsPag
   }, [activeGameId]);
 
   const sortedUsers = useMemo(() => {
-    // For now, we sort by points as a proxy for a real game-specific rank.
-    // This can be replaced with API data later.
     return [...allUsers].sort((a, b) => (b.points || 0) - (a.points || 0));
   }, [allUsers]);
 
@@ -73,7 +78,37 @@ export default function LiveStatsPageClient({ allGames, allUsers }: LiveStatsPag
 
   const handleTabChange = (gameId: string) => {
     setIsLoading(true);
+    setApiResult(null); // Clear API result when switching games
     setActiveGameId(gameId);
+  }
+
+  const handlePlayerSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) {
+        setApiResult(null); // Clear result if search is cleared
+        return;
+    }
+    setIsLoadingApi(true);
+    setApiResult(null);
+    try {
+        const result = await fetchLivePlayerStats({ playerName: searchTerm });
+        setApiResult(result);
+        if(!result.isApiData) {
+          toast({
+            title: "Displaying Placeholder Data",
+            description: "Live API is disabled. Showing simulated stats instead.",
+          });
+        }
+    } catch(error) {
+        console.error("Error fetching live stats:", error);
+        toast({
+            title: "API Error",
+            description: "Could not fetch live player stats. Please try again later.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsLoadingApi(false);
+    }
   }
 
   return (
@@ -104,17 +139,60 @@ export default function LiveStatsPageClient({ allGames, allUsers }: LiveStatsPag
             <Card>
                 <CardHeader>
                     <CardTitle>Live Leaderboard: {game.name}</CardTitle>
-                    <div className="relative mt-2">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <CardDescription>Search for a player to fetch their live stats directly from the game's API, or browse the current leaderboard from our platform.</CardDescription>
+                    <form onSubmit={handlePlayerSearch} className="flex gap-2 pt-2">
                         <Input
-                        placeholder="Search player..."
-                        className="pl-10 max-w-sm"
+                        placeholder="Search player by in-game name..."
+                        className="max-w-sm"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         />
-                    </div>
+                        <Button type="submit" disabled={isLoadingApi}>
+                            {isLoadingApi ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Search className="mr-2 h-4 w-4" />}
+                            Search
+                        </Button>
+                    </form>
                 </CardHeader>
                 <CardContent>
+                    {isLoadingApi ? (
+                        <div className="text-center p-8">
+                            <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
+                            <p className="text-muted-foreground">Fetching live stats for "{searchTerm}"...</p>
+                        </div>
+                    ) : apiResult ? (
+                         <Card className="bg-primary/5 border-primary/20">
+                            <CardHeader>
+                                <CardTitle className="flex items-center justify-between">
+                                    <span className="flex items-center gap-2">
+                                        <Server className="h-5 w-5"/> Live Stats for "{apiResult.playerName}"
+                                    </span>
+                                    <Button variant="outline" size="sm" onClick={() => setApiResult(null)}>Clear Search</Button>
+                                </CardTitle>
+                                {!apiResult.isApiData && (
+                                  <CardDescription className="flex items-center gap-2 text-orange-500">
+                                    <Info className="h-4 w-4"/> Displaying placeholder data. Live API is currently disabled.
+                                  </CardDescription>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Stat</TableHead>
+                                            <TableHead className="text-right">Value</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        <TableRow><TableCell>K/D Ratio</TableCell><TableCell className="text-right font-mono">{apiResult.kdRatio}</TableCell></TableRow>
+                                        <TableRow><TableCell>Wins</TableCell><TableCell className="text-right font-mono">{apiResult.wins}</TableCell></TableRow>
+                                        <TableRow><TableCell>Kills</TableCell><TableCell className="text-right font-mono">{apiResult.kills}</TableCell></TableRow>
+                                        <TableRow><TableCell>Deaths</TableCell><TableCell className="text-right font-mono">{apiResult.deaths}</TableCell></TableRow>
+                                        <TableRow><TableCell>Matches Played</TableCell><TableCell className="text-right font-mono">{apiResult.matchesPlayed}</TableCell></TableRow>
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    ) : (
                     <div className="overflow-x-auto">
                     <Table>
                         <TableHeader>
@@ -166,13 +244,14 @@ export default function LiveStatsPageClient({ allGames, allUsers }: LiveStatsPag
                         ) : (
                             <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center">
-                                No players found for "{searchTerm}".
+                                No players found on the leaderboard.
                             </TableCell>
                             </TableRow>
                         )}
                         </TableBody>
                     </Table>
                     </div>
+                    )}
                 </CardContent>
             </Card>
         </TabsContent>
