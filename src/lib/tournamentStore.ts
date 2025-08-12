@@ -133,16 +133,18 @@ export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 
 };
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
-  let qConstraints: QueryConstraint[] = [orderBy("startDate", "desc")];
+  let qConstraints: QueryConstraint[] = [];
+  
+  if (queryParams && Object.keys(queryParams).length > 0) {
+      qConstraints.push(orderBy("startDate", "desc"));
+  }
 
   if (queryParams?.status) {
     qConstraints.push(where("status", "==", queryParams.status));
   }
   
-  // This logic is adjusted to avoid needing a composite index for gameId + startDate.
-  // We query by gameId only and then sort the results in the application code.
   if (queryParams?.gameId) {
-    qConstraints = [where("gameId", "==", queryParams.gameId)];
+    qConstraints.push(where("gameId", "==", queryParams.gameId));
   }
 
   if (queryParams?.featured !== undefined) {
@@ -190,8 +192,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     return tournament;
   });
   
-  // If we queried by gameId, we need to sort manually now.
-  if(queryParams?.gameId) {
+  if(!queryParams || Object.keys(queryParams).length === 0) {
     tournaments = tournaments.sort((a,b) => b.startDate.getTime() - a.startDate.getTime());
   }
 
