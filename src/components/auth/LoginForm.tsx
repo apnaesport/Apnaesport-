@@ -44,11 +44,7 @@ export function LoginForm() {
   const handleResendVerification = async (user: User) => {
     setIsLoading(true);
     try {
-        const actionCodeSettings = {
-            url: `${window.location.origin}/auth/login`,
-            handleCodeInApp: true,
-        };
-        await sendEmailVerification(user, actionCodeSettings);
+        await sendEmailVerification(user);
         toast({
             title: "Verification Email Sent",
             description: "A new verification link has been sent to your email address.",
