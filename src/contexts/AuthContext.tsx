@@ -37,7 +37,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User",
           email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL || null,
+          photoURL: null,
           isAdmin: userIsAdmin,
           createdAt: serverTimestamp() as Timestamp,
           updatedAt: serverTimestamp() as Timestamp,
@@ -127,7 +127,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const refreshUser = useCallback(async () => {
     if (auth.currentUser) {
       setLoading(true); // Indicate loading state
-      await fetchAndSetUser(auth.currentUser);
+      await auth.currentUser.reload(); // Reload Firebase Auth user data
+      await fetchAndSetUser(auth.currentUser); // Then fetch and set our custom profile
     }
   }, [fetchAndSetUser]);
 
