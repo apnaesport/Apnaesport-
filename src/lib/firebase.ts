@@ -21,3 +21,7 @@ const db = getFirestore(app);
 export { app, auth, db };
 
 export const ADMIN_EMAIL = "xyzadminserviceacc@gmail.com";
+
+// NOTE: For production, API keys should be stored in environment variables, not in source code.
+// This is added here for prototype functionality.
+export const BGMI_API_KEY = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJqdGkiOiI0YjAyOGY2MC01OTkwLTAxM2UtNWY5Zi03NmNhZDljYTc2ODYiLCJpc3MiOiJnYW1lbG9ja2VyIiwiaWF0IjoxNzU0OTkyNDgyLCJwdWIiOiJibHVlaG9sZSIsInRpdGxlIjoicHViZyIsImFwcCI6ImFwbmEtZXNwb3J0In0._mCGDyWmDNmJqH7wNrMO_dZB_zjSyC5iCd-zsylK-gI";

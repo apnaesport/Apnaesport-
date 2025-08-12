@@ -3,6 +3,8 @@ import { PageTitle } from "@/components/shared/PageTitle";
 import type { Metadata } from 'next';
 import { getGamesFromFirestore, getAllUsersFromFirestore } from "@/lib/tournamentStore";
 import LiveStatsPageClient from "./LiveStatsPageClient";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Zap } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "Live Stats Arena | Apna Esport",
@@ -27,8 +29,8 @@ export default async function LiveStatsPage() {
   const allGames = await getGamesFromFirestore();
   const allUsers = await getAllUsersFromFirestore();
   
-  // For now, we assume all games are "API-powered" for the simulation
-  const apiGames = allGames.map(serializeObject);
+  // Filter for only games marked as API-powered
+  const apiGames = allGames.filter(game => game.isApiPowered).map(serializeObject);
   const serializableUsers = allUsers.map(serializeObject);
 
   return (
@@ -37,7 +39,17 @@ export default async function LiveStatsPage() {
         title="Live Stats Arena"
         subtitle="Real-time leaderboards and player statistics for top competitive games."
       />
-      <LiveStatsPageClient allGames={apiGames} allUsers={serializableUsers} />
+      {apiGames.length > 0 ? (
+        <LiveStatsPageClient allGames={apiGames} allUsers={serializableUsers} />
+      ) : (
+        <Alert>
+            <Zap className="h-4 w-4" />
+            <AlertTitle>No API-Powered Games Found</AlertTitle>
+            <AlertDescription>
+              There are no games configured for the Live Stats Arena yet. An admin can enable this feature for specific games in the 'Manage Games' section of the admin panel.
+            </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }

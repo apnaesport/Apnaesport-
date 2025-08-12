@@ -31,6 +31,7 @@ export type Game = {
   iconUrl: string;
   bannerUrl?: string;
   dataAiHint?: string;
+  isApiPowered?: boolean; // Added for API-specific games
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
