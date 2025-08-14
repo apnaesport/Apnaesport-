@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
@@ -31,12 +31,13 @@ import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const communitySchema = z.object({
     name: z.string().min(3, "Community name must be at least 3 characters.").max(50, "Name cannot exceed 50 characters."),
     tagline: z.string().min(10, "Tagline must be at least 10 characters.").max(100, "Tagline cannot exceed 100 characters."),
     description: z.string().min(20, "Description must be at least 20 characters.").max(1000, "Description cannot exceed 1000 characters."),
-    gameId: z.string().optional(), // Make optional for now
+    gameId: z.string().optional(),
 });
 
 type CommunityFormData = z.infer<typeof communitySchema>;
@@ -180,19 +181,40 @@ export default function CommunityHubPage() {
                           </DialogHeader>
                           <form onSubmit={form.handleSubmit(handleCreateCommunity)} className="space-y-4 py-4">
                               <div>
-                                  <Label htmlFor="name">Community Name</Label>
+                                  <Label htmlFor="name">Community Name *</Label>
                                   <Input id="name" {...form.register("name")} disabled={isCreating} />
                                   {form.formState.errors.name && <p className="text-destructive text-xs mt-1">{form.formState.errors.name.message}</p>}
                               </div>
                                <div>
-                                  <Label htmlFor="tagline">Tagline</Label>
+                                  <Label htmlFor="tagline">Tagline *</Label>
                                   <Input id="tagline" {...form.register("tagline")} placeholder="e.g., The official hub for top-tier gamers." disabled={isCreating} />
                                   {form.formState.errors.tagline && <p className="text-destructive text-xs mt-1">{form.formState.errors.tagline.message}</p>}
                               </div>
                               <div>
-                                  <Label htmlFor="description">Description</Label>
+                                  <Label htmlFor="description">Description *</Label>
                                   <Textarea id="description" {...form.register("description")} rows={4} disabled={isCreating} />
                                   {form.formState.errors.description && <p className="text-destructive text-xs mt-1">{form.formState.errors.description.message}</p>}
+                              </div>
+                              <div>
+                                <Label htmlFor="gameId">Primary Game (Optional)</Label>
+                                <Controller
+                                    name="gameId"
+                                    control={form.control}
+                                    render={({ field }) => (
+                                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isCreating}>
+                                        <SelectTrigger id="gameId">
+                                        <SelectValue placeholder="Select a game..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                        <SelectItem value="">Variety Gaming (No specific game)</SelectItem>
+                                        {games.map(game => (
+                                            <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>
+                                        ))}
+                                        </SelectContent>
+                                    </Select>
+                                    )}
+                                />
+                                {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
                               </div>
                               <DialogFooter>
                                   <DialogClose asChild>

@@ -4,6 +4,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -484,7 +485,7 @@ export const createCommunityInFirestore = async (
         description: communityData.description,
         ownerId: owner.uid,
         ownerName: owner.displayName || 'Owner',
-        gameId: communityData.gameId || undefined,
+        gameId: communityData.gameId || null,
         gameName: communityData.gameName || 'Variety',
         logoUrl: `https://placehold.co/100x100.png?text=${communityData.name.substring(0, 2)}`,
         bannerUrl: `https://placehold.co/800x200.png?text=${encodeURIComponent(communityData.name)}`,
