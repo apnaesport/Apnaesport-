@@ -1,23 +1,32 @@
 
 "use client";
 
-import type { Metadata } from 'next';
 import { notFound, useRouter } from 'next/navigation';
-import { PageTitle } from '@/components/shared/PageTitle';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Gamepad2, BarChart3, Medal, Home, Camera, CheckCircle, PlusCircle, Loader2 } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Community, CommunityMember, CommunityPost } from '@/lib/types';
+import type { Community, CommunityMember } from '@/lib/types';
 import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface CommunityPageProps {
     params: { communityId: string };
@@ -64,7 +73,7 @@ const AnnouncementCard = ({ icon: Icon, title, text }: { icon: React.ElementType
 )
 
 
-export default function CommunityDetailPage({ params }: CommunityPageProps) {
+export default function CommunityDetailPage({ params: { communityId } }: CommunityPageProps) {
     const { user, loading: authLoading, refreshUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
@@ -74,10 +83,10 @@ export default function CommunityDetailPage({ params }: CommunityPageProps) {
     const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
-        const unsubscribe = listenToCommunityById(params.communityId, async (liveCommunity) => {
+        const unsubscribe = listenToCommunityById(communityId, async (liveCommunity) => {
             if (liveCommunity) {
                 setCommunity(liveCommunity);
-                const fetchedMembers = await getCommunityMembers(params.communityId);
+                const fetchedMembers = await getCommunityMembers(communityId);
                 setMembers(fetchedMembers);
                 setIsLoading(false);
             } else {
@@ -86,7 +95,7 @@ export default function CommunityDetailPage({ params }: CommunityPageProps) {
         });
 
         return () => unsubscribe();
-    }, [params.communityId]);
+    }, [communityId]);
 
     const isMember = useMemo(() => {
         if (!user || !community) return false;
@@ -96,7 +105,7 @@ export default function CommunityDetailPage({ params }: CommunityPageProps) {
     const handleJoinCommunity = async () => {
         if (!user) {
             toast({ title: "Not Logged In", description: "You must be logged in to join.", variant: "destructive" });
-            router.push(`/auth/login?redirect=/community/${params.communityId}`);
+            router.push(`/auth/login?redirect=/community/${communityId}`);
             return;
         }
         if (user.communityId) {
@@ -105,7 +114,7 @@ export default function CommunityDetailPage({ params }: CommunityPageProps) {
         }
         setIsProcessing(true);
         try {
-            await joinCommunity(params.communityId, user);
+            await joinCommunity(communityId, user);
             await refreshUser();
             toast({ title: "Welcome!", description: `You have joined ${community?.name}.` });
         } catch (error: any) {
@@ -123,7 +132,7 @@ export default function CommunityDetailPage({ params }: CommunityPageProps) {
         }
         setIsProcessing(true);
         try {
-            await leaveCommunity(params.communityId, user);
+            await leaveCommunity(communityId, user);
             await refreshUser();
             toast({ title: "Community Left", description: `You have left ${community.name}.` });
         } catch (error: any) {
