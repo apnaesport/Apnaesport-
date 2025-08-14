@@ -105,7 +105,7 @@ export default function CommunityHubPage() {
 
     const form = useForm<CommunityFormData>({
         resolver: zodResolver(communitySchema),
-        defaultValues: { name: "", tagline: "", description: "", gameId: "" },
+        defaultValues: { name: "", tagline: "", description: "", gameId: "none" },
     });
 
     const fetchPageData = useCallback(async () => {
@@ -141,9 +141,12 @@ export default function CommunityHubPage() {
 
         setIsCreating(true);
         try {
-            const selectedGame = games.find(g => g.id === data.gameId);
+            const finalGameId = data.gameId === 'none' ? undefined : data.gameId;
+            const selectedGame = games.find(g => g.id === finalGameId);
+
             const newCommunityId = await createCommunityInFirestore({
                 ...data,
+                gameId: finalGameId,
                 gameName: selectedGame?.name,
             }, user);
             await refreshUser();
@@ -206,7 +209,7 @@ export default function CommunityHubPage() {
                                         <SelectValue placeholder="Select a game..." />
                                         </SelectTrigger>
                                         <SelectContent>
-                                        <SelectItem value="">Variety Gaming (No specific game)</SelectItem>
+                                        <SelectItem value="none">Variety Gaming (No specific game)</SelectItem>
                                         {games.map(game => (
                                             <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>
                                         ))}
