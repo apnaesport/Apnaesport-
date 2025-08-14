@@ -2,6 +2,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -25,7 +26,7 @@ import {
   Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest, Community } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest, Community, CommunityMember } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -856,6 +857,28 @@ export const getCommunitiesFromFirestore = async (): Promise<Community[]> => {
     const communitiesSnapshot = await getDocs(query(collection(db, COMMUNITIES_COLLECTION), orderBy("createdAt", "desc")));
     return communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
 };
+
+export const getCommunityById = async (communityId: string): Promise<Community | null> => {
+    if (!communityId) return null;
+    const docRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+            id: docSnap.id,
+            ...data,
+            createdAt: data.createdAt as Timestamp,
+            updatedAt: data.updatedAt as Timestamp,
+        } as Community;
+    }
+    return null;
+}
+
+export const getCommunityMembers = async (communityId: string): Promise<CommunityMember[]> => {
+    const membersRef = collection(db, COMMUNITIES_COLLECTION, communityId, 'members');
+    const membersSnap = await getDocs(query(membersRef, orderBy("joinedAt", "asc")));
+    return membersSnap.docs.map(doc => doc.data() as CommunityMember);
+}
 
 
 // Aliases for easier use

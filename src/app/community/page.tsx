@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { createCommunityInFirestore, getCommunitiesFromFirestore, getGamesFromFirestore } from '@/lib/tournamentStore';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
@@ -50,7 +50,7 @@ const CommunityCard = ({ community }: { community: Community }) => {
                     src={community.bannerUrl || ''}
                     fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(community.name)}`}
                     alt={`${community.name} banner`}
-                    layout="fill"
+                    fill
                     objectFit="cover"
                     className="transition-transform duration-300 group-hover:scale-105"
                     data-ai-hint="esports community banner"
@@ -83,11 +83,11 @@ const CommunityCard = ({ community }: { community: Community }) => {
                     </div>
                 </div>
              </CardContent>
-             <DialogFooter className="p-4 border-t">
+             <CardFooter className="p-4 border-t">
                  <Button asChild className="w-full">
                     <Link href={`/community/${community.id}`}>View & Join</Link>
                 </Button>
-             </DialogFooter>
+             </CardFooter>
         </Card>
     )
 }
@@ -232,9 +232,9 @@ export default function CommunityHubPage() {
                                <Skeleton className="h-5 w-3/4"/>
                                <Skeleton className="h-4 w-1/2"/>
                            </CardContent>
-                           <DialogFooter className="p-4 border-t">
+                           <CardFooter className="p-4 border-t">
                                <Skeleton className="h-10 w-full" />
-                           </DialogFooter>
+                           </CardFooter>
                        </Card>
                     ))}
                 </div>

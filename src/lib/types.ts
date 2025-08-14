@@ -1,5 +1,6 @@
 
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -214,7 +215,7 @@ export interface Community {
     ownerName: string;
     gameId?: string;
     gameName?: string;
-a    logoUrl?: string;
+    logoUrl?: string;
     bannerUrl?: string;
     memberCount: number;
     level: number;
