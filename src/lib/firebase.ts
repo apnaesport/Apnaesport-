@@ -30,7 +30,7 @@ if (typeof window !== 'undefined') {
 
 export { app, auth, db };
 
-export const ADMIN_EMAIL = "xyzadminserviceacc@gmail.com";
+export const ADMIN_EMAIL = "xyzapplywork@gmail.com";
 
 // NOTE: For production, API keys should be stored in environment variables, not in source code.
 // This is added here for prototype functionality.
