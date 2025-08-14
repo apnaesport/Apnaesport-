@@ -1,5 +1,6 @@
 
 
+
 import {
   collection,
   doc,
@@ -272,7 +273,7 @@ export const listenToTournamentById = (
     }
   });
 
-  return unsubscribe;
+  return unsubscribe; // Return the unsubscribe function
 };
 
 export const updateTournamentInFirestore = async (tournamentId: string, tournamentData: Partial<Omit<Tournament, 'id' | 'createdAt' | 'startDate' | 'endDate'> & { startDate?: Date, endDate?: Date | null }>): Promise<void> => {
@@ -356,6 +357,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
   const docSnap = await getDoc(userRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
+    // Ensure all fields are present to prevent "undefined" errors downstream.
     return {
       uid: docSnap.id,
       displayName: data.displayName || "Unknown User",
