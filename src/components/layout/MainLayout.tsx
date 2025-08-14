@@ -16,9 +16,10 @@ import {
 import Link from "next/link";
 import { SponsorshipCTA } from "./SponsorshipCTA";
 import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram, Facebook, Download } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle } from "lucide-react"; 
 import { Button } from "../ui/button";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -44,28 +45,44 @@ export function MainLayout({ children }: MainLayoutProps) {
         </main>
         <footer className="bg-secondary/20 border-t">
             <div className="container mx-auto py-12 px-4 md:px-6 lg:px-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 text-center md:text-left">
+              <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-8">
                 {/* Branding Column */}
-                <div className="space-y-4 lg:col-span-1 flex flex-col items-center md:items-start">
+                <div className="space-y-4 md:col-span-4 lg:col-span-2 flex flex-col items-center text-center md:items-start md:text-left">
                   <Logo size="lg"/>
-                  <p className="text-muted-foreground text-sm max-w-xs">
-                    The ultimate destination for competitive gaming. Join tournaments, climb the leaderboard, and become a champion.
+                  <p className="text-muted-foreground text-sm max-w-sm">
+                    The ultimate destination for competitive gaming. Join tournaments, build communities, and become a champion.
                   </p>
-                  <div className="space-y-3 pt-4 w-full max-w-xs">
-                     <h4 className="font-semibold text-foreground text-center md:text-left">Promote Your Brand</h4>
-                     <p className="text-sm text-muted-foreground">Get your brand in front of passionate gamers. Partner with us for tournaments and site-wide visibility.</p>
-                     <SponsorshipCTA />
+                  <div className="flex flex-col sm:flex-row gap-4 pt-4 w-full">
+                     <Card className="w-full">
+                        <CardHeader className="p-4">
+                           <CardTitle className="text-base flex items-center gap-2"><Users className="h-5 w-5 text-primary"/>Communities</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 pt-0">
+                           <p className="text-sm text-muted-foreground mb-3">Create or join a community to compete with friends.</p>
+                           <Button asChild className="w-full" size="sm"><Link href="/community">Explore Communities</Link></Button>
+                        </CardContent>
+                     </Card>
+                     <Card className="w-full">
+                         <CardHeader className="p-4">
+                           <CardTitle className="text-base">Sponsorships</CardTitle>
+                         </CardHeader>
+                         <CardContent className="p-4 pt-0">
+                            <p className="text-sm text-muted-foreground mb-3">Get your brand in front of passionate gamers.</p>
+                            <SponsorshipCTA />
+                         </CardContent>
+                     </Card>
                   </div>
                 </div>
 
                 {/* Links Columns */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:col-span-3 gap-8">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:col-span-4 lg:col-span-3 gap-8 text-center sm:text-left">
                     <div>
                         <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
                         <ul className="space-y-2 text-sm">
                             <li><Link href="/dashboard" className="text-muted-foreground hover:text-primary transition-colors">Home</Link></li>
                             <li><Link href="/tournaments" className="text-muted-foreground hover:text-primary transition-colors">Tournaments</Link></li>
-                            <li><Link href="/leaderboard" className="text-muted-foreground hover:text-primary transition-colors">Leaderboard</Link></li>
+                            <li><Link href="/community" className="text-muted-foreground hover:text-primary transition-colors">Communities</Link></li>
+                            <li><Link href="/games" className="text-muted-foreground hover:text-primary transition-colors">Games</Link></li>
                             <li><Link href="/about" className="text-muted-foreground hover:text-primary transition-colors">About Us</Link></li>
                         </ul>
                     </div>
@@ -77,10 +94,10 @@ export function MainLayout({ children }: MainLayoutProps) {
                             <li><Link href="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact</Link></li>
                         </ul>
                     </div>
-                    <div className="space-y-6">
+                    <div className="space-y-6 col-span-2 sm:col-span-1">
                       <div>
                         <h4 className="font-semibold text-foreground mb-4">Connect With Us</h4>
-                        <div className="flex items-center space-x-3 justify-center md:justify-start">
+                        <div className="flex items-center space-x-3 justify-center sm:justify-start">
                           <Button variant="outline" size="icon" asChild>
                               <a href="https://m.youtube.com/@apnaesport" target="_blank" rel="noopener noreferrer" aria-label="YouTube">
                                   <Youtube className="h-5 w-5 text-red-600"/>

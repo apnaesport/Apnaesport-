@@ -168,7 +168,7 @@ export default function CommunityHubPage() {
                   <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                       <DialogTrigger asChild>
                            <Button>
-                               <PlusCircle className="mr-2 h-4 w-4" /> Create Community
+                               <PlusCircle className="mr-2 h-4 w-4" /> Create Your Community
                            </Button>
                       </DialogTrigger>
                       <DialogContent className="sm:max-w-lg">
