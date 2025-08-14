@@ -82,9 +82,14 @@ export function RegisterForm() {
       });
 
       toast({
-        title: "Registration Successful!",
-        description: "Your account has been created. Please check your email to verify your account before logging in.",
-        duration: 8000,
+        title: "Registration Successful! Please Verify Your Email.",
+        description: (
+          <div>
+            <p>A verification email has been sent to your inbox.</p>
+            <p className="font-bold mt-2">Please check your spam folder and mark it as "not spam".</p>
+          </div>
+        ),
+        duration: 10000,
       });
       await auth.signOut();
       router.push("/auth/login");

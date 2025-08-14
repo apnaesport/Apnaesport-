@@ -5,11 +5,11 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
     function getRole(userId) {
@@ -25,9 +25,18 @@ service cloud.firestore {
     }
 
     function isTeamLeader(teamId, userId) {
-      return get(/databases/$(database)/documents/teams/$(teamId)).data.leaderUid == userId;
+      let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
+      return team.leaderUid == userId;
     }
     
+    function isTournamentOrganizer(tournamentId) {
+        return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
+    }
+    
+    function isJoiningTournament() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']);
+    }
+
     // --- Default Security: Deny all access unless explicitly allowed ---
     match /{document=**} {
       allow read, write: if false;
@@ -38,14 +47,14 @@ service cloud.firestore {
       // Anyone can read public profile data (get) or list all users for leaderboards
       allow get, list: if true;
 
-      // A user can create their own profile document
-      allow create: if isOwner(userId);
+      // A user can create their own profile document, but cannot make themselves an admin on creation
+      allow create: if isOwner(userId) && request.resource.data.isAdmin == false;
       
       // A user can only update their own profile, and cannot make themselves an admin
-      allow update: if isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin;
+      allow update: if (isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin();
       
       // A user cannot delete their own profile through the app
-      allow delete: if false;
+      allow delete: if isAdmin();
     }
 
     // --- Games (`games`) ---
@@ -64,17 +73,16 @@ service cloud.firestore {
         // Signed-in users can create tournaments
         allow create: if isSignedIn();
         
-        // --- Granular Update Rules ---
-        allow update: if
-          // 1. Admins can update anything.
-          isAdmin() ||
-          // 2. The organizer can update their own tournament, but cannot change fundamental details like the organizer or game.
-          (isOwner(resource.data.organizerId) && request.resource.data.organizerId == resource.data.organizerId && request.resource.data.gameId == resource.data.gameId) ||
-          // 3. Any signed-in user can join a tournament by adding their participant object to the 'participants' array.
-          // This rule ensures no other fields can be changed at the same time.
-          (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']));
-
-        // Only admins can delete tournaments to prevent data loss for registered users.
+        // Admins can update anything.
+        // Organizers can update their own tournament (but not critical fields).
+        // Any signed-in user can join a tournament by updating only the participants list.
+        allow update: if isSignedIn() && (
+            isAdmin() || 
+            (isTournamentOrganizer(tournamentId) && request.resource.data.organizerId == resource.data.organizerId && request.resource.data.gameId == resource.data.gameId) ||
+            isJoiningTournament()
+        );
+        
+        // Only admins can delete tournaments to prevent data loss for participants.
         allow delete: if isAdmin();
     }
     
@@ -108,7 +116,7 @@ service cloud.firestore {
       allow list: if isSignedIn(); // Allow listing teams
       
       // A signed-in user can create a team if they are not already in one
-      allow create: if isSignedIn() && request.resource.data.leaderUid == request.auth.uid && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == null;
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == null;
       
       // Only the team leader can update team details (e.g., adding/removing members)
       // Members can't update directly, they must use the 'leave' logic

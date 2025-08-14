@@ -21,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -32,6 +33,8 @@ export function LoginForm() {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showVerificationAlert, setShowVerificationAlert] = useState(false);
+  const [unverifiedUser, setUnverifiedUser] = useState<User | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -41,14 +44,16 @@ export function LoginForm() {
     },
   });
 
-  const handleResendVerification = async (user: User) => {
+  const handleResendVerification = async () => {
+    if (!unverifiedUser) return;
     setIsLoading(true);
     try {
-        await sendEmailVerification(user);
+        await sendEmailVerification(unverifiedUser);
         toast({
             title: "Verification Email Sent",
-            description: "A new verification link has been sent to your email address.",
+            description: "A new verification link has been sent to your email. Please also check your spam folder.",
         });
+        setShowVerificationAlert(false);
     } catch (error) {
         console.error("Error resending verification email:", error);
         toast({
@@ -57,7 +62,6 @@ export function LoginForm() {
             variant: "destructive",
         });
     } finally {
-      // We sign out here AFTER resending the email.
       await auth.signOut();
       setIsLoading(false);
     }
@@ -66,23 +70,14 @@ export function LoginForm() {
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    setShowVerificationAlert(false);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
       
       if (!userCredential.user.emailVerified) {
-        toast({
-            title: "Email Not Verified",
-            description: "Please verify your email before logging in. A verification link was sent to your inbox.",
-            variant: "destructive",
-            action: (
-                 <Button variant="secondary" size="sm" onClick={() => handleResendVerification(userCredential.user)}>
-                    Resend Link
-                </Button>
-            ),
-            duration: 10000,
-        });
-        // We do NOT sign out here immediately. We let handleResendVerification do it.
-        // If the user doesn't click resend, they will be signed out by the session timeout or next action.
+        setUnverifiedUser(userCredential.user);
+        setShowVerificationAlert(true);
+        // Do not sign out here immediately, let the user decide to resend.
         setIsLoading(false);
         return;
       }
@@ -103,16 +98,24 @@ export function LoginForm() {
         description: errorMessage,
         variant: "destructive",
       });
-    } finally {
-      // Don't set loading to false here if we are showing the toast for unverified email
-      if (auth.currentUser?.emailVerified) {
-         setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }
 
   return (
     <Form {...form}>
+      {showVerificationAlert && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTitle>Email Not Verified</AlertTitle>
+            <AlertDescription>
+                Please verify your email address before logging in.
+            </AlertDescription>
+             <Button variant="secondary" size="sm" onClick={handleResendVerification} className="mt-2" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Resend Verification Link
+            </Button>
+          </Alert>
+      )}
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <FormField
           control={form.control}
