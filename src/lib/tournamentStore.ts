@@ -5,6 +5,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -25,7 +26,8 @@ import {
   arrayUnion,
   arrayRemove,
   onSnapshot, 
-  Query
+  Query,
+  increment
 } from "firebase/firestore";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember } from './types';
@@ -514,26 +516,82 @@ export const createCommunityInFirestore = async (
     return communityRef.id;
 };
 
+export const joinCommunity = async (communityId: string, user: UserProfile) => {
+    const batch = writeBatch(db);
+
+    // Add user to community's members subcollection
+    const memberRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'members', user.uid);
+    batch.set(memberRef, {
+        uid: user.uid,
+        displayName: user.displayName,
+        avatarUrl: user.photoURL,
+        role: "Member",
+        points: 0,
+        joinedAt: serverTimestamp(),
+    });
+
+    // Update user's profile with communityId
+    const userRef = doc(db, USERS_COLLECTION, user.uid);
+    batch.update(userRef, { communityId: communityId });
+
+    // Increment member count on community
+    const communityRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    batch.update(communityRef, { memberCount: increment(1) });
+
+    await batch.commit();
+};
+
+export const leaveCommunity = async (communityId: string, user: UserProfile) => {
+    const batch = writeBatch(db);
+
+    // Remove user from community's members subcollection
+    const memberRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'members', user.uid);
+    batch.delete(memberRef);
+
+    // Remove communityId from user's profile
+    const userRef = doc(db, USERS_COLLECTION, user.uid);
+    batch.update(userRef, { communityId: null });
+
+    // Decrement member count on community
+    const communityRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    batch.update(communityRef, { memberCount: increment(-1) });
+
+    await batch.commit();
+};
+
+
 export const getCommunitiesFromFirestore = async (): Promise<Community[]> => {
     const communitiesSnapshot = await getDocs(query(collection(db, COMMUNITIES_COLLECTION), orderBy("createdAt", "desc")));
     return communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
 };
 
-export const getCommunityById = async (communityId: string): Promise<Community | null> => {
-    if (!communityId) return null;
-    const docRef = doc(db, COMMUNITIES_COLLECTION, communityId);
-    const docSnap = await getDoc(docRef);
+export const listenToCommunityById = (
+    communityId: string,
+    callback: (community: Community | null) => void
+): (() => void) => {
+  if (!communityId) {
+    callback(null);
+    return () => {}; 
+  }
+  const docRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+  const unsubscribe = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
-        const data = docSnap.data();
-        return {
-            id: docSnap.id,
-            ...data,
-            createdAt: data.createdAt as Timestamp,
-            updatedAt: data.updatedAt as Timestamp,
-        } as Community;
+      const data = docSnap.data();
+       const community: Community = {
+        id: docSnap.id,
+        ...data,
+        createdAt: data.createdAt as Timestamp,
+        updatedAt: data.updatedAt as Timestamp,
+      } as Community;
+       callback(community);
+    } else {
+      callback(null);
     }
-    return null;
-}
+  });
+
+  return unsubscribe; 
+};
+
 
 export const getCommunityMembers = async (communityId: string): Promise<CommunityMember[]> => {
     const membersRef = collection(db, COMMUNITIES_COLLECTION, communityId, 'members');
@@ -546,3 +604,8 @@ export const getCommunityMembers = async (communityId: string): Promise<Communit
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
+export const getCommunityById = getCommunityDetails;
+function getCommunityDetails(communityId: string): Promise<Community | null> {
+    throw new Error("Function not implemented.");
+}
+

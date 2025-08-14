@@ -1,5 +1,6 @@
 
 
+
 "use client";
 
 import type { ReactNode } from "react";
@@ -20,9 +21,66 @@ import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle } fr
 import { Button } from "../ui/button";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
+import { useAuth } from "@/contexts/AuthContext";
+import { Badge } from "../ui/badge";
+import { ImageWithFallback } from "../shared/ImageWithFallback";
+import { Skeleton } from "../ui/skeleton";
 
 interface MainLayoutProps {
   children: ReactNode;
+}
+
+const MyCommunityCard = () => {
+    const { user, loading } = useAuth();
+
+    if(loading) {
+        return <Skeleton className="h-24 w-full" />
+    }
+
+    if (!user?.communityId) {
+        return (
+            <Card className="bg-card/50">
+                <CardHeader>
+                    <CardTitle className="text-base">No Community Joined</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground mb-3">Join a community to connect with other players.</p>
+                    <Button asChild size="sm" className="w-full">
+                        <Link href="/community">
+                            <Users className="mr-2 h-4 w-4" /> Explore Communities
+                        </Link>
+                    </Button>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    return (
+        <Card className="bg-card/50">
+            <CardHeader className="p-3">
+                <CardTitle className="text-sm flex items-center justify-between">
+                    <span>My Community</span>
+                    <Badge variant="outline">Member</Badge>
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+                <Link href={`/community/${user.communityId}`} className="flex items-center gap-3 group">
+                    <ImageWithFallback 
+                        src="" 
+                        fallbackSrc="https://placehold.co/40x40.png" 
+                        alt="Community Logo"
+                        width={40} height={40}
+                        className="rounded-md"
+                        data-ai-hint="community logo"
+                    />
+                    <div>
+                        <p className="font-semibold group-hover:text-primary transition-colors">Your Community Name</p>
+                        <p className="text-xs text-muted-foreground">Click to view</p>
+                    </div>
+                </Link>
+            </CardContent>
+        </Card>
+    )
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
@@ -34,8 +92,13 @@ export function MainLayout({ children }: MainLayoutProps) {
         <SidebarHeader className="p-4">
           <Logo size="md" />
         </SidebarHeader>
-        <SidebarContent className="p-2">
-          <SidebarNav />
+        <SidebarContent className="p-2 flex flex-col">
+            <div className="flex-grow">
+                <SidebarNav />
+            </div>
+            <div className="p-2">
+                <MyCommunityCard />
+            </div>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
