@@ -1,6 +1,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -20,11 +21,11 @@ import {
   writeBatch,
   arrayUnion,
   arrayRemove,
-  onSnapshot, // For real-time chat messages
+  onSnapshot, 
   Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest, Community } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -36,6 +37,7 @@ const TEAMS_COLLECTION = "teams";
 const CHATS_COLLECTION = "chats";
 const MESSAGES_SUBCOLLECTION = "messages";
 const SPONSORSHIPS_COLLECTION = "sponsorships";
+const COMMUNITIES_COLLECTION = "communities";
 
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
@@ -137,7 +139,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   let qConstraints: QueryConstraint[] = [];
   
   if (!queryParams || Object.keys(queryParams).length === 0) {
-      // No specific filters, no specific order to avoid index issues.
+      qConstraints.push(orderBy("startDate", "desc"));
   } else {
       qConstraints.push(orderBy("startDate", "desc"));
   }
@@ -182,7 +184,6 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
 
-    // Auto-update status logic
     const currentStatus = tournament.status;
     const newStatus = getTournamentStatus(tournament);
     
@@ -236,7 +237,6 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
     
-    // Check and update status if needed
     const currentStatus = tournament.status;
     const newStatus = getTournamentStatus(tournament);
     if(currentStatus !== newStatus && currentStatus !== "Cancelled") {
@@ -255,7 +255,7 @@ export const listenToTournamentById = (
 ): (() => void) => {
   if (!tournamentId) {
     callback(null);
-    return () => {}; // Return an empty unsubscribe function
+    return () => {}; 
   }
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
   const unsubscribe = onSnapshot(docRef, (docSnap) => {
@@ -273,7 +273,7 @@ export const listenToTournamentById = (
     }
   });
 
-  return unsubscribe; // Return the unsubscribe function
+  return unsubscribe; 
 };
 
 export const updateTournamentInFirestore = async (tournamentId: string, tournamentData: Partial<Omit<Tournament, 'id' | 'createdAt' | 'startDate' | 'endDate'> & { startDate?: Date, endDate?: Date | null }>): Promise<void> => {
@@ -335,8 +335,6 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
   if (target) {
     qConstraints.push(where("target", "==", target));
   }
-  // Composite index required: target (ASC), createdAt (DESC) on notifications collection.
-  // Create in Firebase Console if error. Link: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=ClZwcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy9ub3RpZmljYXRpb25zL2luZGV4ZXMvXxABGgoKBnRhcmdldBABGg0KCWNyZWF0ZWRBdBACGgwKCF9fbmFtZV9fEAI
   const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
   const notificationsSnapshot = await getDocs(q);
 
@@ -357,7 +355,6 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
   const docSnap = await getDoc(userRef);
   if (docSnap.exists()) {
     const data = docSnap.data();
-    // Ensure all fields are present to prevent "undefined" errors downstream.
     return {
       uid: docSnap.id,
       displayName: data.displayName || "Unknown User",
@@ -372,6 +369,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       sentFriendRequests: data.sentFriendRequests || [],
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
+      communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
       kills: data.kills || 0,
@@ -386,7 +384,6 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
   const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), orderBy("displayName", "asc")));
   return usersSnapshot.docs.map(doc => {
     const data = doc.data();
-    // This is the fix: return only serializable data
     return {
       uid: doc.id,
       displayName: data.displayName || "Unknown User",
@@ -401,6 +398,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       sentFriendRequests: data.sentFriendRequests || [],
       receivedFriendRequests: data.receivedFriendRequests || [],
       teamId: data.teamId || null,
+      communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
       kills: data.kills || 0,
@@ -440,11 +438,6 @@ export const updateUserProfileInFirestore = async (userId: string, profileData: 
 export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId: string): Promise<UserProfile[]> => {
   if (!searchTerm.trim()) return [];
   const lowerSearchTerm = searchTerm.toLowerCase();
-
-  // Note: Firestore doesn't support case-insensitive search or partial string matching (like SQL LIKE) directly on its own.
-  // For small user bases, fetching all and filtering client-side is okay for prototyping.
-  // For larger scale, you'd use a dedicated search service like Algolia or Typesense,
-  // or denormalize searchable fields (e.g., all lowercase name).
   const allUsers = await getAllUsersFromFirestore();
   return allUsers.filter(user =>
     user.uid !== currentUserId &&
@@ -611,12 +604,9 @@ export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | n
 export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly: boolean = false): Promise<Team[]> => {
   let qConstraints: QueryConstraint[] = [];
   if (asLeaderOnly) {
-    // Index needed: leaderUid (ASC), createdAt (DESC)
-    // Example: https://console.firebase.google.com/v1/r/project/battlezone-faa03/firestore/indexes?create_composite=Ck5wcm9qZWN0cy9iYXR0bGV6b25lLWZhYTAzL2RhdGFiYXNlcy8oZGVmYXVsdCkvY29sbGVjdGlvbkdyb3Vwcy90ZWFtcy9pbmRleGVzL18QARoNCglsZWFkZXJVaWQQARoNCgljcmVhdGVkQXQQAhoMCghfX25hbWVfXxAC
     qConstraints.push(where("leaderUid", "==", userId));
-    qConstraints.push(orderBy("createdAt", "desc")); // Added orderBy for consistency
+    qConstraints.push(orderBy("createdAt", "desc"));
   } else {
-    // Index needed for memberUids array-contains + orderBy createdAt (ASC or DESC)
     qConstraints.push(where("memberUids", "array-contains", userId));
     qConstraints.push(orderBy("createdAt", "desc"));
   }
@@ -735,10 +725,6 @@ export const saveSiteSettingsToFirestore = async (settingsData: Partial<SiteSett
 
 // --- Chat Functions ---
 
-/**
- * Generates a consistent chat ID for two user UIDs.
- * The UIDs are sorted to ensure the ID is the same regardless of who initiated the chat.
- */
 export const getChatId = (uid1: string, uid2: string): string => {
   return [uid1, uid2].sort().join('_');
 };
@@ -753,17 +739,13 @@ export const sendMessageToFirestore = async (chatId: string, senderId: string, s
   };
   const messageDocRef = await addDoc(messagesColRef, messageData);
   
-  // Optionally, update a 'lastMessageTimestamp' on the parent chat document
-  // const chatDocRef = doc(db, CHATS_COLLECTION, chatId);
-  // await setDoc(chatDocRef, { lastMessageTimestamp: serverTimestamp(), participantUids: chatId.split('_') }, { merge: true });
-
   return messageDocRef.id;
 };
 
 export const getMessagesForChat = (
   chatId: string,
   callback: (messages: ChatMessage[]) => void
-): (() => void) => { // Returns an unsubscribe function
+): (() => void) => { 
   const messagesColRef = collection(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION);
   const q = query(messagesColRef, orderBy("timestamp", "asc"));
 
@@ -776,10 +758,9 @@ export const getMessagesForChat = (
     callback(messages);
   }, (error) => {
     console.error("Error fetching real-time messages:", error);
-    // Optionally, notify the user via toast or other UI element
   });
 
-  return unsubscribe; // Return the unsubscribe function
+  return unsubscribe; 
 };
 
 export const deleteMessageFromFirestore = async (chatId: string, messageId: string, currentUserId: string): Promise<void> => {
@@ -821,6 +802,59 @@ export const getSponsorshipRequestsFromFirestore = async (): Promise<Sponsorship
 export const updateSponsorshipRequestStatusInFirestore = async (id: string, status: SponsorshipRequest['status']): Promise<void> => {
     const docRef = doc(db, SPONSORSHIPS_COLLECTION, id);
     await updateDoc(docRef, { status });
+};
+
+
+// --- Community Functions ---
+
+export const createCommunityInFirestore = async (
+    communityData: Pick<Community, 'name' | 'tagline' | 'description' | 'gameName' | 'gameId'>, 
+    owner: UserProfile
+): Promise<string> => {
+    if (!owner) throw new Error("An owner is required to create a community.");
+    if (owner.communityId) throw new Error("You are already in a community.");
+
+    const batch = writeBatch(db);
+
+    const communityRef = doc(collection(db, COMMUNITIES_COLLECTION));
+    const newCommunity: Omit<Community, 'id'> = {
+        name: communityData.name,
+        tagline: communityData.tagline,
+        description: communityData.description,
+        ownerId: owner.uid,
+        ownerName: owner.displayName || 'Owner',
+        gameId: communityData.gameId || undefined,
+        gameName: communityData.gameName || 'Variety',
+        logoUrl: `https://placehold.co/100x100.png?text=${communityData.name.substring(0, 2)}`,
+        bannerUrl: `https://placehold.co/800x200.png?text=${encodeURIComponent(communityData.name)}`,
+        memberCount: 1,
+        level: 1,
+        points: 0,
+        createdAt: serverTimestamp() as Timestamp,
+        updatedAt: serverTimestamp() as Timestamp,
+    };
+    batch.set(communityRef, newCommunity);
+
+    const ownerMemberRef = doc(db, COMMUNITIES_COLLECTION, communityRef.id, 'members', owner.uid);
+    batch.set(ownerMemberRef, {
+        uid: owner.uid,
+        displayName: owner.displayName,
+        avatarUrl: owner.photoURL,
+        role: "Owner",
+        points: 0,
+        joinedAt: serverTimestamp(),
+    });
+
+    const userRef = doc(db, USERS_COLLECTION, owner.uid);
+    batch.update(userRef, { communityId: communityRef.id });
+
+    await batch.commit();
+    return communityRef.id;
+};
+
+export const getCommunitiesFromFirestore = async (): Promise<Community[]> => {
+    const communitiesSnapshot = await getDocs(query(collection(db, COMMUNITIES_COLLECTION), orderBy("createdAt", "desc")));
+    return communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
 };
 
 

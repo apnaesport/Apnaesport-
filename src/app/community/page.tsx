@@ -1,0 +1,260 @@
+
+"use client";
+
+import { useState, useEffect, useCallback } from 'react';
+import { PageTitle } from "@/components/shared/PageTitle";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PlusCircle, Search, Filter, Users, Loader2 } from "lucide-react";
+import type { Community, Game } from "@/lib/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { createCommunityInFirestore, getCommunitiesFromFirestore, getGamesFromFirestore } from '@/lib/tournamentStore';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const communitySchema = z.object({
+    name: z.string().min(3, "Community name must be at least 3 characters.").max(50, "Name cannot exceed 50 characters."),
+    tagline: z.string().min(10, "Tagline must be at least 10 characters.").max(100, "Tagline cannot exceed 100 characters."),
+    description: z.string().min(20, "Description must be at least 20 characters.").max(1000, "Description cannot exceed 1000 characters."),
+    gameId: z.string().optional(), // Make optional for now
+});
+
+type CommunityFormData = z.infer<typeof communitySchema>;
+
+
+const CommunityCard = ({ community }: { community: Community }) => {
+    return (
+        <Card className="overflow-hidden shadow-lg hover:shadow-primary/20 transition-all duration-300 group flex flex-col h-full">
+            <CardHeader className="relative p-0 h-40">
+                <ImageWithFallback
+                    src={community.bannerUrl || ''}
+                    fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(community.name)}`}
+                    alt={`${community.name} banner`}
+                    layout="fill"
+                    objectFit="cover"
+                    className="transition-transform duration-300 group-hover:scale-105"
+                    data-ai-hint="esports community banner"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                <div className="absolute bottom-0 left-0 p-4 w-full">
+                    <div className="flex items-center gap-3">
+                         <ImageWithFallback
+                            src={community.logoUrl || ''}
+                            fallbackSrc={`https://placehold.co/40x40.png?text=${community.name.substring(0, 2)}`}
+                            alt={`${community.name} logo`}
+                            width={40}
+                            height={40}
+                            className="rounded-full border-2 border-background shadow-lg"
+                            data-ai-hint="community logo"
+                        />
+                        <div>
+                             <CardTitle className="text-lg font-bold text-white drop-shadow-md line-clamp-1">{community.name}</CardTitle>
+                             <p className="text-xs text-slate-300 line-clamp-1">{community.tagline}</p>
+                        </div>
+                    </div>
+                </div>
+            </CardHeader>
+             <CardContent className="p-4 flex-grow">
+                 <div className="flex justify-between items-center text-xs text-muted-foreground">
+                    <Badge variant="outline">{community.gameName || 'Variety'}</Badge>
+                    <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        <span>{community.memberCount || 1}</span>
+                    </div>
+                </div>
+             </CardContent>
+             <DialogFooter className="p-4 border-t">
+                 <Button asChild className="w-full">
+                    <Link href={`/community/${community.id}`}>View & Join</Link>
+                </Button>
+             </DialogFooter>
+        </Card>
+    )
+}
+
+export default function CommunityHubPage() {
+    const { user, refreshUser } = useAuth();
+    const router = useRouter();
+    const { toast } = useToast();
+    const [communities, setCommunities] = useState<Community[]>([]);
+    const [games, setGames] = useState<Game[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isCreating, setIsCreating] = useState(false);
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+
+    const form = useForm<CommunityFormData>({
+        resolver: zodResolver(communitySchema),
+        defaultValues: { name: "", tagline: "", description: "", gameId: "" },
+    });
+
+    const fetchPageData = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const [fetchedCommunities, fetchedGames] = await Promise.all([
+                getCommunitiesFromFirestore(),
+                getGamesFromFirestore()
+            ]);
+            setCommunities(fetchedCommunities);
+            setGames(fetchedGames);
+        } catch (error) {
+            console.error("Error fetching community data:", error);
+            toast({ title: "Error", description: "Could not load community data.", variant: "destructive" });
+        } finally {
+            setIsLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        fetchPageData();
+    }, [fetchPageData]);
+
+    const handleCreateCommunity: SubmitHandler<CommunityFormData> = async (data) => {
+        if (!user) {
+            toast({ title: "Not Authenticated", description: "You must be logged in to create a community.", variant: "destructive" });
+            return;
+        }
+        if (user.communityId) {
+            toast({ title: "Already in a Community", description: "You can only create or be a part of one community at a time.", variant: "destructive"});
+            return;
+        }
+
+        setIsCreating(true);
+        try {
+            const selectedGame = games.find(g => g.id === data.gameId);
+            const newCommunityId = await createCommunityInFirestore({
+                ...data,
+                gameName: selectedGame?.name,
+            }, user);
+            await refreshUser();
+            toast({ title: "Community Created!", description: `Your community "${data.name}" is now live.` });
+            router.push(`/community/${newCommunityId}`);
+            setIsCreateDialogOpen(false);
+            form.reset();
+        } catch (error: any) {
+            console.error("Error creating community:", error);
+            toast({ title: "Creation Failed", description: error.message || "Could not create community.", variant: "destructive" });
+        } finally {
+            setIsCreating(false);
+        }
+    };
+
+
+    return (
+        <div className="space-y-8">
+            <PageTitle
+                title="Community Hub"
+                subtitle="Discover, join, and create communities. Compete together and grow your legacy."
+                actions={
+                  <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+                      <DialogTrigger asChild>
+                           <Button>
+                               <PlusCircle className="mr-2 h-4 w-4" /> Create Community
+                           </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-lg">
+                          <DialogHeader>
+                              <DialogTitle>Create Your Community</DialogTitle>
+                              <DialogDescription>
+                                  Build your own space for your team, fans, or friends. Fill out the details to get started.
+                              </DialogDescription>
+                          </DialogHeader>
+                          <form onSubmit={form.handleSubmit(handleCreateCommunity)} className="space-y-4 py-4">
+                              <div>
+                                  <Label htmlFor="name">Community Name</Label>
+                                  <Input id="name" {...form.register("name")} disabled={isCreating} />
+                                  {form.formState.errors.name && <p className="text-destructive text-xs mt-1">{form.formState.errors.name.message}</p>}
+                              </div>
+                               <div>
+                                  <Label htmlFor="tagline">Tagline</Label>
+                                  <Input id="tagline" {...form.register("tagline")} placeholder="e.g., The official hub for top-tier gamers." disabled={isCreating} />
+                                  {form.formState.errors.tagline && <p className="text-destructive text-xs mt-1">{form.formState.errors.tagline.message}</p>}
+                              </div>
+                              <div>
+                                  <Label htmlFor="description">Description</Label>
+                                  <Textarea id="description" {...form.register("description")} rows={4} disabled={isCreating} />
+                                  {form.formState.errors.description && <p className="text-destructive text-xs mt-1">{form.formState.errors.description.message}</p>}
+                              </div>
+                              <DialogFooter>
+                                  <DialogClose asChild>
+                                      <Button type="button" variant="outline" disabled={isCreating}>Cancel</Button>
+                                  </DialogClose>
+                                  <Button type="submit" disabled={isCreating}>
+                                      {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                      {isCreating ? "Creating..." : "Confirm & Create"}
+                                  </Button>
+                              </DialogFooter>
+                          </form>
+                      </DialogContent>
+                  </Dialog>
+                }
+            />
+
+            <div className="flex flex-col md:flex-row gap-4">
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input
+                        placeholder="Search communities by name..."
+                        className="pl-10"
+                        // Add state and onChange later
+                    />
+                </div>
+                <Button variant="outline">
+                    <Filter className="mr-2 h-4 w-4" /> Filter
+                </Button>
+            </div>
+
+            {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                       <Card key={i}>
+                           <Skeleton className="h-40 w-full"/>
+                           <CardContent className="p-4 space-y-2">
+                               <Skeleton className="h-5 w-3/4"/>
+                               <Skeleton className="h-4 w-1/2"/>
+                           </CardContent>
+                           <DialogFooter className="p-4 border-t">
+                               <Skeleton className="h-10 w-full" />
+                           </DialogFooter>
+                       </Card>
+                    ))}
+                </div>
+            ) : communities.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {communities.map(community => (
+                        <CommunityCard key={community.id} community={community} />
+                    ))}
+                </div>
+            ) : (
+                <Card className="text-center py-10">
+                    <CardHeader>
+                        <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                        <CardTitle>No Communities Yet</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-muted-foreground">Be the first to create a community and start building your legacy!</p>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
+    );
+}

@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -18,6 +19,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   streamingChannelUrl?: string;
   friendUids?: string[];
   teamId?: string | null;
+  communityId?: string | null; // Added
   points?: number;
   sentFriendRequests?: string[];
   receivedFriendRequests?: string[];
@@ -32,7 +34,7 @@ export type Game = {
   iconUrl: string;
   bannerUrl?: string;
   dataAiHint?: string;
-  isApiPowered?: boolean; // Added for API-specific games
+  isApiPowered?: boolean; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };
@@ -169,7 +171,7 @@ export interface ChatMessage {
   id: string;
   chatId: string;
   senderId: string;
-  senderName: string; // Denormalized for display
+  senderName: string; 
   text: string;
   timestamp: Timestamp;
 }
@@ -186,5 +188,60 @@ export interface SponsorshipRequest {
     sponsorshipType: 'tournament' | 'site-wide' | 'other';
     message: string;
     status: SponsorshipRequestStatus;
+    createdAt: Timestamp;
+}
+
+
+// --- New Community Types ---
+
+export type CommunityRole = "Owner" | "Admin" | "Moderator" | "Member";
+
+export interface CommunityMember {
+    uid: string;
+    displayName: string;
+    avatarUrl?: string;
+    role: CommunityRole;
+    points: number;
+    joinedAt: Timestamp;
+}
+
+export interface Community {
+    id: string;
+    name: string;
+    tagline: string;
+    description: string;
+    ownerId: string;
+    ownerName: string;
+    gameId?: string;
+    gameName?: string;
+a    logoUrl?: string;
+    bannerUrl?: string;
+    memberCount: number;
+    level: number;
+    points: number;
+    socialLinks?: {
+        youtube?: string;
+        discord?: string;
+        twitch?: string;
+        instagram?: string;
+    };
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+}
+
+export type CommunityPostType = "Announcement" | "Media" | "General";
+
+export interface CommunityPost {
+    id: string;
+    communityId: string;
+    authorId: string;
+    authorName: string;
+    authorAvatarUrl?: string;
+    type: CommunityPostType;
+    title?: string;
+    content: string;
+    mediaUrl?: string; // For images or video clips
+    likes: number;
+    likedBy: string[]; // Array of UIDs
     createdAt: Timestamp;
 }

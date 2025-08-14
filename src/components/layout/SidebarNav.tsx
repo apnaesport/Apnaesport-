@@ -32,10 +32,10 @@ import { Separator } from "../ui/separator";
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/community", label: "Communities", icon: Users },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
   { href: "/live-stats", label: "Live Stats Arena", icon: TrendingUp },
-  // { href: "/stats", label: "My Stats", icon: BarChart3 }, 
   { href: "/notifications", label: "Notifications", icon: Bell },
   { href: "/social", label: "Social", icon: Users },
 ];

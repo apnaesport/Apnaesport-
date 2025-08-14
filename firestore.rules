@@ -5,152 +5,131 @@ service cloud.firestore {
 
     // --- Helper Functions ---
     function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified == true;
+      return request.auth != null;
     }
 
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
     }
 
-    function getRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.isAdmin;
+    function isVerifiedUser() {
+        return isSignedIn() && request.auth.token.email_verified == true;
     }
 
     function isAdmin() {
-      return isSignedIn() && getRole(request.auth.uid) == true;
-    }
-    
-    function isTeamMember(teamId, userId) {
-      return userId in get(/databases/$(database)/documents/teams/$(teamId)).data.memberUids;
+      // Check a custom claim `isAdmin` on the user's auth token.
+      // This is more secure and performant than reading from Firestore.
+      // You would set this claim using a Cloud Function or the Firebase Admin SDK.
+      return isSignedIn() && request.auth.token.isAdmin == true;
     }
 
-    function isTeamLeader(teamId, userId) {
-      let team = get(/databases/$(database)/documents/teams/$(teamId)).data;
-      return team.leaderUid == userId;
+    function isCommunityOwner(communityId, userId) {
+        return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == userId;
     }
-    
-    function isTournamentOrganizer(tournamentId) {
-        return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
+
+    function isCommunityMember(communityId, userId) {
+        return exists(/databases/$(database)/documents/communities/$(communityId)/members/$(userId));
     }
-    
-    function isJoiningTournament() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants']);
-    }
+
 
     // --- Default Security: Deny all access unless explicitly allowed ---
-    match /{document=**} {
+    // This is good practice.
+    match /{path=**} {
       allow read, write: if false;
     }
 
     // --- User Profiles (`users`) ---
     match /users/{userId} {
-      // Anyone can read public profile data (get) or list all users for leaderboards
-      allow get, list: if true;
+      allow get: if true;
+      allow list: if isSignedIn();
 
-      // A user can create their own profile document, but cannot make themselves an admin on creation
-      allow create: if isOwner(userId) && request.resource.data.isAdmin == false;
-      
-      // A user can only update their own profile, and cannot make themselves an admin
+      allow create: if isOwner(userId);
+
       allow update: if (isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin();
       
-      // A user cannot delete their own profile through the app
       allow delete: if isAdmin();
     }
 
     // --- Games (`games`) ---
     match /games/{gameId} {
-      // Game data is public
       allow read: if true;
-      // Only admins can create, update, or delete games
       allow write: if isAdmin();
     }
     
     // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
-        // Tournament data is public
         allow read: if true;
+        allow create: if isVerifiedUser();
         
-        // Signed-in users can create tournaments
-        allow create: if isSignedIn();
-        
-        // Admins can update anything.
-        // Organizers can update their own tournament (but not critical fields).
-        // Any signed-in user can join a tournament by updating only the participants list.
-        allow update: if isSignedIn() && (
-            isAdmin() || 
-            (isTournamentOrganizer(tournamentId) && request.resource.data.organizerId == resource.data.organizerId && request.resource.data.gameId == resource.data.gameId) ||
-            isJoiningTournament()
-        );
-        
-        // Only admins can delete tournaments to prevent data loss for participants.
+        allow update: if (isAdmin()) || 
+                       (isOwner(resource.data.organizerId) && !(request.resource.data.diff(resource.data).affectedKeys().hasAny(['gameId', 'organizerId']))) ||
+                       (isVerifiedUser() && request.resource.data.participants.size() == resource.data.participants.size() + 1);
+
         allow delete: if isAdmin();
     }
     
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        // Any signed-in user can read notifications
         allow read: if isSignedIn();
-        // Only admins can create/write notifications
         allow write: if isAdmin();
     }
     
     // --- Site Settings (`settings`) ---
     match /settings/global {
-        // Site settings are public
         allow read: if true;
-        // Only admins can change site settings
         allow write: if isAdmin();
     }
     
     // --- Sponsorships (`sponsorships`) ---
     match /sponsorships/{sponsorshipId} {
-      // Any signed in user can create a request
       allow create: if isSignedIn();
-      // Only admins can read, update status, or delete requests
-      allow read, update, delete: if isAdmin();
+      allow read, update: if isAdmin();
     }
     
     // --- Teams (`teams`) ---
     match /teams/{teamId} {
-      allow get: if true; // Anyone can view a team's basic info
-      allow list: if isSignedIn(); // Allow listing teams
+      allow get: if true; 
+      allow list: if isSignedIn(); 
       
-      // A signed-in user can create a team if they are not already in one
-      allow create: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId == null;
+      allow create: if isVerifiedUser() && request.resource.data.leaderUid == request.auth.uid;
       
-      // Only the team leader can update team details (e.g., adding/removing members)
-      // Members can't update directly, they must use the 'leave' logic
-      allow update: if isSignedIn() && isTeamLeader(teamId, request.auth.uid);
-      
-      // Only the team leader can delete the team
-      allow delete: if isSignedIn() && isTeamLeader(teamId, request.auth.uid);
-      
-      // --- Team Chat (`chats/{teamId}/messages`) ---
-      match /messages/{messageId} {
-        // Allow team members to read and write to their team's chat
-        allow read, create: if isSignedIn() && isTeamMember(teamId, request.auth.uid);
-        
-        // Users can only delete their own messages
-        allow delete: if isSignedIn() && isOwner(resource.data.senderId);
-      }
+      allow update, delete: if isSignedIn() && isTeamLeader(teamId, request.auth.uid);
     }
     
     // --- Direct Messages (`chats`) ---
-    // The document ID is a composite of two user IDs, e.g., "uid1_uid2"
     match /chats/{chatId} {
-        // Allow access to the chat document if the user is one of the participants
-        allow get: if isSignedIn() && (request.auth.uid in chatId.split('_'));
-
-        // --- Private Chat Messages ---
         match /messages/{messageId} {
-            // Allow participants of the chat to read messages
-            allow read: if isSignedIn() && (request.auth.uid in chatId.split('_'));
+            allow read, create: if isSignedIn() && (request.auth.uid in chatId.split('_'));
+            allow delete: if isOwner(resource.data.senderId);
+        }
+    }
 
-            // Allow participants to create messages and ensure senderId is correct
-            allow create: if isSignedIn() && (request.auth.uid in chatId.split('_')) && request.resource.data.senderId == request.auth.uid;
-            
-            // Users can only delete their own messages
-            allow delete: if isSignedIn() && isOwner(resource.data.senderId);
+    // --- Communities ---
+    match /communities/{communityId} {
+        allow get, list: if true;
+
+        allow create: if isVerifiedUser() && request.resource.data.ownerId == request.auth.uid;
+
+        // Only the owner can update core details
+        allow update: if isVerifiedUser() && isCommunityOwner(communityId, request.auth.uid);
+        
+        allow delete: if isVerifiedUser() && isCommunityOwner(communityId, request.auth.uid);
+
+        // Community Members Subcollection
+        match /members/{memberId} {
+            // Community owner can add/remove anyone. User can join/leave.
+            allow write: if isVerifiedUser() && (isCommunityOwner(communityId, request.auth.uid) || isOwner(memberId));
+            // Anyone can see the list of members
+            allow read: if true;
+        }
+
+        // Community Posts Subcollection
+        match /posts/{postId} {
+            allow read: if true;
+            // Only members can create posts
+            allow create: if isVerifiedUser() && isCommunityMember(communityId, request.auth.uid);
+            // Owner can update/delete any post. Author can update/delete their own.
+            allow update, delete: if isVerifiedUser() && (isCommunityOwner(communityId, request.auth.uid) || isOwner(resource.data.authorId));
         }
     }
   }
