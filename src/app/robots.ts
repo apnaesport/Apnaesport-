@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: '*',
       allow: '/',
-      disallow: ['/admin/', '/profile/', '/settings/', '/social/'],
+      disallow: ['/admin/', '/profile/', '/settings/'],
     },
     sitemap: 'https://apnaesport.vercel.app/sitemap.xml',
   }

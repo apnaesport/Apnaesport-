@@ -54,11 +54,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           bio: "",
           favoriteGameIds: [],
           streamingChannelUrl: "",
-          friendUids: [],
-          sentFriendRequests: [],
-          receivedFriendRequests: [],
-          teamId: null,
-          points: 0,
+          communityId: null,
+          points: 0, 
         };
         await setDoc(userDocRef, initialProfileData);
         userDocSnap = await getDoc(userDocRef);
@@ -78,10 +75,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         bio: userProfileData.bio || "",
         favoriteGameIds: userProfileData.favoriteGameIds || [],
         streamingChannelUrl: userProfileData.streamingChannelUrl || "",
-        friendUids: userProfileData.friendUids || [],
-        sentFriendRequests: userProfileData.sentFriendRequests || [],
-        receivedFriendRequests: userProfileData.receivedFriendRequests || [],
-        teamId: userProfileData.teamId || null,
+        communityId: userProfileData.communityId || null,
         points: userProfileData.points || 0,
         emailVerified: firebaseUser.emailVerified,
         isAnonymous: firebaseUser.isAnonymous,

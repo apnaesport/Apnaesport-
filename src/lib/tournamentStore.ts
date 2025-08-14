@@ -3,6 +3,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -26,7 +27,7 @@ import {
   Query
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, Team, TeamFormData, ChatMessage, TournamentStatus, SponsorshipRequest, Community, CommunityMember } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -34,9 +35,6 @@ const NOTIFICATIONS_COLLECTION = "notifications";
 const USERS_COLLECTION = "users";
 const SETTINGS_COLLECTION = "settings";
 const GLOBAL_SETTINGS_ID = "global";
-const TEAMS_COLLECTION = "teams";
-const CHATS_COLLECTION = "chats";
-const MESSAGES_SUBCOLLECTION = "messages";
 const SPONSORSHIPS_COLLECTION = "sponsorships";
 const COMMUNITIES_COLLECTION = "communities";
 
@@ -366,10 +364,6 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
-      friendUids: data.friendUids || [],
-      sentFriendRequests: data.sentFriendRequests || [],
-      receivedFriendRequests: data.receivedFriendRequests || [],
-      teamId: data.teamId || null,
       communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
@@ -395,10 +389,6 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
-      friendUids: data.friendUids || [],
-      sentFriendRequests: data.sentFriendRequests || [],
-      receivedFriendRequests: data.receivedFriendRequests || [],
-      teamId: data.teamId || null,
       communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
@@ -413,293 +403,19 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'friendUids' | 'teamId' | 'points' | 'sentFriendRequests' | 'receivedFriendRequests'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'points' | 'communityId'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const dataToUpdate: any = { ...profileData, updatedAt: serverTimestamp() };
   
   if (profileData.hasOwnProperty('favoriteGameIds') && !Array.isArray(profileData.favoriteGameIds)) {
     dataToUpdate.favoriteGameIds = [];
   }
-  if (profileData.hasOwnProperty('friendUids') && !Array.isArray(profileData.friendUids)) {
-    dataToUpdate.friendUids = [];
-  }
-   if (profileData.hasOwnProperty('sentFriendRequests') && !Array.isArray(profileData.sentFriendRequests)) {
-    dataToUpdate.sentFriendRequests = [];
-  }
-  if (profileData.hasOwnProperty('receivedFriendRequests') && !Array.isArray(profileData.receivedFriendRequests)) {
-    dataToUpdate.receivedFriendRequests = [];
-  }
-  if (profileData.hasOwnProperty('teamId') && profileData.teamId === undefined) {
-    dataToUpdate.teamId = null;
+  if (profileData.hasOwnProperty('communityId') && profileData.communityId === undefined) {
+    dataToUpdate.communityId = null;
   }
 
   await updateDoc(userRef, dataToUpdate);
 };
-
-export const searchUsersByNameOrEmail = async (searchTerm: string, currentUserId: string): Promise<UserProfile[]> => {
-  if (!searchTerm.trim()) return [];
-  const lowerSearchTerm = searchTerm.toLowerCase();
-  const allUsers = await getAllUsersFromFirestore();
-  return allUsers.filter(user =>
-    user.uid !== currentUserId &&
-    (user.displayName?.toLowerCase().includes(lowerSearchTerm) || user.email?.toLowerCase().includes(lowerSearchTerm))
-  );
-};
-
-// --- Friend Request System ---
-
-export const sendFriendRequest = async (fromUid: string, toUid: string): Promise<void> => {
-  if (fromUid === toUid) throw new Error("Cannot send a friend request to yourself.");
-
-  const fromUserRef = doc(db, USERS_COLLECTION, fromUid);
-  const toUserRef = doc(db, USERS_COLLECTION, toUid);
-
-  const batch = writeBatch(db);
-
-  const fromUserSnap = await getDoc(fromUserRef);
-  const toUserSnap = await getDoc(toUserRef);
-
-  if (!fromUserSnap.exists() || !toUserSnap.exists()) {
-    throw new Error("User not found.");
-  }
-
-  const fromUserData = fromUserSnap.data() as UserProfile;
-
-  if (fromUserData.friendUids?.includes(toUid)) {
-    throw new Error("You are already friends with this user.");
-  }
-  if (fromUserData.sentFriendRequests?.includes(toUid)) {
-    throw new Error("Friend request already sent.");
-  }
-  if (fromUserData.receivedFriendRequests?.includes(toUid)) {
-    throw new Error("This user has already sent you a friend request. Please check your incoming requests.");
-  }
-
-  batch.update(fromUserRef, {
-    sentFriendRequests: arrayUnion(toUid),
-    updatedAt: serverTimestamp()
-  });
-  batch.update(toUserRef, {
-    receivedFriendRequests: arrayUnion(fromUid),
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-};
-
-export const acceptFriendRequest = async (currentUserUid: string, requesterUid: string): Promise<void> => {
-  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const requesterRef = doc(db, USERS_COLLECTION, requesterUid);
-  const batch = writeBatch(db);
-
-  batch.update(currentUserRef, {
-    receivedFriendRequests: arrayRemove(requesterUid),
-    friendUids: arrayUnion(requesterUid),
-    updatedAt: serverTimestamp()
-  });
-  batch.update(requesterRef, {
-    sentFriendRequests: arrayRemove(currentUserUid),
-    friendUids: arrayUnion(currentUserUid),
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-};
-
-export const declineFriendRequest = async (currentUserUid: string, requesterUid: string): Promise<void> => {
-  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const requesterRef = doc(db, USERS_COLLECTION, requesterUid);
-  const batch = writeBatch(db);
-
-  batch.update(currentUserRef, {
-    receivedFriendRequests: arrayRemove(requesterUid),
-    updatedAt: serverTimestamp()
-  });
-  batch.update(requesterRef, {
-    sentFriendRequests: arrayRemove(currentUserUid),
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-};
-
-export const cancelFriendRequest = async (currentUserUid: string, targetUid: string): Promise<void> => {
-  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const targetRef = doc(db, USERS_COLLECTION, targetUid);
-  const batch = writeBatch(db);
-
-  batch.update(currentUserRef, {
-    sentFriendRequests: arrayRemove(targetUid),
-    updatedAt: serverTimestamp()
-  });
-  batch.update(targetRef, {
-    receivedFriendRequests: arrayRemove(currentUserUid),
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-};
-
-
-export const removeFriend = async (currentUserUid: string, friendToRemoveUid: string): Promise<void> => {
-  const currentUserRef = doc(db, USERS_COLLECTION, currentUserUid);
-  const friendToRemoveRef = doc(db, USERS_COLLECTION, friendToRemoveUid);
-  const batch = writeBatch(db);
-
-  batch.update(currentUserRef, {
-    friendUids: arrayRemove(friendToRemoveUid),
-    updatedAt: serverTimestamp()
-  });
-  batch.update(friendToRemoveRef, {
-    friendUids: arrayRemove(currentUserUid),
-    updatedAt: serverTimestamp()
-  });
-
-  await batch.commit();
-};
-
-
-// --- Team Functions ---
-
-export const createTeamInFirestore = async (teamData: TeamFormData, leader: UserProfile): Promise<string> => {
-  if (!leader) throw new Error("Leader information is required to create a team.");
-  
-  const existingTeamsLed = await getTeamsByUserIdFromFirestore(leader.uid, true);
-  if (existingTeamsLed.length > 0) {
-    throw new Error("You can only lead one team.");
-  }
-  if (leader.teamId) {
-      throw new Error("You are already part of a team. Leave your current team to create a new one.");
-  }
-
-  const teamDocRef = await addDoc(collection(db, TEAMS_COLLECTION), {
-    name: teamData.name,
-    leaderUid: leader.uid,
-    leaderName: leader.displayName || leader.email,
-    memberUids: [leader.uid], 
-    createdAt: serverTimestamp(),
-    lastActivityAt: serverTimestamp(),
-  });
-
-  await updateUserTeamInFirestore(leader.uid, teamDocRef.id);
-
-  return teamDocRef.id;
-};
-
-export const getTeamByIdFromFirestore = async (teamId: string): Promise<Team | null> => {
-  if (!teamId) return null;
-  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
-  const teamSnap = await getDoc(teamRef);
-  if (teamSnap.exists()) {
-    const data = teamSnap.data();
-    return { 
-        id: teamSnap.id, 
-        ...data,
-        createdAt: data.createdAt as Timestamp,
-        lastActivityAt: data.lastActivityAt as Timestamp,
-     } as Team;
-  }
-  return null;
-};
-
-export const getTeamsByUserIdFromFirestore = async (userId: string, asLeaderOnly: boolean = false): Promise<Team[]> => {
-  let qConstraints: QueryConstraint[] = [];
-  if (asLeaderOnly) {
-    qConstraints.push(where("leaderUid", "==", userId));
-    qConstraints.push(orderBy("createdAt", "desc"));
-  } else {
-    qConstraints.push(where("memberUids", "array-contains", userId));
-    qConstraints.push(orderBy("createdAt", "desc"));
-  }
-  
-  const q = query(collection(db, TEAMS_COLLECTION), ...qConstraints);
-  const teamsSnapshot = await getDocs(q);
-  return teamsSnapshot.docs.map(doc => {
-      const data = doc.data();
-      return { 
-          id: doc.id, 
-          ...data,
-          createdAt: data.createdAt as Timestamp,
-          lastActivityAt: data.lastActivityAt as Timestamp,
-        } as Team
-    });
-};
-
-
-export const updateUserTeamInFirestore = async (userId: string, teamId: string | null): Promise<void> => {
-  const userRef = doc(db, USERS_COLLECTION, userId);
-  await updateDoc(userRef, { teamId: teamId, updatedAt: serverTimestamp() });
-};
-
-export const addMemberToTeamInFirestore = async (teamId: string, userIdToAdd: string): Promise<void> => {
-  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
-  const userRef = doc(db, USERS_COLLECTION, userIdToAdd);
-  
-  const userSnap = await getDoc(userRef);
-  if (userSnap.exists() && userSnap.data().teamId) {
-      throw new Error("User is already in another team.");
-  }
-  if (!userSnap.exists()) {
-    throw new Error("User to add not found.");
-  }
-
-  const batch = writeBatch(db);
-  batch.update(teamRef, { memberUids: arrayUnion(userIdToAdd), lastActivityAt: serverTimestamp() });
-  batch.update(userRef, { teamId: teamId, updatedAt: serverTimestamp() });
-  await batch.commit();
-};
-
-export const removeMemberFromTeamInFirestore = async (teamId: string, userIdToRemove: string): Promise<void> => {
-  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
-  const userRef = doc(db, USERS_COLLECTION, userIdToRemove);
-  
-  const teamSnap = await getDoc(teamRef);
-  if (!teamSnap.exists()) throw new Error("Team not found.");
-  const teamData = teamSnap.data() as Team;
-
-  const batch = writeBatch(db);
-  batch.update(teamRef, { memberUids: arrayRemove(userIdToRemove), lastActivityAt: serverTimestamp() });
-  batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
-
-  if (teamData.memberUids.length === 1 && teamData.memberUids.includes(userIdToRemove)) {
-    batch.delete(teamRef);
-  } else if (teamData.leaderUid === userIdToRemove && teamData.memberUids.length > 1) {
-    teamData.memberUids.forEach(memberUid => {
-        if (memberUid !== userIdToRemove) { 
-            const otherUserRef = doc(db, USERS_COLLECTION, memberUid);
-            batch.update(otherUserRef, { teamId: null, updatedAt: serverTimestamp() });
-        }
-    });
-    batch.delete(teamRef);
-  }
-  await batch.commit();
-};
-
-export const deleteTeamFromFirestore = async (teamId: string, currentUserId: string): Promise<void> => {
-  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
-  const teamSnap = await getDoc(teamRef);
-
-  if (!teamSnap.exists()) throw new Error("Team not found.");
-  const teamData = teamSnap.data() as Team;
-
-  if (teamData.leaderUid !== currentUserId) {
-    throw new Error("Only the team leader can delete the team.");
-  }
-
-  const batch = writeBatch(db);
-  for (const memberUid of teamData.memberUids) {
-    const userRef = doc(db, USERS_COLLECTION, memberUid);
-    batch.update(userRef, { teamId: null, updatedAt: serverTimestamp() });
-  }
-  batch.delete(teamRef);
-  await batch.commit();
-};
-
-export const updateTeamLastActivity = async (teamId: string): Promise<void> => {
-  const teamRef = doc(db, TEAMS_COLLECTION, teamId);
-  await updateDoc(teamRef, { lastActivityAt: serverTimestamp() });
-};
-
 
 // --- Site Settings Functions ---
 export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | null> => {
@@ -722,62 +438,6 @@ export const saveSiteSettingsToFirestore = async (settingsData: Partial<SiteSett
     ...settingsData,
     updatedAt: serverTimestamp(),
   }, { merge: true });
-};
-
-// --- Chat Functions ---
-
-export const getChatId = (uid1: string, uid2: string): string => {
-  return [uid1, uid2].sort().join('_');
-};
-
-export const sendMessageToFirestore = async (chatId: string, senderId: string, senderName: string, text: string): Promise<string> => {
-  const messagesColRef = collection(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION);
-  const messageData: Omit<ChatMessage, 'id' | 'chatId'> = {
-    senderId,
-    senderName,
-    text,
-    timestamp: serverTimestamp() as Timestamp,
-  };
-  const messageDocRef = await addDoc(messagesColRef, messageData);
-  
-  return messageDocRef.id;
-};
-
-export const getMessagesForChat = (
-  chatId: string,
-  callback: (messages: ChatMessage[]) => void
-): (() => void) => { 
-  const messagesColRef = collection(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION);
-  const q = query(messagesColRef, orderBy("timestamp", "asc"));
-
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
-    const messages = querySnapshot.docs.map(docSnap => ({
-      id: docSnap.id,
-      chatId: chatId,
-      ...docSnap.data()
-    } as ChatMessage));
-    callback(messages);
-  }, (error) => {
-    console.error("Error fetching real-time messages:", error);
-  });
-
-  return unsubscribe; 
-};
-
-export const deleteMessageFromFirestore = async (chatId: string, messageId: string, currentUserId: string): Promise<void> => {
-  const messageDocRef = doc(db, CHATS_COLLECTION, chatId, MESSAGES_SUBCOLLECTION, messageId);
-  const messageSnap = await getDoc(messageDocRef);
-
-  if (messageSnap.exists()) {
-    const messageData = messageSnap.data() as ChatMessage;
-    if (messageData.senderId === currentUserId) {
-      await deleteDoc(messageDocRef);
-    } else {
-      throw new Error("You can only delete your own messages.");
-    }
-  } else {
-    throw new Error("Message not found.");
-  }
 };
 
 // --- Sponsorship Functions ---

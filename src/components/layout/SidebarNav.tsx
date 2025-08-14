@@ -34,10 +34,8 @@ const mainNavItems = [
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/community", label: "Communities", icon: Users },
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/leaderboard", label: "Leaderboard", icon: BarChart3 },
   { href: "/live-stats", label: "Live Stats Arena", icon: TrendingUp },
   { href: "/notifications", label: "Notifications", icon: Bell },
-  { href: "/social", label: "Social", icon: Users },
 ];
 
 const secondaryNavItems = [

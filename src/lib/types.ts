@@ -1,6 +1,7 @@
 
 
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -18,12 +19,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   bio?: string;
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
-  friendUids?: string[];
-  teamId?: string | null;
   communityId?: string | null; // Added
   points?: number;
-  sentFriendRequests?: string[];
-  receivedFriendRequests?: string[];
   wins?: number;
   kills?: number;
   deaths?: number;
@@ -152,29 +149,6 @@ export interface NotificationFormData {
   message: string;
   type: NotificationType;
   target: NotificationTarget;
-}
-
-export interface Team {
-  id: string;
-  name: string;
-  leaderUid: string;
-  leaderName: string; 
-  memberUids: string[];
-  createdAt: Timestamp;
-  lastActivityAt: Timestamp;
-}
-
-export interface TeamFormData {
-  name: string;
-}
-
-export interface ChatMessage {
-  id: string;
-  chatId: string;
-  senderId: string;
-  senderName: string; 
-  text: string;
-  timestamp: Timestamp;
 }
 
 export type SponsorshipRequestStatus = "New" | "Contacted" | "In Progress" | "Closed";
