@@ -1,6 +1,5 @@
 
 
-
 "use client";
 
 import type { ReactNode } from "react";
@@ -25,6 +24,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "../ui/badge";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 import { Skeleton } from "../ui/skeleton";
+import { useState, useEffect } from "react";
+import type { Community } from "@/lib/types";
+import { listenToCommunityById } from "@/lib/tournamentStore";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -32,27 +34,62 @@ interface MainLayoutProps {
 
 const MyCommunityCard = () => {
     const { user, loading } = useAuth();
+    const [community, setCommunity] = useState<Community | null>(null);
+    const [communityLoading, setCommunityLoading] = useState(true);
 
-    if(loading) {
-        return <Skeleton className="h-24 w-full" />
+    useEffect(() => {
+        if (!user || !user.communityId) {
+            setCommunityLoading(false);
+            setCommunity(null);
+            return;
+        }
+
+        setCommunityLoading(true);
+        const unsubscribe = listenToCommunityById(user.communityId, (liveCommunity) => {
+            setCommunity(liveCommunity);
+            setCommunityLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user, user?.communityId]);
+
+    if (loading) {
+        return <Skeleton className="h-32 w-full" />;
     }
 
     if (!user?.communityId) {
         return (
             <Card className="bg-card/50">
-                <CardHeader>
+                <CardHeader className="p-3">
                     <CardTitle className="text-base">No Community Joined</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-3 pt-0">
                     <p className="text-sm text-muted-foreground mb-3">Join a community to connect with other players.</p>
                     <Button asChild size="sm" className="w-full">
                         <Link href="/community">
-                            <Users className="mr-2 h-4 w-4" /> Explore Communities
+                            <Users className="mr-2 h-4 w-4" /> Explore
                         </Link>
                     </Button>
                 </CardContent>
             </Card>
-        )
+        );
+    }
+    
+    if (communityLoading) {
+        return <Skeleton className="h-32 w-full" />;
+    }
+
+    if (!community) {
+         return (
+            <Card className="bg-card/50 border-destructive">
+                <CardHeader className="p-3">
+                    <CardTitle className="text-base">Community Error</CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 pt-0">
+                    <p className="text-sm text-muted-foreground">Could not load your community details. You may need to leave and rejoin.</p>
+                </CardContent>
+            </Card>
+        );
     }
 
     return (
@@ -64,24 +101,24 @@ const MyCommunityCard = () => {
                 </CardTitle>
             </CardHeader>
             <CardContent className="p-3 pt-0">
-                <Link href={`/community/${user.communityId}`} className="flex items-center gap-3 group">
+                <Link href={`/community/${community.id}`} className="flex items-center gap-3 group">
                     <ImageWithFallback 
-                        src="" 
-                        fallbackSrc="https://placehold.co/40x40.png" 
-                        alt="Community Logo"
+                        src={community.logoUrl || ''} 
+                        fallbackSrc={`https://placehold.co/40x40.png?text=${community.name.substring(0, 2)}`}
+                        alt={`${community.name} Logo`}
                         width={40} height={40}
                         className="rounded-md"
                         data-ai-hint="community logo"
                     />
                     <div>
-                        <p className="font-semibold group-hover:text-primary transition-colors">Your Community Name</p>
+                        <p className="font-semibold group-hover:text-primary transition-colors line-clamp-1">{community.name}</p>
                         <p className="text-xs text-muted-foreground">Click to view</p>
                     </div>
                 </Link>
             </CardContent>
         </Card>
-    )
-}
+    );
+};
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { settings } = useSiteSettings();
@@ -204,3 +241,5 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   );
 }
+
+    
