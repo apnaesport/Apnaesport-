@@ -73,7 +73,8 @@ const AnnouncementCard = ({ icon: Icon, title, text }: { icon: React.ElementType
 )
 
 
-export default function CommunityDetailPage({ params: { communityId } }: CommunityPageProps) {
+export default function CommunityDetailPage({ params }: CommunityPageProps) {
+    const { communityId } = params;
     const { user, loading: authLoading, refreshUser } = useAuth();
     const { toast } = useToast();
     const router = useRouter();
