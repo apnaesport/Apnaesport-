@@ -241,5 +241,3 @@ export function MainLayout({ children }: MainLayoutProps) {
     </SidebarProvider>
   );
 }
-
-    
