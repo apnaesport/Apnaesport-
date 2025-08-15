@@ -129,10 +129,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const refreshUser = useCallback(async () => {
-    if (auth.currentUser) {
+    const currentUser = auth.currentUser;
+    if (currentUser) {
       setLoading(true); // Indicate loading state
-      await auth.currentUser.reload(); // Reload Firebase Auth user data
-      await fetchAndSetUser(auth.currentUser); // Then fetch and set our custom profile
+      await currentUser.reload(); // Reload Firebase Auth user data
+      // fetchAndSetUser will be called by onAuthStateChanged listener, 
+      // but we call it manually to ensure UI updates immediately
+      await fetchAndSetUser(auth.currentUser); 
     }
   }, [fetchAndSetUser]);
 

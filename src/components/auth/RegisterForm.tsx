@@ -61,7 +61,7 @@ export function RegisterForm() {
 
       await updateFirebaseProfile(user, { displayName: values.name });
 
-      const userIsAdmin = values.email === "xyzapplywork@gmail.com";
+      const userIsAdmin = values.email === ADMIN_EMAIL;
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: values.name,
@@ -75,6 +75,7 @@ export function RegisterForm() {
         favoriteGameIds: [],
         streamingChannelUrl: "",
         points: 0, 
+        communityId: null,
       });
 
       toast({
