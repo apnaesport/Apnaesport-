@@ -29,13 +29,9 @@ service cloud.firestore {
     }
 
     function isCommunityOwner(communityId) {
-      return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
-    }
-    
-    // Checks if the only field being changed by a user is their own communityId
-    function isChangingOwnCommunityId() {
-      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      return changedKeys.hasOnly(['communityId', 'updatedAt']);
+      // Ensure the document exists before trying to access its data
+      return exists(/databases/$(database)/documents/communities/$(communityId))
+        && get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
     }
 
     // --- Default Security: Deny all access unless explicitly allowed ---
@@ -51,10 +47,13 @@ service cloud.firestore {
       // A user can create their own profile document, but cannot make themselves an admin on creation
       allow create: if isOwner(userId) && request.resource.data.isAdmin == false;
       
-      // A user can update their own profile (and not make themselves an admin).
-      // A user is also allowed to ONLY change their own communityId (for joining/leaving).
-      // An admin can update any profile.
-      allow update: if (isOwner(userId) && (request.resource.data.isAdmin == resource.data.isAdmin || isChangingOwnCommunityId())) || isAdmin();
+      // A user can only update their own profile (and not make themselves an admin) or an admin can update any profile.
+      // A user is specifically allowed to update their own communityId.
+      allow update: if (isOwner(userId) && (
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'bio', 'photoURL', 'favoriteGameIds', 'streamingChannelUrl', 'updatedAt'])) ||
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['communityId', 'updatedAt']))
+                      ) && request.resource.data.isAdmin == resource.data.isAdmin
+                    ) || isAdmin();
       
       // Only an admin can delete a user account
       allow delete: if isAdmin();
@@ -85,8 +84,8 @@ service cloud.firestore {
             isJoiningTournament()
         );
         
-        // Only admins can delete tournaments to prevent data loss for participants.
-        allow delete: if isAdmin();
+        // Only admins or the tournament organizer can delete tournaments.
+        allow delete: if isAdmin() || isTournamentOrganizer(tournamentId);
     }
     
     // --- Notifications (`notifications`) ---
@@ -118,13 +117,15 @@ service cloud.firestore {
       // Anyone can view a community's public page
       allow read: if true;
 
-      // A signed-in user can create a community.
-      // The user's communityId is checked on the client and in the user update rule.
+      // A signed-in user can create a community if they aren't already in one.
       // Must set themself as the owner.
-      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() 
+                      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.communityId == null
+                      && request.resource.data.ownerId == request.auth.uid
+                      && request.resource.data.memberCount == 1;
       
       // Only the community owner or a platform admin can update details
-      allow update: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
+      allow update: if isSignedIn() && (isAdmin() || (isCommunityOwner(communityId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerId', 'memberCount'])));
       
       // Only the community owner or a platform admin can delete the community
       allow delete: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
@@ -134,13 +135,11 @@ service cloud.firestore {
         // Anyone can see who is in the community
         allow read: if true;
 
-        // A user can join a community (create their own member doc)
-        // Community owners can also add members
-        allow create: if isSignedIn() && (isOwner(userId) || isCommunityOwner(communityId));
+        // A user can join a community (create their own member doc) if they are not already in one
+        allow create: if isOwner(userId) && get(/databases/$(database)/documents/users/$(userId)).data.communityId == null;
         
         // A user can leave a community (delete their own member doc)
-        // Community owners can also remove members
-        allow delete: if isSignedIn() && (isOwner(userId) || isCommunityOwner(communityId));
+        allow delete: if isOwner(userId);
 
         // Roles and other details can only be updated by the community owner or an admin
         allow update: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));

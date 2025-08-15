@@ -4,13 +4,13 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { Community, CommunityMember, SiteSettings } from '@/lib/types';
-import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore } from '@/lib/tournamentStore';
+import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,6 +41,7 @@ import { format } from "date-fns";
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -89,7 +90,9 @@ const AnnouncementCard = ({ icon: Icon, title, text }: { icon: React.ElementType
 
 const ManageCommunityDialog = ({ community }: { community: Community }) => {
     const { toast } = useToast();
+    const router = useRouter();
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
     const [logoPreview, setLogoPreview] = useState<string | null>(community.logoUrl || null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(community.bannerUrl || null);
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -138,6 +141,20 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
         }
     };
 
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            await deleteCommunityFromFirestore(community.id);
+            toast({ title: "Community Deleted", description: `"${community.name}" has been permanently removed.`});
+            router.push('/community');
+        } catch (error) {
+            console.error("Error deleting community", error);
+            toast({ title: "Error", description: "Could not delete community.", variant: "destructive" });
+        } finally {
+            setIsDeleting(false);
+        }
+    }
+
     return (
         <Dialog>
             <DialogTrigger asChild>
@@ -146,7 +163,7 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Manage Community</DialogTitle>
-                    <DialogDescription>Update your community's logo and banner.</DialogDescription>
+                    <DialogDescription>Update your community's branding or manage settings.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-6 py-4">
                     <div className="space-y-2">
@@ -158,6 +175,33 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
                         <Label htmlFor="bannerFile">Community Banner (16:9 Ratio)</Label>
                         <Input id="bannerFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isUpdating}/>
                         {bannerPreview && <ImageWithFallback src={bannerPreview} alt="Banner Preview" width={400} height={225} className="rounded-md mt-2 border aspect-video object-cover" fallbackSrc="" data-ai-hint="banner preview" unoptimized={bannerPreview.startsWith('data:')}/>}
+                    </div>
+                     <Separator />
+                    <div className="space-y-2">
+                        <Label className="text-destructive">Danger Zone</Label>
+                         <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <Button variant="destructive" className="w-full" disabled={isDeleting}>
+                                    <Trash2 className="mr-2 h-4 w-4"/> Delete Community
+                                </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        This action cannot be undone. This will permanently delete the community and remove all members.
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                                        {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                        Confirm Deletion
+                                    </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                         <p className="text-xs text-muted-foreground">Deleting your community is permanent.</p>
                     </div>
                 </div>
                 <DialogFooter>
@@ -233,7 +277,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const handleLeaveCommunity = async () => {
         if (!user || !community) return;
         if (user.uid === community.ownerId) {
-            toast({ title: "Action Not Allowed", description: "The community owner cannot leave.", variant: "destructive" });
+            toast({ title: "Action Not Allowed", description: "The community owner cannot leave. You must delete the community instead.", variant: "destructive" });
             return;
         }
         setIsProcessing(true);

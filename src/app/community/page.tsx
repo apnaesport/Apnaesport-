@@ -33,6 +33,7 @@ import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const communitySchema = z.object({
     name: z.string().min(3, "Community name must be at least 3 characters.").max(50, "Name cannot exceed 50 characters."),
@@ -95,7 +96,7 @@ const CommunityCard = ({ community, settings, isMember }: CommunityCardProps) =>
              </CardContent>
              <CardFooter className="p-4 border-t">
                  <Button asChild className="w-full" variant={isMember ? "secondary" : "default"}>
-                    <Link href={`/community/${community.id}`}>{isMember ? 'View Community' : 'View & Join'}</Link>
+                    <Link href={`/community/${community.id}`}>{isMember ? 'View Your Community' : 'View & Join'}</Link>
                 </Button>
              </CardFooter>
         </Card>
@@ -180,11 +181,24 @@ export default function CommunityHubPage() {
                 subtitle="Discover, join, and create communities. Compete together and grow your legacy."
                 actions={
                   <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                      <DialogTrigger asChild>
-                           <Button>
-                               <PlusCircle className="mr-2 h-4 w-4" /> Create Your Community
-                           </Button>
-                      </DialogTrigger>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span tabIndex={0}>
+                                <DialogTrigger asChild>
+                                  <Button disabled={!!user?.communityId}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Create Your Community
+                                  </Button>
+                                </DialogTrigger>
+                            </span>
+                          </TooltipTrigger>
+                           {user?.communityId && (
+                            <TooltipContent>
+                                <p>You must leave your current community to create a new one.</p>
+                            </TooltipContent>
+                           )}
+                        </Tooltip>
+                      </TooltipProvider>
                       <DialogContent className="sm:max-w-lg">
                           <DialogHeader>
                               <DialogTitle>Create Your Community</DialogTitle>

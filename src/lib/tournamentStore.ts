@@ -619,6 +619,31 @@ export const updateCommunityDetailsInFirestore = async (communityId: string, upd
     });
 };
 
+export const deleteCommunityFromFirestore = async (communityId: string): Promise<void> => {
+    const batch = writeBatch(db);
+    
+    // 1. Get all members to update their user profiles
+    const members = await getCommunityMembers(communityId);
+    
+    // 2. For each member, update their user profile to remove communityId
+    for (const member of members) {
+        const userRef = doc(db, USERS_COLLECTION, member.uid);
+        batch.update(userRef, { communityId: null });
+        
+        // 3. Delete the member document from the subcollection
+        const memberDocRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'members', member.uid);
+        batch.delete(memberDocRef);
+    }
+    
+    // 4. Delete the main community document
+    const communityRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    batch.delete(communityRef);
+    
+    // 5. Commit all operations
+    await batch.commit();
+};
+
+
 
 // Aliases for easier use
 export const getGameDetails = getGameByIdFromFirestore;
