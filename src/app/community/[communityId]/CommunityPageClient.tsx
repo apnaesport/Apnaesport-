@@ -4,13 +4,13 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2 } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Community, CommunityMember } from '@/lib/types';
-import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity } from '@/lib/tournamentStore';
+import type { Community, CommunityMember, SiteSettings } from '@/lib/types';
+import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,7 +27,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose
+} from "@/components/ui/dialog";
 import { format } from "date-fns";
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -74,8 +87,94 @@ const AnnouncementCard = ({ icon: Icon, title, text }: { icon: React.ElementType
     </Card>
 )
 
+const ManageCommunityDialog = ({ community }: { community: Community }) => {
+    const { toast } = useToast();
+    const [isUpdating, setIsUpdating] = useState(false);
+    const [logoPreview, setLogoPreview] = useState<string | null>(community.logoUrl || null);
+    const [bannerPreview, setBannerPreview] = useState<string | null>(community.bannerUrl || null);
+    const [logoFile, setLogoFile] = useState<File | null>(null);
+    const [bannerFile, setBannerFile] = useState<File | null>(null);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                if (type === 'logo') {
+                    setLogoPreview(result);
+                    setLogoFile(file);
+                } else {
+                    setBannerPreview(result);
+                    setBannerFile(file);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleUpdate = async () => {
+        setIsUpdating(true);
+        try {
+            const updates: Partial<Community> = {};
+            if (logoPreview && logoPreview.startsWith('data:')) {
+                updates.logoUrl = logoPreview;
+            }
+            if (bannerPreview && bannerPreview.startsWith('data:')) {
+                updates.bannerUrl = bannerPreview;
+            }
+
+            if (Object.keys(updates).length > 0) {
+                await updateCommunityDetailsInFirestore(community.id, updates);
+                toast({ title: "Success", description: "Community branding updated." });
+            } else {
+                toast({ title: "No Changes", description: "No new images were selected to upload." });
+            }
+        } catch (error) {
+            console.error("Error updating community:", error);
+            toast({ title: "Error", description: "Could not update community details.", variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="outline"><Shield className="mr-2 h-4 w-4" /> Manage Community</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Manage Community</DialogTitle>
+                    <DialogDescription>Update your community's logo and banner.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-6 py-4">
+                    <div className="space-y-2">
+                        <Label htmlFor="logoFile">Community Logo (1:1 Ratio)</Label>
+                        <Input id="logoFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'logo')} disabled={isUpdating}/>
+                        {logoPreview && <ImageWithFallback src={logoPreview} alt="Logo Preview" width={80} height={80} className="rounded-full mt-2 border" fallbackSrc="" data-ai-hint="logo preview" unoptimized={logoPreview.startsWith('data:')} />}
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="bannerFile">Community Banner (16:9 Ratio)</Label>
+                        <Input id="bannerFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isUpdating}/>
+                        {bannerPreview && <ImageWithFallback src={bannerPreview} alt="Banner Preview" width={400} height={225} className="rounded-md mt-2 border aspect-video object-cover" fallbackSrc="" data-ai-hint="banner preview" unoptimized={bannerPreview.startsWith('data:')}/>}
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="outline" disabled={isUpdating}>Cancel</Button></DialogClose>
+                    <Button onClick={handleUpdate} disabled={isUpdating}>
+                        {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Changes
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 export default function CommunityPageClient({ initialCommunity, initialMembers }: CommunityPageClientProps) {
     const { user, loading: authLoading, refreshUser } = useAuth();
+    const { settings, loadingSettings } = useSiteSettings();
     const { toast } = useToast();
     const router = useRouter();
     const [community, setCommunity] = useState<Community>(initialCommunity);
@@ -86,21 +185,15 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const communityId = community.id;
 
     useEffect(() => {
-        // We already have initial data, so we set loading to false.
-        // The real-time listener will update it from here.
         setIsLoading(false);
-
         const unsubscribe = listenToCommunityById(communityId, async (liveCommunity) => {
             if (liveCommunity) {
-                // We need to re-serialize the timestamps for the client
                 const serializableLiveCommunity = {
                     ...liveCommunity,
                     createdAt: liveCommunity.createdAt ? (liveCommunity.createdAt as any).toDate().toISOString() : new Date().toISOString(),
                     updatedAt: liveCommunity.updatedAt ? (liveCommunity.updatedAt as any).toDate().toISOString() : new Date().toISOString(),
                 }
                 setCommunity(serializableLiveCommunity as Community);
-                
-                // Also refetch members if the count changes, for example
                 if (liveCommunity.memberCount !== community.memberCount) {
                     const fetchedMembers = await getCommunityMembers(communityId);
                     setMembers(fetchedMembers);
@@ -109,15 +202,11 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 notFound();
             }
         });
-
         return () => unsubscribe();
-    // community.memberCount is included to refetch members when count changes
     }, [communityId, community.memberCount]);
 
-    const isMember = useMemo(() => {
-        if (!user || !community) return false;
-        return user.communityId === community.id;
-    }, [user, community]);
+    const isMember = useMemo(() => user?.communityId === community.id, [user, community]);
+    const isOwner = useMemo(() => user?.uid === community.ownerId, [user, community]);
 
     const handleJoinCommunity = async () => {
         if (!user) {
@@ -159,7 +248,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
         }
     }
 
-    if (isLoading || authLoading) {
+    if (isLoading || authLoading || loadingSettings) {
         return (
              <div className="space-y-4">
                 <Skeleton className="h-48 w-full" />
@@ -176,12 +265,15 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const xpPercentage = community.level > 0 ? (community.points / (community.level * 500)) * 100 : 0;
     const createdAtDate = community.createdAt ? new Date(community.createdAt as any) : new Date();
 
+    const bannerSrc = community.bannerUrl || settings?.defaultCommunityBannerUrl || '';
+    const logoSrc = community.logoUrl || settings?.defaultCommunityLogoUrl || '';
+
     return (
         <div className="space-y-6">
             <header className="rounded-lg overflow-hidden shadow-lg bg-card border">
                 <div className="h-32 sm:h-40 bg-gradient-to-r from-orange-400 to-rose-500 relative">
                      <ImageWithFallback
-                        src={community.bannerUrl || ''}
+                        src={bannerSrc}
                         fallbackSrc={`https://placehold.co/1200x300.png?text=${encodeURIComponent(community.name)}`}
                         alt={`${community.name} banner`}
                         fill
@@ -193,7 +285,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
                         <div className="relative w-24 h-24 sm:w-32 sm:h-32 -mt-16 sm:-mt-20 shrink-0">
                              <ImageWithFallback
-                                src={community.logoUrl || ''}
+                                src={logoSrc}
                                 fallbackSrc={`https://placehold.co/128x128.png?text=${community.name.substring(0, 2)}`}
                                 alt={`${community.name} logo`}
                                 fill
@@ -209,11 +301,12 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                                     </h1>
                                     <p className="text-sm text-muted-foreground">Joined: {format(createdAtDate, "MMM dd, yyyy")} | Members: {community.memberCount}</p>
                                 </div>
-                                <div className="shrink-0">
+                                <div className="shrink-0 flex items-center gap-2">
+                                     {isOwner && <ManageCommunityDialog community={community} />}
                                     {isMember ? (
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="destructive" disabled={isProcessing}>
+                                                <Button variant="destructive" disabled={isProcessing || isOwner}>
                                                     {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                                     Leave
                                                 </Button>

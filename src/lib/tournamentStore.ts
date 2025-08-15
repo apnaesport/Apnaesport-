@@ -466,7 +466,8 @@ export const updateSponsorshipRequestStatusInFirestore = async (id: string, stat
 
 export const createCommunityInFirestore = async (
     communityData: Pick<Community, 'name' | 'tagline' | 'description' | 'gameName' | 'gameId'>, 
-    owner: UserProfile
+    owner: UserProfile,
+    settings: SiteSettings | null
 ): Promise<string> => {
     if (!owner) throw new Error("An owner is required to create a community.");
     if (owner.communityId) throw new Error("You are already in a community.");
@@ -482,8 +483,8 @@ export const createCommunityInFirestore = async (
         ownerName: owner.displayName || 'Owner',
         gameId: communityData.gameId || null,
         gameName: communityData.gameName || 'Variety',
-        logoUrl: `https://placehold.co/100x100.png?text=${communityData.name.substring(0, 2)}`,
-        bannerUrl: `https://placehold.co/800x200.png?text=${encodeURIComponent(communityData.name)}`,
+        logoUrl: settings?.defaultCommunityLogoUrl || `https://placehold.co/100x100.png?text=${communityData.name.substring(0, 2)}`,
+        bannerUrl: settings?.defaultCommunityBannerUrl || `https://placehold.co/800x200.png?text=${encodeURIComponent(communityData.name)}`,
         memberCount: 1,
         level: 1,
         points: 0,
@@ -609,10 +610,17 @@ export const getCommunityMembers = async (communityId: string): Promise<Communit
     return membersSnap.docs.map(doc => doc.data() as CommunityMember);
 }
 
+export const updateCommunityDetailsInFirestore = async (communityId: string, updates: Partial<Community>): Promise<void> => {
+    const communityRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    await updateDoc(communityRef, {
+        ...updates,
+        updatedAt: serverTimestamp(),
+    });
+};
+
 
 // Aliases for easier use
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-

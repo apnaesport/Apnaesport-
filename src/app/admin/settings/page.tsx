@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -32,6 +32,8 @@ const settingsSchema = z.object({
   downloadAppLink: z.string().url("Must be a valid URL for the app download.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
+  defaultCommunityLogoUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  defaultCommunityBannerUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
 });
 
 
@@ -44,6 +46,8 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   downloadAppLink: "",
   defaultTheme: "system",
   basePlayerCount: 0,
+  defaultCommunityLogoUrl: "",
+  defaultCommunityBannerUrl: "",
 };
 
 function AdminSettingsPageContent() {
@@ -101,6 +105,8 @@ function AdminSettingsPageContent() {
         downloadAppLink: data.downloadAppLink,
         defaultTheme: theme,
         basePlayerCount: Number(data.basePlayerCount) || 0,
+        defaultCommunityLogoUrl: data.defaultCommunityLogoUrl,
+        defaultCommunityBannerUrl: data.defaultCommunityBannerUrl,
       };
 
       await saveSiteSettingsToFirestore(settingsToSave);
@@ -212,6 +218,20 @@ function AdminSettingsPageContent() {
             <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://example.com/favicon.ico" disabled={isSaving}/>
             {form.formState.errors.faviconUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.faviconUrl.message as string}</p>}
           </div>
+          <Separator />
+           <div className="space-y-2">
+            <Label htmlFor="defaultCommunityLogoUrl" className="flex items-center gap-2"><ImageIcon className="h-4 w-4"/>Default Community Logo URL</Label>
+            <Input id="defaultCommunityLogoUrl" {...form.register("defaultCommunityLogoUrl")} placeholder="https://example.com/default-logo.png" disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">This logo will be used for new communities that don't upload their own.</p>
+            {form.formState.errors.defaultCommunityLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.defaultCommunityLogoUrl.message as string}</p>}
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="defaultCommunityBannerUrl" className="flex items-center gap-2"><ImageIcon className="h-4 w-4"/>Default Community Banner URL</Label>
+            <Input id="defaultCommunityBannerUrl" {...form.register("defaultCommunityBannerUrl")} placeholder="https://example.com/default-banner.png" disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">This banner will be used for new communities that don't upload their own.</p>
+            {form.formState.errors.defaultCommunityBannerUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.defaultCommunityBannerUrl.message as string}</p>}
+          </div>
+          <Separator />
            <div>
               <Label className="font-medium">Default Site Theme</Label>
               <p className="text-sm text-muted-foreground mb-2">Set the default theme for all users. Individual users can override this in their settings.</p>
@@ -278,5 +298,3 @@ export default function AdminSettingsPage() {
     </SiteSettingsProvider>
   )
 }
-
-    

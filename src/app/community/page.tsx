@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Search, Filter, Users, Loader2 } from "lucide-react";
-import type { Community, Game } from "@/lib/types";
+import type { Community, Game, SiteSettings } from "@/lib/types";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 
 const communitySchema = z.object({
     name: z.string().min(3, "Community name must be at least 3 characters.").max(50, "Name cannot exceed 50 characters."),
@@ -42,13 +43,21 @@ const communitySchema = z.object({
 
 type CommunityFormData = z.infer<typeof communitySchema>;
 
+interface CommunityCardProps {
+    community: Community;
+    settings: SiteSettings | null;
+    isMember: boolean;
+}
 
-const CommunityCard = ({ community }: { community: Community }) => {
+const CommunityCard = ({ community, settings, isMember }: CommunityCardProps) => {
+    const bannerSrc = community.bannerUrl || settings?.defaultCommunityBannerUrl || '';
+    const logoSrc = community.logoUrl || settings?.defaultCommunityLogoUrl || '';
+
     return (
         <Card className="overflow-hidden shadow-lg hover:shadow-primary/20 transition-all duration-300 group flex flex-col h-full">
             <CardHeader className="relative p-0 h-40">
                 <ImageWithFallback
-                    src={community.bannerUrl || ''}
+                    src={bannerSrc}
                     fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(community.name)}`}
                     alt={`${community.name} banner`}
                     fill
@@ -60,7 +69,7 @@ const CommunityCard = ({ community }: { community: Community }) => {
                 <div className="absolute bottom-0 left-0 p-4 w-full">
                     <div className="flex items-center gap-3">
                          <ImageWithFallback
-                            src={community.logoUrl || ''}
+                            src={logoSrc}
                             fallbackSrc={`https://placehold.co/40x40.png?text=${community.name.substring(0, 2)}`}
                             alt={`${community.name} logo`}
                             width={40}
@@ -85,8 +94,8 @@ const CommunityCard = ({ community }: { community: Community }) => {
                 </div>
              </CardContent>
              <CardFooter className="p-4 border-t">
-                 <Button asChild className="w-full">
-                    <Link href={`/community/${community.id}`}>View & Join</Link>
+                 <Button asChild className="w-full" variant={isMember ? "secondary" : "default"}>
+                    <Link href={`/community/${community.id}`}>{isMember ? 'View Community' : 'View & Join'}</Link>
                 </Button>
              </CardFooter>
         </Card>
@@ -95,6 +104,7 @@ const CommunityCard = ({ community }: { community: Community }) => {
 
 export default function CommunityHubPage() {
     const { user, refreshUser } = useAuth();
+    const { settings, loadingSettings } = useSiteSettings();
     const router = useRouter();
     const { toast } = useToast();
     const [communities, setCommunities] = useState<Community[]>([]);
@@ -148,7 +158,7 @@ export default function CommunityHubPage() {
                 ...data,
                 gameId: finalGameId,
                 gameName: selectedGame?.name,
-            }, user);
+            }, user, settings);
             await refreshUser();
             toast({ title: "Community Created!", description: `Your community "${data.name}" is now live.` });
             router.push(`/community/${newCommunityId}`);
@@ -248,7 +258,7 @@ export default function CommunityHubPage() {
                 </Button>
             </div>
 
-            {isLoading ? (
+            {isLoading || loadingSettings ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {Array.from({ length: 6 }).map((_, i) => (
                        <Card key={i}>
@@ -266,7 +276,7 @@ export default function CommunityHubPage() {
             ) : communities.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {communities.map(community => (
-                        <CommunityCard key={community.id} community={community} />
+                        <CommunityCard key={community.id} community={community} settings={settings} isMember={user?.communityId === community.id} />
                     ))}
                 </div>
             ) : (

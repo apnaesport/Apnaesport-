@@ -1,8 +1,4 @@
 
-
-
-
-
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -130,6 +126,8 @@ export interface SiteSettings {
   downloadAppLink?: string;
   defaultTheme?: string;
   basePlayerCount?: number;
+  defaultCommunityLogoUrl?: string;
+  defaultCommunityBannerUrl?: string;
   updatedAt?: Timestamp;
 }
 
@@ -188,7 +186,7 @@ export interface Community {
     description: string;
     ownerId: string;
     ownerName: string;
-    gameId?: string;
+    gameId?: string | null;
     gameName?: string;
     logoUrl?: string;
     bannerUrl?: string;
