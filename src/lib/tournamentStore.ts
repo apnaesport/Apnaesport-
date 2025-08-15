@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 import {
   collection,
   doc,
@@ -565,6 +558,23 @@ export const getCommunitiesFromFirestore = async (): Promise<Community[]> => {
     return communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
 };
 
+export const getCommunityByIdFromFirestore = async (communityId: string): Promise<Community | null> => {
+    if (!communityId) return null;
+    const docRef = doc(db, COMMUNITIES_COLLECTION, communityId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+            id: docSnap.id,
+            ...data,
+            createdAt: data.createdAt as Timestamp,
+            updatedAt: data.updatedAt as Timestamp,
+        } as Community;
+    }
+    return null;
+};
+
+
 export const listenToCommunityById = (
     communityId: string,
     callback: (community: Community | null) => void
@@ -604,8 +614,5 @@ export const getCommunityMembers = async (communityId: string): Promise<Communit
 export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
-export const getCommunityById = getCommunityDetails;
-function getCommunityDetails(communityId: string): Promise<Community | null> {
-    throw new Error("Function not implemented.");
-}
+export const getCommunityDetails = getCommunityByIdFromFirestore;
 
