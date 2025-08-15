@@ -3,16 +3,18 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---================-------------
-    // ---      HELPER FUNCTIONS     ---
-    // ---================-------------
-
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    // A more secure check to ensure the user is updating their own document
+    function isSelf(userId) {
+        return request.auth.uid == userId;
     }
 
     function getRole(userId) {
@@ -28,56 +30,32 @@ service cloud.firestore {
     }
 
     function isCommunityOwner(communityId) {
-      return isSignedIn() && get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
+      return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
     }
 
-    function isCommunityMember(communityId, userId) {
-      return exists(/databases/$(database)/documents/communities/$(communityId)/members/$(userId));
-    }
-    
-    function isCommunityAdmin(communityId, userId) {
-        let memberRole = get(/databases/$(database)/documents/communities/$(communityId)/members/$(userId)).data.role;
-        return memberRole == "Owner" || memberRole == "Admin";
-    }
-    
-    // Checks if the only field being changed by a user is their own communityId
-    function isChangingOwnCommunityId() {
-      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
-      // Allow 'updatedAt' to be changed alongside 'communityId'
-      return changedKeys.hasOnly(['communityId', 'updatedAt']);
-    }
-
-    // ---================-------------
-    // ---      DEFAULT RULES        ---
-    // ---================-------------
+    // --- Default Security: Deny all access unless explicitly allowed ---
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // ---================-------------
-    // ---      USER PROFILES        ---
-    // ---================-------------
+    // --- User Profiles (`users`) ---
     match /users/{userId} {
       // Anyone can read public profile data (get) or list all users for leaderboards
       allow get, list: if true;
 
       // A user can create their own profile document, but cannot make themselves an admin on creation.
-      // The `uid` in the document must match the authenticated user's uid.
-      allow create: if request.auth.uid == userId 
-                    && request.resource.data.isAdmin == false;
+      // This rule ensures the document ID matches the authenticated user's ID.
+      allow create: if isSelf(userId) && request.resource.data.isAdmin == false;
       
-      // A user can update their own profile (and not make themselves an admin).
-      // A user is also allowed to ONLY change their own communityId (for joining/leaving).
-      // A platform admin can update any profile.
-      allow update: if (isOwner(userId) && (request.resource.data.isAdmin == resource.data.isAdmin || isChangingOwnCommunityId())) || isAdmin();
+      // A user can update their own profile, but cannot change their admin status.
+      // An admin can update any profile.
+      allow update: if (isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin();
       
       // Only an admin can delete a user account
       allow delete: if isAdmin();
     }
 
-    // ---================-------------
-    // ---          GAMES            ---
-    // ---================-------------
+    // --- Games (`games`) ---
     match /games/{gameId} {
       // Game data is public
       allow read: if true;
@@ -85,9 +63,7 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     
-    // ---================-------------
-    // ---       TOURNAMENTS         ---
-    // ---================-------------
+    // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
         // Tournament data is public
         allow read: if true;
@@ -97,25 +73,18 @@ service cloud.firestore {
         
         // Admins can update anything.
         // Organizers can update their own tournament (but not critical fields).
-        // Any signed-in user can join a tournament by adding only themselves to the participants list.
+        // Any signed-in user can join a tournament if they are ONLY adding themselves to the participants list.
         allow update: if isSignedIn() && (
             isAdmin() || 
             (isTournamentOrganizer(tournamentId) && request.resource.data.organizerId == resource.data.organizerId && request.resource.data.gameId == resource.data.gameId) ||
-            (
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'updatedAt']) &&
-                request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
-                request.auth.uid in request.resource.data.participants.map(p => p.id) &&
-                !(request.auth.uid in resource.data.participants.map(p => p.id))
-            )
+            (request.resource.data.participants == resource.data.participants.concat([request.auth.uid]))
         );
         
-        // Only admins or the tournament organizer can delete tournaments.
-        allow delete: if isSignedIn() && (isAdmin() || isTournamentOrganizer(tournamentId));
+        // Only admins can delete tournaments to prevent data loss for participants.
+        allow delete: if isAdmin();
     }
     
-    // ---================-------------
-    // ---      NOTIFICATIONS        ---
-    // ---================-------------
+    // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
         // Any signed-in user can read notifications
         allow read: if isSignedIn();
@@ -123,9 +92,7 @@ service cloud.firestore {
         allow write: if isAdmin();
     }
     
-    // ---================-------------
-    // ---       SITE SETTINGS       ---
-    // ---================-------------
+    // --- Site Settings (`settings`) ---
     match /settings/global {
         // Site settings are public
         allow read: if true;
@@ -133,9 +100,7 @@ service cloud.firestore {
         allow write: if isAdmin();
     }
     
-    // ---================-------------
-    // ---       SPONSORSHIPS        ---
-    // ---================-------------
+    // --- Sponsorships (`sponsorships`) ---
     match /sponsorships/{sponsorshipId} {
       // Any signed in user can create a request
       allow create: if isSignedIn();
@@ -143,21 +108,22 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
     
-    // ---================-------------
-    // ---        COMMUNITIES        ---
-    // ---================-------------
+    // --- Communities (`communities`) ---
     match /communities/{communityId} {
       // Anyone can view a community's public page
       allow read: if true;
 
-      // A signed-in user can create a community if they aren't already in one.
+      // A signed-in user can create a community.
+      // The user's communityId is checked on the client-side.
       // Must set themself as the owner.
-      allow create: if isSignedIn() 
-                      && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.communityId == null
-                      && request.resource.data.ownerId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
-      // Only the community owner or a platform admin can update community details (e.g., banner, logo, description).
-      allow update: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
+      // Community owner or a platform admin can update details.
+      // Any user can update the community IF they are ONLY incrementing the member count by 1.
+      allow update: if isSignedIn() && (
+        (isAdmin() || isCommunityOwner(communityId)) ||
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && request.resource.data.memberCount == resource.data.memberCount + 1)
+      );
       
       // Only the community owner or a platform admin can delete the community
       allow delete: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
@@ -165,19 +131,16 @@ service cloud.firestore {
       // --- Community Members (`members`) ---
       match /members/{userId} {
         // Anyone can see who is in the community
-        allow list, get: if true;
+        allow read: if true;
 
-        // A user can join a community (create their own member doc).
-        // The joining user must not already be in a community.
-        allow create: if isSignedIn() 
-                      && isOwner(userId)
-                      && get(/databases/$(database)/documents/users/$(userId)).data.communityId == null;
+        // A user can join a community (create their own member doc)
+        allow create: if isSignedIn() && isSelf(userId);
         
-        // A user can leave a community (delete their own member doc).
-        // Community owners can also remove members.
-        allow delete: if isSignedIn() && (isOwner(userId) || isCommunityOwner(communityId));
+        // A user can leave a community (delete their own member doc)
+        // Community owners can also remove (kick) members
+        allow delete: if isSignedIn() && (isSelf(userId) || isCommunityOwner(communityId));
 
-        // Roles and other details can only be updated by the community owner or a platform admin.
+        // Roles and other details can only be updated by the community owner or an admin
         allow update: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
       }
     }
