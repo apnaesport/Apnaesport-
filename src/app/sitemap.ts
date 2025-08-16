@@ -1,8 +1,8 @@
 
 import { MetadataRoute } from 'next'
-import { getTournamentsFromFirestore, getGamesFromFirestore } from '@/lib/tournamentStore';
+import { getTournamentsFromFirestore, getGamesFromFirestore, getCommunitiesFromFirestore } from '@/lib/tournamentStore';
 
-const BASE_URL = 'https://apnaesport.vercel.app'; // Corrected domain
+const BASE_URL = 'https://apnaesport.vercel.app';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static Routes
@@ -24,6 +24,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'weekly',
       priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/community`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    {
+      url: `${BASE_URL}/live-stats`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.7,
     },
     {
       url: `${BASE_URL}/about`,
@@ -87,6 +99,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   });
 
+  // Dynamic Community Routes
+  const communities = await getCommunitiesFromFirestore();
+  const communityRoutes: MetadataRoute.Sitemap = communities.map(community => {
+      const updatedAt = (community.updatedAt as any)?.toDate ? (community.updatedAt as any).toDate() : new Date();
+      return {
+          url: `${BASE_URL}/community/${community.id}`,
+          lastModified: updatedAt,
+          changeFrequency: 'daily',
+          priority: 0.7,
+      }
+  });
 
-  return [...staticRoutes, ...tournamentRoutes, ...gameRoutes];
+
+  return [...staticRoutes, ...tournamentRoutes, ...gameRoutes, ...communityRoutes];
 }
