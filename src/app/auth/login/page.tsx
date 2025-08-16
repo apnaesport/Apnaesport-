@@ -8,6 +8,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import type { Metadata } from 'next';
+
+// Although metadata can't be exported from a client component, 
+// we can define it here for reference or future conversion to server component.
+export const metadata: Metadata = {
+  title: "Login to Apna Esport",
+  description: "Sign in to your Apna Esport account to join tournaments, manage your profile, and connect with the community. Secure apna esport login.",
+  keywords: ["apna esport login", "apna esport sign in", "esports account login", "gaming login"],
+};
+
 
 export default function LoginPage() {
   const { user, loading } = useAuth();

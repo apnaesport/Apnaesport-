@@ -8,6 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { LoadingSpinner } from "@/components/shared/LoadingSpinner";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: "Register for Apna Esport",
+  description: "Create your Apna Esport account to start competing in online gaming tournaments in India. Sign up now for free!",
+  keywords: ["apna esport registration", "apna esport sign up", "create esports account", "gaming registration"],
+};
 
 export default function RegisterPage() {
   const { user, loading } = useAuth();

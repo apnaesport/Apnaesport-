@@ -8,11 +8,10 @@ export function ApnaEsportLogo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 220 50" // Adjusted viewBox width to better fit "APNA ESPORT"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      aria-labelledby="apnaEsportLogoTitle"
-      role="img"
+      aria-hidden="true" // Hide from screen readers as it's decorative
       {...props}
     >
-      <title id="apnaEsportLogoTitle">Apna Esport Logo</title>
+      <title>Apna Esport Logo</title>
       <text
         x="50%"
         y="50%"
