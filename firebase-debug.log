@@ -1,0 +1,77 @@
+[debug] [2025-06-21T04:49:48.608Z] ----------------------------------------------------------------------
+[debug] [2025-06-21T04:49:48.613Z] Command:       /nix/store/rbdrkcs5kkwpalxcd7c6bnm33lk2955n-nodejs-20.19.0/bin/node /home/user/.global_modules/bin/firebase init
+[debug] [2025-06-21T04:49:48.614Z] CLI Version:   14.8.0
+[debug] [2025-06-21T04:49:48.615Z] Platform:      linux
+[debug] [2025-06-21T04:49:48.615Z] Node Version:  v20.19.0
+[debug] [2025-06-21T04:49:48.615Z] Time:          Sat Jun 21 2025 04:49:48 GMT+0000 (Coordinated Universal Time)
+[debug] [2025-06-21T04:49:48.616Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-06-21T04:49:49.288Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-06-21T04:49:49.289Z] > authorizing via signed-in user (karateboyjitenderprajapat@gmail.com)
+[info] 
+     ######## #### ########  ######## ########     ###     ######  ########
+     ##        ##  ##     ## ##       ##     ##  ##   ##  ##       ##
+     ######    ##  ########  ######   ########  #########  ######  ######
+     ##        ##  ##    ##  ##       ##     ## ##     ##       ## ##
+     ##       #### ##     ## ######## ########  ##     ##  ######  ########
+
+You're about to initialize a Firebase project in this directory:
+
+  /home/user/studio
+
+Before we get started, keep in mind:
+
+  * You are initializing within an existing Firebase project directory
+
+[info] 
+=== Project Setup
+[info] 
+[info] First, let's associate this project directory with a Firebase project.
+[info] You can create multiple project aliases by running firebase use --add, 
+[info] but for now we'll just set up a default project.
+[info] 
+[debug] [2025-06-21T04:50:03.233Z] Using project from CLI flag: battlezone-faa03
+[debug] [2025-06-21T04:50:03.243Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:03.244Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:03.249Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/battlezone-faa03 [none]
+[debug] [2025-06-21T04:50:03.598Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/battlezone-faa03 200
+[debug] [2025-06-21T04:50:03.599Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/battlezone-faa03 {"projectId":"battlezone-faa03","projectNumber":"247105947270","displayName":"Apna Esport ","name":"projects/battlezone-faa03","resources":{"hostingSite":"battlezone-faa03"},"state":"ACTIVE","etag":"1_ee9ee54c-6cee-4303-bb1a-c8fde676b31f"}
+[info] i  Using project battlezone-faa03 (Apna Esport ) 
+[info] 
+=== Firestore Setup
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2025-06-21T04:50:03.615Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:03.615Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:03.615Z] >>> [apiv2][query] GET https://serviceusage.googleapis.com/v1/projects/battlezone-faa03/services/firestore.googleapis.com [none]
+[debug] [2025-06-21T04:50:03.616Z] >>> [apiv2][(partial)header] GET https://serviceusage.googleapis.com/v1/projects/battlezone-faa03/services/firestore.googleapis.com x-goog-quota-user=projects/battlezone-faa03
+[debug] [2025-06-21T04:50:04.671Z] <<< [apiv2][status] GET https://serviceusage.googleapis.com/v1/projects/battlezone-faa03/services/firestore.googleapis.com 200
+[debug] [2025-06-21T04:50:04.674Z] <<< [apiv2][body] GET https://serviceusage.googleapis.com/v1/projects/battlezone-faa03/services/firestore.googleapis.com [omitted]
+[info] ✔  firestore: required API firestore.googleapis.com is enabled 
+[debug] [2025-06-21T04:50:04.688Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:04.689Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:04.689Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/battlezone-faa03/databases [none]
+[debug] [2025-06-21T04:50:05.393Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/battlezone-faa03/databases 200
+[debug] [2025-06-21T04:50:05.393Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/battlezone-faa03/databases {"databases":[{"name":"projects/battlezone-faa03/databases/(default)","uid":"19be7070-64d6-45cc-a5dc-1cd366249441","createTime":"2025-05-07T17:18:17.304238Z","updateTime":"2025-05-07T17:18:17.304238Z","locationId":"asia-south2","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2025-06-21T03:50:05.388373Z","appEngineIntegrationMode":"DISABLED","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"etag":"IOC31rLbgY4DMPXaiM+umI0D"}]}
+[info] 
+[info] Firestore Security Rules allow you to define how and when to allow
+[info] requests. You can keep these rules in your project directory
+[info] and publish them with firebase deploy.
+[info] 
+[debug] [2025-06-21T04:50:25.076Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:25.077Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:25.078Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/releases pageSize=10&pageToken=
+[debug] [2025-06-21T04:50:26.103Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/releases 200
+[debug] [2025-06-21T04:50:26.105Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/releases {"releases":[{"name":"projects/battlezone-faa03/releases/cloud.firestore","rulesetName":"projects/battlezone-faa03/rulesets/96a6e6e1-7f9b-4aae-9a11-9be65fa297a6","createTime":"2025-05-07T17:18:23.821924Z","updateTime":"2025-06-14T08:33:04.351979Z"}]}
+[debug] [2025-06-21T04:50:26.109Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:26.109Z] Checked if tokens are valid: true, expires at: 1750484851698
+[debug] [2025-06-21T04:50:26.110Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/rulesets/96a6e6e1-7f9b-4aae-9a11-9be65fa297a6 [none]
+[debug] [2025-06-21T04:50:27.086Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/rulesets/96a6e6e1-7f9b-4aae-9a11-9be65fa297a6 200
+[debug] [2025-06-21T04:50:27.087Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/battlezone-faa03/rulesets/96a6e6e1-7f9b-4aae-9a11-9be65fa297a6 [omitted]
+[info] i  Downloaded the existing Firestore Security Rules from the Firebase console 
+[info] i  firestore.rules is unchanged 
+[info] 
+[info] Firestore indexes allow you to perform complex queries while
+[info] maintaining performance that scales with the size of the result
+[info] set. You can keep index definitions in your project directory
+[info] and publish them with firebase deploy.
+[info] 
