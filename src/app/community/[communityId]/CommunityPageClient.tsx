@@ -4,7 +4,7 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +42,9 @@ import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { PageTitle } from '@/components/shared/PageTitle';
+import Link from 'next/link';
+
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -308,6 +311,18 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 <Skeleton className="h-64 w-full" />
             </div>
         )
+    }
+
+    if (!user) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
+          <PageTitle title="Access Denied" subtitle="You need to be logged in to view this community." />
+          <LogIn className="h-16 w-16 text-primary my-6" />
+          <Button asChild size="lg">
+            <Link href={`/auth/login?redirect=/community/${communityId}`}>Login to View Community</Link>
+          </Button>
+        </div>
+      )
     }
 
     if (!community) {

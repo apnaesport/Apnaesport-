@@ -197,9 +197,9 @@ export default function ProfilePage() {
               )}
             </CardHeader>
             <CardContent>
-              <Button variant="outline" disabled> 
+              {/* <Button variant="outline" disabled> 
                 <Edit3 className="mr-2 h-4 w-4" /> Change Profile Picture
-              </Button>
+              </Button> */}
             </CardContent>
           </Card>
         </div>

@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Users, Loader2 } from "lucide-react";
+import { PlusCircle, Search, Filter, Users, Loader2, LogIn } from "lucide-react";
 import type { Community, Game, SiteSettings } from "@/lib/types";
 import {
   Dialog,
@@ -104,7 +104,7 @@ const CommunityCard = ({ community, settings, isMember }: CommunityCardProps) =>
 }
 
 export default function CommunityHubPage() {
-    const { user, refreshUser } = useAuth();
+    const { user, loading: authLoading, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const router = useRouter();
     const { toast } = useToast();
@@ -137,8 +137,12 @@ export default function CommunityHubPage() {
     }, [toast]);
 
     useEffect(() => {
-        fetchPageData();
-    }, [fetchPageData]);
+        if(user) { // Only fetch if user is logged in
+          fetchPageData();
+        } else {
+          setIsLoading(false); // Stop loading if no user
+        }
+    }, [user, fetchPageData]);
 
     const handleCreateCommunity: SubmitHandler<CommunityFormData> = async (data) => {
         if (!user) {
@@ -173,6 +177,25 @@ export default function CommunityHubPage() {
         }
     };
 
+    if (authLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)]">
+          <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (!user) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
+          <PageTitle title="Access Denied" subtitle="You need to be logged in to view and join communities." />
+           <LogIn className="h-16 w-16 text-primary my-6" />
+          <Button asChild size="lg">
+            <Link href="/auth/login?redirect=/community">Login to View Communities</Link>
+          </Button>
+        </div>
+      )
+    }
 
     return (
         <div className="space-y-8">
