@@ -166,7 +166,7 @@ export interface SponsorshipRequest {
 }
 
 
-// --- New Community Types ---
+// --- Community Types ---
 
 export type CommunityRole = "Owner" | "Admin" | "Moderator" | "Member";
 
@@ -217,5 +217,32 @@ export interface CommunityPost {
     mediaUrl?: string; // For images or video clips
     likes: number;
     likedBy: string[]; // Array of UIDs
+    createdAt: Timestamp;
+}
+
+// --- Creator Hub Types ---
+export interface Creator {
+    id: string;
+    userId: string;
+    name: string;
+    avatarUrl?: string;
+    channelUrl: string;
+    tags: string;
+    followers: string;
+    votes: number;
+    votedBy: string[];
+    createdAt: Timestamp;
+    dataAiHint?: string;
+}
+
+export interface CreatorApplication {
+    id: string;
+    userId: string;
+    name: string;
+    email: string;
+    photoURL?: string;
+    channelUrl: string;
+    tags: string;
+    message?: string;
     createdAt: Timestamp;
 }

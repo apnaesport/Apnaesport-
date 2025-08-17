@@ -3,21 +3,15 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import type { Creator } from "@/lib/types";
 
-export interface TopCreator {
+export interface TopCreatorItemProps {
+    creator: Creator;
     rank: number;
-    name: string;
-    tags: string;
     tier: 'gold' | 'silver' | 'bronze';
-    avatarUrl?: string;
-    dataAiHint?: string;
 }
 
-interface TopCreatorItemProps {
-    creator: TopCreator;
-}
-
-export function TopCreatorItem({ creator }: TopCreatorItemProps) {
+export function TopCreatorItem({ creator, rank, tier }: TopCreatorItemProps) {
     const tierStyles = {
         gold: "bg-yellow-400/20 text-yellow-400 border-yellow-500/30",
         silver: "bg-slate-400/20 text-slate-400 border-slate-500/30",
@@ -28,9 +22,9 @@ export function TopCreatorItem({ creator }: TopCreatorItemProps) {
         <div className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors">
             <div className={cn(
                 "flex-shrink-0 h-10 w-10 grid place-items-center rounded-lg font-bold text-lg border",
-                tierStyles[creator.tier]
+                tierStyles[tier]
             )}>
-                {creator.rank}
+                {rank}
             </div>
             <Avatar className="h-10 w-10">
                 <AvatarImage src={creator.avatarUrl} alt={creator.name} data-ai-hint={creator.dataAiHint} />
@@ -38,7 +32,7 @@ export function TopCreatorItem({ creator }: TopCreatorItemProps) {
             </Avatar>
              <div className="flex-grow">
                 <p className="font-semibold text-foreground text-sm">{creator.name}</p>
-                <p className="text-xs text-muted-foreground">{creator.tags}</p>
+                <p className="text-xs text-muted-foreground">{creator.tags} • {creator.followers} followers</p>
             </div>
         </div>
     );

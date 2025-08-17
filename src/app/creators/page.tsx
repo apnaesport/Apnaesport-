@@ -1,78 +1,88 @@
 
-import type { Metadata } from 'next';
+"use client";
+
 import { PageTitle } from '@/components/shared/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Filter, Search, Star, Users } from 'lucide-react';
-import { CreatorCard, type Creator } from '@/components/creators/CreatorCard';
-import { TopCreatorItem, type TopCreator } from '@/components/creators/TopCreatorItem';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Filter, Search, Star, Users, Loader2, Send } from 'lucide-react';
+import { CreatorCard } from '@/components/creators/CreatorCard';
+import { TopCreatorItem } from '@/components/creators/TopCreatorItem';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useState, useEffect, useCallback } from 'react';
+import type { Creator, CreatorApplication } from '@/lib/types';
+import { submitCreatorApplicationInFirestore, listenToCreators, listenToTopCreators } from '@/lib/tournamentStore';
+import { Skeleton } from '@/components/ui/skeleton';
 
-export const metadata: Metadata = {
-  title: "Creator Hub",
-  description: "Discover and support rising gaming creators on Apna Esport. Vote for your favorite streamers, view top-ranked creators, and join the community.",
-  keywords: ["Apna Esport creators", "gaming creators", "streamer showcase", "top gaming streamers", "creator on rise"],
-};
-
-// Placeholder data for creators
-const creators: Creator[] = [
-  {
-    name: 'RexPlays',
-    tags: 'FPS',
-    followers: '45k',
-    votes: '5.2k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'female gamer',
-  },
-  {
-    name: 'NeonNinja',
-    tags: 'MOBA',
-    followers: '18k',
-    votes: '2.0k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'male gamer',
-  },
-  {
-    name: 'PixelPioneer',
-    tags: 'Indie',
-    followers: '8.7k',
-    votes: '1.1k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'male gamer glasses',
-  },
-   {
-    name: 'StormCaller',
-    tags: 'Battle Royale',
-    followers: '32k',
-    votes: '4.8k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'female gamer angry',
-  },
-  {
-    name: 'GhostRider',
-    tags: 'Racing',
-    followers: '25k',
-    votes: '3.5k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'male gamer serious',
-  },
-   {
-    name: 'PuzzleQueen',
-    tags: 'Strategy',
-    followers: '12k',
-    votes: '1.9k',
-    avatarUrl: 'https://placehold.co/56x56.png',
-    dataAiHint: 'female gamer happy',
-  },
-];
-
-const topCreators: TopCreator[] = [
-  { rank: 1, name: 'RexPlays', tags: 'FPS • 45k', tier: 'gold' },
-  { rank: 2, name: 'StormCaller', tags: 'Battle Royale • 32k', tier: 'silver' },
-  { rank: 3, name: 'NeonNinja', tags: 'MOBA • 18k', tier: 'bronze' },
-];
+const applicationSchema = z.object({
+    channelUrl: z.string().url("Please enter a valid URL (e.g., https://youtube.com/yourchannel)."),
+    tags: z.string().min(2, "Please add at least one tag (e.g., FPS, MOBA).").max(50, "Tags are too long."),
+    message: z.string().max(500, "Message cannot exceed 500 characters.").optional(),
+});
+type ApplicationFormData = z.infer<typeof applicationSchema>;
 
 export default function CreatorHubPage() {
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [creators, setCreators] = useState<Creator[]>([]);
+  const [topCreators, setTopCreators] = useState<Creator[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribeCreators = listenToCreators((data) => {
+        setCreators(data);
+        if (isLoading) setIsLoading(false);
+    });
+    
+    const unsubscribeTopCreators = listenToTopCreators(3, (data) => {
+        setTopCreators(data);
+    });
+
+    return () => {
+        unsubscribeCreators();
+        unsubscribeTopCreators();
+    };
+  }, [isLoading]);
+
+  const form = useForm<ApplicationFormData>({
+    resolver: zodResolver(applicationSchema),
+    defaultValues: { channelUrl: "", tags: "", message: "" },
+  });
+
+  const onSubmitApplication: SubmitHandler<ApplicationFormData> = async (data) => {
+    if (!user) {
+        toast({ title: "Not Logged In", description: "You must be logged in to apply.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+    try {
+        const appData: Omit<CreatorApplication, 'id' | 'createdAt'> = {
+            userId: user.uid,
+            name: user.displayName || 'Unknown',
+            email: user.email || 'Unknown',
+            photoURL: user.photoURL || '',
+            ...data
+        };
+        await submitCreatorApplicationInFirestore(appData);
+        toast({ title: "Application Submitted!", description: "We'll review your application and get back to you soon." });
+        setIsDialogOpen(false);
+        form.reset();
+    } catch (error: any) {
+        toast({ title: "Submission Failed", description: error.message || "An unexpected error occurred.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
       {/* Main Content */}
@@ -100,9 +110,15 @@ export default function CreatorHubPage() {
             <Button variant="ghost"><Filter className="mr-2 h-4 w-4"/> Filter</Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {creators.map(creator => <CreatorCard key={creator.name} creator={creator} />)}
-        </div>
+        {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-[80px] w-full" />)}
+            </div>
+        ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {creators.map(creator => <CreatorCard key={creator.id} creator={creator} />)}
+            </div>
+        )}
       </div>
 
       {/* Sidebar */}
@@ -112,7 +128,45 @@ export default function CreatorHubPage() {
                 <CardTitle>Join the Hub</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-                 <Button className="w-full">Join as Creator</Button>
+                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                         <Button className="w-full" disabled={authLoading}>Join as Creator</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Become a Creator</DialogTitle>
+                            <DialogDescription>Fill out the form below to apply. We'll review your application and get back to you soon.</DialogDescription>
+                        </DialogHeader>
+                        {user ? (
+                        <form onSubmit={form.handleSubmit(onSubmitApplication)} className="space-y-4">
+                            <div>
+                                <Label htmlFor="channelUrl">YouTube/Twitch Channel URL *</Label>
+                                <Input id="channelUrl" {...form.register("channelUrl")} placeholder="https://youtube.com/c/YourChannel" />
+                                {form.formState.errors.channelUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.channelUrl.message}</p>}
+                            </div>
+                            <div>
+                                <Label htmlFor="tags">Primary Game / Tags *</Label>
+                                <Input id="tags" {...form.register("tags")} placeholder="e.g., BGMI, FPS, Variety Streamer" />
+                                {form.formState.errors.tags && <p className="text-destructive text-xs mt-1">{form.formState.errors.tags.message}</p>}
+                            </div>
+                            <div>
+                                <Label htmlFor="message">Message (Optional)</Label>
+                                <Textarea id="message" {...form.register("message")} placeholder="Tell us a bit about yourself and your content." />
+                                {form.formState.errors.message && <p className="text-destructive text-xs mt-1">{form.formState.errors.message.message}</p>}
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                                <Button type="submit" disabled={isSubmitting}>
+                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Submit Application
+                                </Button>
+                            </div>
+                        </form>
+                        ) : (
+                            <p className="text-center text-muted-foreground py-4">Please log in to apply.</p>
+                        )}
+                    </DialogContent>
+                 </Dialog>
                  <Button variant="outline" className="w-full">Explore Creators</Button>
             </CardContent>
         </Card>
@@ -121,7 +175,18 @@ export default function CreatorHubPage() {
             <CardTitle>Top Creators</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {topCreators.map(creator => <TopCreatorItem key={creator.rank} creator={creator} />)}
+             {isLoading ? (
+                Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-[68px] w-full" />)
+             ) : (
+                topCreators.map((creator, index) => (
+                    <TopCreatorItem 
+                        key={creator.id} 
+                        creator={creator}
+                        rank={index + 1}
+                        tier={index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze'}
+                    />
+                ))
+             )}
           </CardContent>
         </Card>
       </div>

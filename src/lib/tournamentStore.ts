@@ -1,5 +1,6 @@
 
 
+
 import {
   collection,
   doc,
@@ -21,10 +22,11 @@ import {
   arrayRemove,
   onSnapshot, 
   Query,
-  increment
+  increment,
+  runTransaction
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -34,6 +36,8 @@ const SETTINGS_COLLECTION = "settings";
 const GLOBAL_SETTINGS_ID = "global";
 const SPONSORSHIPS_COLLECTION = "sponsorships";
 const COMMUNITIES_COLLECTION = "communities";
+const CREATORS_COLLECTION = "creators";
+const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
@@ -641,6 +645,102 @@ export const deleteCommunityFromFirestore = async (communityId: string): Promise
     
     // 5. Commit all operations
     await batch.commit();
+};
+
+
+// --- Creator Functions ---
+
+export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt'>): Promise<string> => {
+    const docRef = await addDoc(collection(db, CREATOR_APPLICATIONS_COLLECTION), {
+        ...applicationData,
+        createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+};
+
+export const getCreatorApplicationsFromFirestore = async (): Promise<CreatorApplication[]> => {
+    const snapshot = await getDocs(query(collection(db, CREATOR_APPLICATIONS_COLLECTION), orderBy("createdAt", "asc")));
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt as Timestamp,
+    } as CreatorApplication));
+};
+
+export const approveCreatorApplicationInFirestore = async (app: CreatorApplication): Promise<void> => {
+    const batch = writeBatch(db);
+
+    // 1. Create the new creator document
+    const creatorRef = doc(db, CREATORS_COLLECTION, app.userId);
+    const newCreatorData: Omit<Creator, 'id'> = {
+        userId: app.userId,
+        name: app.name,
+        avatarUrl: app.photoURL,
+        channelUrl: app.channelUrl,
+        tags: app.tags,
+        followers: "0", // Default value
+        votes: 0,
+        votedBy: [],
+        createdAt: serverTimestamp(),
+    };
+    batch.set(creatorRef, newCreatorData);
+
+    // 2. Delete the application document
+    const appRef = doc(db, CREATOR_APPLICATIONS_COLLECTION, app.id);
+    batch.delete(appRef);
+
+    await batch.commit();
+};
+
+export const rejectCreatorApplicationInFirestore = async (appId: string): Promise<void> => {
+    await deleteDoc(doc(db, CREATOR_APPLICATIONS_COLLECTION, appId));
+};
+
+export const getCreatorsFromFirestore = async (): Promise<Creator[]> => {
+    const snapshot = await getDocs(query(collection(db, CREATORS_COLLECTION), orderBy("votes", "desc")));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Creator));
+};
+
+export const deleteCreatorFromFirestore = async (creatorId: string): Promise<void> => {
+    await deleteDoc(doc(db, CREATORS_COLLECTION, creatorId));
+};
+
+// Real-time listeners for creators
+export const listenToCreators = (callback: (data: Creator[]) => void): (() => void) => {
+    const q = query(collection(db, CREATORS_COLLECTION), orderBy("votes", "desc"));
+    return onSnapshot(q, (snapshot) => {
+        const creators = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Creator));
+        callback(creators);
+    });
+};
+
+export const listenToTopCreators = (count: number, callback: (data: Creator[]) => void): (() => void) => {
+    const q = query(collection(db, CREATORS_COLLECTION), orderBy("votes", "desc"), limit(count));
+    return onSnapshot(q, (snapshot) => {
+        const creators = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Creator));
+        callback(creators);
+    });
+};
+
+export const voteForCreatorInFirestore = async (creatorId: string, userId: string): Promise<void> => {
+    const creatorRef = doc(db, CREATORS_COLLECTION, creatorId);
+
+    return runTransaction(db, async (transaction) => {
+        const creatorDoc = await transaction.get(creatorRef);
+        if (!creatorDoc.exists()) {
+            throw new Error("Creator does not exist.");
+        }
+
+        const creatorData = creatorDoc.data() as Creator;
+        if (creatorData.votedBy?.includes(userId)) {
+            throw new Error("You have already voted for this creator.");
+        }
+
+        transaction.update(creatorRef, {
+            votes: increment(1),
+            votedBy: arrayUnion(userId)
+        });
+    });
 };
 
 
