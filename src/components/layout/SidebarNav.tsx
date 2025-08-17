@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import {
@@ -15,6 +14,7 @@ import {
   Users,
   TrendingUp,
   Download,
+  Star, // Added Star icon
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,6 +33,7 @@ const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/community", label: "Communities", icon: Users },
+  { href: "/creators", label: "Creators", icon: Star }, // Added Creators link
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/live-stats", label: "Live Stats Arena", icon: TrendingUp },
   { href: "/notifications", label: "Notifications", icon: Bell },
