@@ -8,10 +8,6 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
     // A more secure check to ensure the user is updating their own document
     function isSelf(userId) {
         return request.auth.uid == userId;
@@ -45,11 +41,11 @@ service cloud.firestore {
 
       // A user can create their own profile document, but cannot make themselves an admin on creation.
       // This rule ensures the document ID matches the authenticated user's ID.
-      allow create: if isSelf(userId) && request.resource.data.isAdmin == false;
+      allow create: if request.auth.uid == userId && request.resource.data.isAdmin == false;
       
       // A user can update their own profile, but cannot change their admin status.
       // An admin can update any profile.
-      allow update: if (isOwner(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin();
+      allow update: if (isSelf(userId) && request.resource.data.isAdmin == resource.data.isAdmin) || isAdmin();
       
       // Only an admin can delete a user account
       allow delete: if isAdmin();
@@ -71,19 +67,46 @@ service cloud.firestore {
         // Signed-in users can create tournaments
         allow create: if isSignedIn();
         
-        // Admins can update anything.
-        // Organizers can update their own tournament (but not critical fields).
-        // Any signed-in user can join a tournament if they are ONLY adding themselves to the participants list.
+        // Admins can update anything. Organizers can update their own tournament. 
+        // Any signed-in user can join if they are ONLY adding themself to the participants list.
         allow update: if isSignedIn() && (
             isAdmin() || 
             (isTournamentOrganizer(tournamentId) && request.resource.data.organizerId == resource.data.organizerId && request.resource.data.gameId == resource.data.gameId) ||
-            (request.resource.data.participants == resource.data.participants.concat([request.auth.uid]))
+            (request.resource.data.participants.size() == resource.data.participants.size() + 1 && request.auth.uid in request.resource.data.participants.map(p => p.id))
         );
         
-        // Only admins can delete tournaments to prevent data loss for participants.
-        allow delete: if isAdmin();
+        // Only admins or the organizer can delete tournaments.
+        allow delete: if isSignedIn() && (isAdmin() || isTournamentOrganizer(tournamentId));
     }
     
+    // --- Creator Applications (`creatorApplications`) ---
+    match /creatorApplications/{applicationId} {
+      // User can create their own application.
+      allow create: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+      // Only admins can read, update, or delete applications.
+      allow read, update, delete: if isAdmin();
+    }
+
+    // --- Creators (`creators`) ---
+    match /creators/{creatorId} {
+      // Anyone can view creators.
+      allow read: if true;
+
+      // Only admins can add or remove creators.
+      allow create, delete: if isAdmin();
+
+      // Admins can update anything.
+      // A user can update a creator document ONLY for voting.
+      function isVoting() {
+        let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+        return changedKeys.hasOnly(['votes', 'votedBy', 'updatedAt'])
+               && request.resource.data.votes == resource.data.votes + 1
+               && request.resource.data.votedBy.hasAny([request.auth.uid])
+               && !resource.data.votedBy.hasAny([request.auth.uid]);
+      }
+      allow update: if isAdmin() || (isSignedIn() && isVoting());
+    }
+
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
         // Any signed-in user can read notifications
@@ -114,7 +137,6 @@ service cloud.firestore {
       allow read: if true;
 
       // A signed-in user can create a community.
-      // The user's communityId is checked on the client-side.
       // Must set themself as the owner.
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
