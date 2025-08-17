@@ -227,11 +227,13 @@ export interface Creator {
     avatarUrl?: string;
     channelUrl: string;
     tags: string;
-    followers: string;
+    followers: string; // Keep for now, but may phase out
     votes: number;
     votedBy: string[];
     createdAt: Timestamp;
     dataAiHint?: string;
+    communityId?: string | null;
+    communityName?: string | null;
 }
 
 export type CreatorApplicationStatus = "Pending" | "Approved" | "Rejected";
@@ -247,4 +249,7 @@ export interface CreatorApplication {
     message?: string;
     status: CreatorApplicationStatus;
     createdAt: Timestamp;
+    communityId?: string; // Added to link application to a community
 }
+
+    

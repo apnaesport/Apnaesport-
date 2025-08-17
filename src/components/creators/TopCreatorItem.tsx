@@ -32,8 +32,10 @@ export function TopCreatorItem({ creator, rank, tier }: TopCreatorItemProps) {
             </Avatar>
              <div className="flex-grow">
                 <p className="font-semibold text-foreground text-sm">{creator.name}</p>
-                <p className="text-xs text-muted-foreground">{creator.tags} • {creator.followers} followers</p>
+                <p className="text-xs text-muted-foreground">{creator.votes.toLocaleString()} Votes</p>
             </div>
         </div>
     );
 }
+
+    

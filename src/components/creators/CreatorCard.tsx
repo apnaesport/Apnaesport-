@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { ArrowUp, Loader2 } from "lucide-react";
+import { ArrowUp, Loader2, Users } from "lucide-react";
 import type { Creator } from "@/lib/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { voteForCreatorInFirestore } from "@/lib/tournamentStore";
@@ -59,9 +59,15 @@ export function CreatorCard({ creator }: CreatorCardProps) {
                         <AvatarImage src={creator.avatarUrl} alt={creator.name} data-ai-hint={creator.dataAiHint} />
                         <AvatarFallback>{creator.name.substring(0, 2)}</AvatarFallback>
                     </Avatar>
-                    <div className="flex-grow">
-                        <h4 className="font-semibold text-foreground">{creator.name}</h4>
-                        <p className="text-xs text-muted-foreground">{creator.tags} • {creator.followers} followers</p>
+                    <div className="flex-grow overflow-hidden">
+                        <h4 className="font-semibold text-foreground truncate">{creator.name}</h4>
+                        <p className="text-xs text-muted-foreground truncate">{creator.tags}</p>
+                        {creator.communityName && (
+                            <Link href={`/community/${creator.communityId}`} onClick={(e) => e.stopPropagation()} className="flex items-center text-xs text-primary hover:underline mt-1">
+                                <Users className="h-3 w-3 mr-1" />
+                                <span className="truncate">{creator.communityName}</span>
+                            </Link>
+                        )}
                     </div>
                     <Button 
                         size="sm"
@@ -99,3 +105,5 @@ export function CreatorCard({ creator }: CreatorCardProps) {
         </Dialog>
     );
 }
+
+    

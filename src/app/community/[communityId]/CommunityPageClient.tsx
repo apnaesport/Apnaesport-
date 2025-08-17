@@ -4,13 +4,13 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2 } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Community, CommunityMember, SiteSettings } from '@/lib/types';
-import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore } from '@/lib/tournamentStore';
+import type { Community, CommunityMember, SiteSettings, Creator } from '@/lib/types';
+import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore, getCreatorById } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -225,6 +225,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const [members, setMembers] = useState<CommunityMember[]>(initialMembers);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [ownerIsCreator, setOwnerIsCreator] = useState(false);
 
     const communityId = community.id;
 
@@ -242,6 +243,13 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     const fetchedMembers = await getCommunityMembers(communityId);
                     setMembers(fetchedMembers);
                 }
+
+                 // Check if owner is a creator
+                if (liveCommunity.ownerId) {
+                    const creatorProfile = await getCreatorById(liveCommunity.ownerId);
+                    setOwnerIsCreator(!!creatorProfile);
+                }
+
             } else {
                 notFound();
             }
@@ -340,9 +348,16 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                         <div className="flex-grow">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-                                        <Users2 className="h-7 w-7 text-primary" /> {community.name}
-                                    </h1>
+                                    <div className="flex items-center gap-2">
+                                        <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+                                            <Users2 className="h-7 w-7 text-primary" /> {community.name}
+                                        </h1>
+                                        {ownerIsCreator && (
+                                            <Badge variant="outline" className="text-amber-500 border-amber-500/50 bg-amber-500/10 whitespace-nowrap">
+                                                <Star className="h-3 w-3 mr-1" /> Creator
+                                            </Badge>
+                                        )}
+                                    </div>
                                     <p className="text-sm text-muted-foreground">Joined: {format(createdAtDate, "MMM dd, yyyy")} | Members: {community.memberCount}</p>
                                 </div>
                                 <div className="shrink-0 flex items-center gap-2">
@@ -418,3 +433,5 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
         </div>
     );
 }
+
+    

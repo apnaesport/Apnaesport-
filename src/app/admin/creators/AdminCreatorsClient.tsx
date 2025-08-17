@@ -2,13 +2,14 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { Creator, CreatorApplication } from "@/lib/types";
+import type { Creator, CreatorApplication, Community } from "@/lib/types";
 import {
   approveCreatorApplicationInFirestore,
   getCreatorApplicationsFromFirestore,
   getCreatorsFromFirestore,
   rejectCreatorApplicationInFirestore,
-  deleteCreatorFromFirestore
+  deleteCreatorFromFirestore,
+  getCommunityByIdFromFirestore
 } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Check, X, Loader2, Link as LinkIcon, Trash2 } from "lucide-react";
+import { Check, X, Loader2, Link as LinkIcon, Trash2, Users } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
@@ -205,7 +206,7 @@ export default function AdminCreatorsClient() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Creator</TableHead>
-                    <TableHead>Tags</TableHead>
+                    <TableHead>Community</TableHead>
                     <TableHead className="hidden md:table-cell">Votes</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -234,7 +235,15 @@ export default function AdminCreatorsClient() {
                                 </div>
                             </TableCell>
                             <TableCell>
-                                <Badge variant="outline">{creator.tags}</Badge>
+                                {creator.communityId ? (
+                                    <Button variant="link" size="sm" asChild className="p-0 h-auto">
+                                        <Link href={`/community/${creator.communityId}`} target="_blank" className="flex items-center gap-1">
+                                           <Users className="h-3 w-3" /> {creator.communityName || "View Community"}
+                                        </Link>
+                                    </Button>
+                                ) : (
+                                    <span className="text-xs text-muted-foreground">N/A</span>
+                                )}
                             </TableCell>
                             <TableCell className="hidden md:table-cell font-mono">{creator.votes}</TableCell>
                             <TableCell className="text-right">
@@ -321,3 +330,5 @@ export default function AdminCreatorsClient() {
     </Tabs>
   );
 }
+
+    

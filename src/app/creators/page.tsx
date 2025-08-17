@@ -4,7 +4,7 @@
 import { PageTitle } from '@/components/shared/PageTitle';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Filter, Search, Star, Users, Loader2, Send } from 'lucide-react';
+import { Filter, Search, Star, Users, Loader2, Send, CheckCircle, Clock } from 'lucide-react';
 import { CreatorCard } from '@/components/creators/CreatorCard';
 import { TopCreatorItem } from '@/components/creators/TopCreatorItem';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,8 +18,9 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback } from 'react';
 import type { Creator, CreatorApplication } from '@/lib/types';
-import { submitCreatorApplicationInFirestore, listenToCreators, listenToTopCreators } from '@/lib/tournamentStore';
+import { submitCreatorApplicationInFirestore, listenToCreators, listenToTopCreators, getMyApplicationsFromFirestore } from '@/lib/tournamentStore';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const applicationSchema = z.object({
     channelUrl: z.string().url("Please enter a valid URL (e.g., https://youtube.com/yourchannel)."),
@@ -36,10 +37,17 @@ export default function CreatorHubPage() {
   const [creators, setCreators] = useState<Creator[]>([]);
   const [topCreators, setTopCreators] = useState<Creator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [applicationStatus, setApplicationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
+  const [isCreator, setIsCreator] = useState(false);
 
   useEffect(() => {
     const unsubscribeCreators = listenToCreators((data) => {
         setCreators(data);
+        if (user) {
+            const userIsCreator = data.some(c => c.userId === user.uid);
+            setIsCreator(userIsCreator);
+            if(userIsCreator) setApplicationStatus('approved');
+        }
         if (isLoading) setIsLoading(false);
     });
     
@@ -51,7 +59,26 @@ export default function CreatorHubPage() {
         unsubscribeCreators();
         unsubscribeTopCreators();
     };
-  }, [isLoading]);
+  }, [isLoading, user]);
+
+  useEffect(() => {
+    if (user && !isCreator) {
+      getMyApplicationsFromFirestore(user.uid).then(apps => {
+        if (apps.length > 0) {
+          const latestApp = apps[0];
+          if (latestApp.status === 'Pending') {
+            setApplicationStatus('pending');
+          } else if (latestApp.status === 'Rejected') {
+            setApplicationStatus('rejected');
+          }
+        } else {
+            setApplicationStatus('none');
+        }
+      });
+    } else if (!user) {
+      setApplicationStatus('none');
+    }
+  }, [user, isCreator]);
 
   const form = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
@@ -61,6 +88,10 @@ export default function CreatorHubPage() {
   const onSubmitApplication: SubmitHandler<ApplicationFormData> = async (data) => {
     if (!user) {
         toast({ title: "Not Logged In", description: "You must be logged in to apply.", variant: "destructive" });
+        return;
+    }
+     if (!user.communityId) {
+        toast({ title: "Community Required", description: "You must be a member of a community to apply.", variant: "destructive" });
         return;
     }
     setIsSubmitting(true);
@@ -74,6 +105,7 @@ export default function CreatorHubPage() {
         };
         await submitCreatorApplicationInFirestore(appData);
         toast({ title: "Application Submitted!", description: "We'll review your application and get back to you soon." });
+        setApplicationStatus('pending');
         setIsDialogOpen(false);
         form.reset();
     } catch (error: any) {
@@ -81,6 +113,76 @@ export default function CreatorHubPage() {
     } finally {
         setIsSubmitting(false);
     }
+  }
+
+  const renderJoinButton = () => {
+    if (authLoading) {
+      return <Skeleton className="h-10 w-full" />;
+    }
+    if (applicationStatus === 'approved') {
+      return <Button className="w-full" disabled variant="outline"><CheckCircle className="mr-2 h-4 w-4 text-green-500" /> Verified Creator</Button>;
+    }
+    if (applicationStatus === 'pending') {
+      return <Button className="w-full" disabled variant="outline"><Clock className="mr-2 h-4 w-4 text-yellow-500" /> Application In Progress</Button>;
+    }
+    
+    const needsCommunity = !user?.communityId;
+    
+    return (
+       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="w-full">
+                  <DialogTrigger asChild>
+                    <Button className="w-full" disabled={needsCommunity}>Join as Creator</Button>
+                  </DialogTrigger>
+                </div>
+              </TooltipTrigger>
+              {needsCommunity && (
+                <TooltipContent>
+                  <p>You must join a community to become a creator.</p>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          <DialogContent>
+              <DialogHeader>
+                  <DialogTitle>Become a Creator</DialogTitle>
+                  <DialogDescription>Fill out the form below to apply. We'll review your application and get back to you soon.</DialogDescription>
+              </DialogHeader>
+              {user ? (
+              <form onSubmit={form.handleSubmit(onSubmitApplication)} className="space-y-4">
+                  <div>
+                      <Label htmlFor="channelUrl">YouTube/Twitch Channel URL *</Label>
+                      <Input id="channelUrl" {...form.register("channelUrl")} placeholder="https://youtube.com/c/YourChannel" />
+                      {form.formState.errors.channelUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.channelUrl.message}</p>}
+                  </div>
+                  <div>
+                      <Label htmlFor="tags">Primary Game / Tags *</Label>
+                      <Input id="tags" {...form.register("tags")} placeholder="e.g., BGMI, FPS, Variety Streamer" />
+                      {form.formState.errors.tags && <p className="text-destructive text-xs mt-1">{form.formState.errors.tags.message}</p>}
+                  </div>
+                  <div>
+                      <Label htmlFor="message">Message (Optional)</Label>
+                      <Textarea id="message" {...form.register("message")} placeholder="Tell us a bit about yourself and your content." />
+                      {form.formState.errors.message && <p className="text-destructive text-xs mt-1">{form.formState.errors.message.message}</p>}
+                  </div>
+                  <div className="flex justify-end gap-2">
+                      <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                      <Button type="submit" disabled={isSubmitting}>
+                          {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Submit Application
+                      </Button>
+                  </div>
+              </form>
+              ) : (
+                  <p className="text-center text-muted-foreground py-4">Please log in to apply.</p>
+              )}
+          </DialogContent>
+        </Dialog>
+    )
   }
 
   return (
@@ -128,45 +230,7 @@ export default function CreatorHubPage() {
                 <CardTitle>Join the Hub</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
-                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                    <DialogTrigger asChild>
-                         <Button className="w-full" disabled={authLoading}>Join as Creator</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Become a Creator</DialogTitle>
-                            <DialogDescription>Fill out the form below to apply. We'll review your application and get back to you soon.</DialogDescription>
-                        </DialogHeader>
-                        {user ? (
-                        <form onSubmit={form.handleSubmit(onSubmitApplication)} className="space-y-4">
-                            <div>
-                                <Label htmlFor="channelUrl">YouTube/Twitch Channel URL *</Label>
-                                <Input id="channelUrl" {...form.register("channelUrl")} placeholder="https://youtube.com/c/YourChannel" />
-                                {form.formState.errors.channelUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.channelUrl.message}</p>}
-                            </div>
-                            <div>
-                                <Label htmlFor="tags">Primary Game / Tags *</Label>
-                                <Input id="tags" {...form.register("tags")} placeholder="e.g., BGMI, FPS, Variety Streamer" />
-                                {form.formState.errors.tags && <p className="text-destructive text-xs mt-1">{form.formState.errors.tags.message}</p>}
-                            </div>
-                            <div>
-                                <Label htmlFor="message">Message (Optional)</Label>
-                                <Textarea id="message" {...form.register("message")} placeholder="Tell us a bit about yourself and your content." />
-                                {form.formState.errors.message && <p className="text-destructive text-xs mt-1">{form.formState.errors.message.message}</p>}
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-                                <Button type="submit" disabled={isSubmitting}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Submit Application
-                                </Button>
-                            </div>
-                        </form>
-                        ) : (
-                            <p className="text-center text-muted-foreground py-4">Please log in to apply.</p>
-                        )}
-                    </DialogContent>
-                 </Dialog>
+                 {renderJoinButton()}
                  <Button variant="outline" className="w-full">Explore Creators</Button>
             </CardContent>
         </Card>
@@ -193,3 +257,5 @@ export default function CreatorHubPage() {
     </div>
   );
 }
+
+    

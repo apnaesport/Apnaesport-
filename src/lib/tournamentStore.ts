@@ -1,8 +1,4 @@
 
-
-
-
-
 import {
   collection,
   doc,
@@ -653,6 +649,17 @@ export const deleteCommunityFromFirestore = async (communityId: string): Promise
 // --- Creator Functions ---
 
 export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+    // Check if user already has a pending or approved application
+    const q = query(
+        collection(db, CREATOR_APPLICATIONS_COLLECTION),
+        where("userId", "==", applicationData.userId),
+        where("status", "in", ["Pending", "Approved"])
+    );
+    const existingApps = await getDocs(q);
+    if (!existingApps.empty) {
+        throw new Error("You already have an active or approved application.");
+    }
+
     const docRef = await addDoc(collection(db, CREATOR_APPLICATIONS_COLLECTION), {
         ...applicationData,
         status: "Pending",
@@ -687,6 +694,7 @@ export const getMyApplicationsFromFirestore = async (userId: string): Promise<Cr
 
 export const approveCreatorApplicationInFirestore = async (app: CreatorApplication): Promise<void> => {
     const batch = writeBatch(db);
+    const community = await getCommunityByIdFromFirestore(app.communityId || '');
 
     const creatorRef = doc(db, CREATORS_COLLECTION, app.userId);
     const newCreatorData: Omit<Creator, 'id'> = {
@@ -699,6 +707,8 @@ export const approveCreatorApplicationInFirestore = async (app: CreatorApplicati
         votes: 0,
         votedBy: [],
         createdAt: serverTimestamp(),
+        communityId: community?.id || null,
+        communityName: community?.name || null,
     };
     batch.set(creatorRef, newCreatorData);
 
@@ -717,6 +727,16 @@ export const getCreatorsFromFirestore = async (): Promise<Creator[]> => {
     const snapshot = await getDocs(query(collection(db, CREATORS_COLLECTION), orderBy("votes", "desc")));
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Creator));
 };
+
+export const getCreatorById = async (creatorId: string): Promise<Creator | null> => {
+    if (!creatorId) return null;
+    const docRef = doc(db, CREATORS_COLLECTION, creatorId);
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() } as Creator;
+    }
+    return null;
+}
 
 export const deleteCreatorFromFirestore = async (creatorId: string): Promise<void> => {
     await deleteDoc(doc(db, CREATORS_COLLECTION, creatorId));
@@ -767,3 +787,5 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+
+    
