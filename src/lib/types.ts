@@ -29,7 +29,6 @@ export type Game = {
   iconUrl: string;
   bannerUrl?: string;
   dataAiHint?: string;
-  isApiPowered?: boolean; 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 };

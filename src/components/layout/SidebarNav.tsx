@@ -35,7 +35,6 @@ const mainNavItems = [
   { href: "/community", label: "Communities", icon: Users },
   { href: "/creators", label: "Creators", icon: Star }, // Added Creators link
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/live-stats", label: "Live Stats Arena", icon: TrendingUp },
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 

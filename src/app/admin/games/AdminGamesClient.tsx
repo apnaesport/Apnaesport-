@@ -54,7 +54,6 @@ const gameSchema = z.object({
   iconFile: z.custom<FileList>().optional(),
   bannerFile: z.custom<FileList>().optional(),
   dataAiHint: z.string().max(30, "AI Hint too long (max 2 words recommended)").optional(),
-  isApiPowered: z.boolean().optional(),
 });
 type GameFormData = z.infer<typeof gameSchema>;
 
@@ -87,7 +86,7 @@ export default function AdminGamesClient() {
 
   const form = useForm<GameFormData>({
     resolver: zodResolver(gameSchema),
-    defaultValues: { name: "", iconUrl: "", bannerUrl: "", dataAiHint: "", isApiPowered: false },
+    defaultValues: { name: "", iconUrl: "", bannerUrl: "", dataAiHint: "" },
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
@@ -153,7 +152,6 @@ export default function AdminGamesClient() {
         iconUrl: finalIconUrl || `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`,
         bannerUrl: finalBannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`,
         dataAiHint: data.dataAiHint || data.name.toLowerCase().split(" ").slice(0,2).join(" "),
-        isApiPowered: data.isApiPowered || false,
       };
 
       if (editingGame && editingGame.id) {
@@ -183,7 +181,6 @@ export default function AdminGamesClient() {
       iconUrl: game.iconUrl,
       bannerUrl: game.bannerUrl || "",
       dataAiHint: game.dataAiHint || "",
-      isApiPowered: game.isApiPowered || false,
     });
     setIconPreview(game.iconUrl);
     setBannerPreview(game.bannerUrl || null);
@@ -205,7 +202,7 @@ export default function AdminGamesClient() {
 
   const openNewGameDialog = () => {
     setEditingGame(null);
-    form.reset({ name: "", iconUrl: "", bannerUrl: "", dataAiHint:"", isApiPowered: false });
+    form.reset({ name: "", iconUrl: "", bannerUrl: "", dataAiHint:"" });
     setIconPreview(null);
     setBannerPreview(null);
     setIsDialogOpen(true);
@@ -274,25 +271,6 @@ export default function AdminGamesClient() {
                {form.formState.errors.dataAiHint && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.dataAiHint.message}</p>}
             </div>
 
-            <div className="col-start-2 col-span-3 flex items-center space-x-2">
-                <Controller
-                    name="isApiPowered"
-                    control={form.control}
-                    render={({ field }) => (
-                        <Checkbox
-                            id="isApiPowered"
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            disabled={isSubmitting}
-                        />
-                    )}
-                />
-                <Label htmlFor="isApiPowered" className="font-normal cursor-pointer flex items-center gap-1">
-                    <Zap className="h-4 w-4 text-yellow-500" /> Is API-Powered
-                </Label>
-            </div>
-
-
             <DialogFooter>
               <DialogClose asChild>
                 <Button type="button" variant="outline" disabled={isSubmitting}>Cancel</Button>
@@ -342,7 +320,6 @@ export default function AdminGamesClient() {
                 </TableCell>
                 <TableCell className="font-medium flex items-center gap-2">
                     {game.name}
-                    {game.isApiPowered && <Badge variant="outline" className="border-yellow-500/50 text-yellow-500"><Zap className="h-3 w-3 mr-1"/> API</Badge>}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground hidden sm:table-cell">{game.dataAiHint}</TableCell>
                 <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap text-right">
