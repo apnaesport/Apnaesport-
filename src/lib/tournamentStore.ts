@@ -1,6 +1,7 @@
 
 
 
+
 import {
   collection,
   doc,
@@ -650,9 +651,10 @@ export const deleteCommunityFromFirestore = async (communityId: string): Promise
 
 // --- Creator Functions ---
 
-export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt'>): Promise<string> => {
+export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt' | 'status'>): Promise<string> => {
     const docRef = await addDoc(collection(db, CREATOR_APPLICATIONS_COLLECTION), {
         ...applicationData,
+        status: "Pending",
         createdAt: serverTimestamp(),
     });
     return docRef.id;
@@ -667,10 +669,24 @@ export const getCreatorApplicationsFromFirestore = async (): Promise<CreatorAppl
     } as CreatorApplication));
 };
 
+export const getMyApplicationsFromFirestore = async (userId: string): Promise<CreatorApplication[]> => {
+    if (!userId) return [];
+    const q = query(
+        collection(db, CREATOR_APPLICATIONS_COLLECTION),
+        where("userId", "==", userId),
+        orderBy("createdAt", "desc")
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt as Timestamp,
+    } as CreatorApplication));
+};
+
 export const approveCreatorApplicationInFirestore = async (app: CreatorApplication): Promise<void> => {
     const batch = writeBatch(db);
 
-    // 1. Create the new creator document
     const creatorRef = doc(db, CREATORS_COLLECTION, app.userId);
     const newCreatorData: Omit<Creator, 'id'> = {
         userId: app.userId,
@@ -678,22 +694,22 @@ export const approveCreatorApplicationInFirestore = async (app: CreatorApplicati
         avatarUrl: app.photoURL,
         channelUrl: app.channelUrl,
         tags: app.tags,
-        followers: "0", // Default value
+        followers: "0", 
         votes: 0,
         votedBy: [],
         createdAt: serverTimestamp(),
     };
     batch.set(creatorRef, newCreatorData);
 
-    // 2. Delete the application document
     const appRef = doc(db, CREATOR_APPLICATIONS_COLLECTION, app.id);
-    batch.delete(appRef);
+    batch.update(appRef, { status: 'Approved' });
 
     await batch.commit();
 };
 
 export const rejectCreatorApplicationInFirestore = async (appId: string): Promise<void> => {
-    await deleteDoc(doc(db, CREATOR_APPLICATIONS_COLLECTION, appId));
+    const appRef = doc(db, CREATOR_APPLICATIONS_COLLECTION, appId);
+    await updateDoc(appRef, { status: 'Rejected' });
 };
 
 export const getCreatorsFromFirestore = async (): Promise<Creator[]> => {
@@ -750,5 +766,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-
-    

@@ -21,6 +21,14 @@ import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const statusColors: Record<CreatorApplication['status'], string> = {
+    Pending: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
+    Approved: "bg-green-500/20 text-green-500 border-green-500/30",
+    Rejected: "bg-red-500/20 text-red-500 border-red-500/30",
+};
+
 
 export default function AdminCreatorsClient() {
   const [applications, setApplications] = useState<CreatorApplication[]>([]);
@@ -98,14 +106,15 @@ export default function AdminCreatorsClient() {
   return (
     <Tabs defaultValue="applications">
       <TabsList>
-        <TabsTrigger value="applications">Applications ({applications.length})</TabsTrigger>
+        <TabsTrigger value="applications">Applications ({applications.filter(a => a.status === 'Pending').length})</TabsTrigger>
         <TabsTrigger value="verified">Verified Creators ({creators.length})</TabsTrigger>
+        <TabsTrigger value="archive">Archived Applications</TabsTrigger>
       </TabsList>
       <TabsContent value="applications">
         <Card>
           <CardHeader>
             <CardTitle>Creator Applications</CardTitle>
-            <CardDescription>Review and approve new creator requests.</CardDescription>
+            <CardDescription>Review and approve new creator requests. Only pending applications are shown here.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -128,7 +137,7 @@ export default function AdminCreatorsClient() {
                         <TableCell className="text-right"><Skeleton className="h-9 w-24 ml-auto" /></TableCell>
                       </TableRow>
                     ))
-                  ) : applications.length > 0 ? applications.map((app) => (
+                  ) : applications.filter(a => a.status === 'Pending').length > 0 ? applications.filter(a => a.status === 'Pending').map((app) => (
                     <TableRow key={app.id}>
                       <TableCell>
                         <div className="flex items-center gap-3">
@@ -244,6 +253,65 @@ export default function AdminCreatorsClient() {
                             <TableCell colSpan={4} className="text-center h-24">No verified creators yet.</TableCell>
                         </TableRow>
                     )}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+        <TabsContent value="archive">
+        <Card>
+          <CardHeader>
+            <CardTitle>Archived Applications</CardTitle>
+            <CardDescription>History of all approved and rejected applications.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="hidden md:table-cell">Submitted</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={`skeleton-archive-${i}`}>
+                        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                        <TableCell className="hidden md:table-cell"><Skeleton className="h-6 w-20" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : applications.filter(a => a.status !== 'Pending').length > 0 ? applications.filter(a => a.status !== 'Pending').map((app) => (
+                    <TableRow key={app.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar>
+                            <AvatarImage src={app.photoURL} alt={app.name} />
+                            <AvatarFallback>{app.name.substring(0, 2)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{app.name}</p>
+                            <p className="text-xs text-muted-foreground">{app.email}</p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(statusColors[app.status])}>
+                            {app.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                        {formatDistanceToNow(app.createdAt.toDate(), { addSuffix: true })}
+                      </TableCell>
+                    </TableRow>
+                  )) : (
+                    <TableRow>
+                      <TableCell colSpan={3} className="text-center h-24">No archived applications.</TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>

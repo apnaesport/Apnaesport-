@@ -235,6 +235,8 @@ export interface Creator {
     dataAiHint?: string;
 }
 
+export type CreatorApplicationStatus = "Pending" | "Approved" | "Rejected";
+
 export interface CreatorApplication {
     id: string;
     userId: string;
@@ -244,5 +246,6 @@ export interface CreatorApplication {
     channelUrl: string;
     tags: string;
     message?: string;
+    status: CreatorApplicationStatus;
     createdAt: Timestamp;
 }
