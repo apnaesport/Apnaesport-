@@ -12,7 +12,7 @@ const inter = Inter({
 // It does not include the main app's sidebar or header providers.
 export default function LandingLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
