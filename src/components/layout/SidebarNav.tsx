@@ -14,7 +14,8 @@ import {
   Users,
   TrendingUp,
   Download,
-  Star, // Added Star icon
+  Star,
+  Home, // Added Home icon
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,7 +34,7 @@ const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/community", label: "Communities", icon: Users },
-  { href: "/creators", label: "Creators", icon: Star }, // Added Creators link
+  { href: "/creators", label: "Creators", icon: Star },
   { href: "/games", label: "Games", icon: Gamepad2 },
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
@@ -89,6 +90,17 @@ export function SidebarNav() {
       </SidebarMenu>
       
       <div className="mt-auto flex flex-col gap-2">
+         <Separator className="my-1 bg-sidebar-border" />
+         <SidebarMenu>
+            <SidebarMenuItem>
+                <Link href="/landing" passHref legacyBehavior>
+                    <SidebarMenuButton as="a" tooltip="Home Page" onClick={() => handleNavigate('/landing')}>
+                        <Home/>
+                        <span>Home</span>
+                    </SidebarMenuButton>
+                </Link>
+            </SidebarMenuItem>
+         </SidebarMenu>
         {!loadingSettings && settings?.downloadAppLink && (
           <SidebarMenu className="p-2">
              <SidebarMenuItem>

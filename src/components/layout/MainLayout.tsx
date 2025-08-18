@@ -16,7 +16,7 @@ import {
 import Link from "next/link";
 import { SponsorshipCTA } from "./SponsorshipCTA";
 import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle, Home } from "lucide-react"; 
 import { Button } from "../ui/button";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -179,7 +179,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                     <div>
                         <h4 className="font-semibold text-foreground mb-4">Quick Links</h4>
                         <ul className="space-y-2 text-sm">
-                            <li><Link href="/dashboard" className="text-muted-foreground hover:text-primary transition-colors">Home</Link></li>
+                            <li><Link href="/landing" className="text-muted-foreground hover:text-primary transition-colors">Home</Link></li>
                             <li><Link href="/tournaments" className="text-muted-foreground hover:text-primary transition-colors">Tournaments</Link></li>
                             <li><Link href="/community" className="text-muted-foreground hover:text-primary transition-colors">Communities</Link></li>
                             <li><Link href="/games" className="text-muted-foreground hover:text-primary transition-colors">Games</Link></li>
