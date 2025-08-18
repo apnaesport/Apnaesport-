@@ -1,8 +1,21 @@
 
 import { MetadataRoute } from 'next'
 import { getTournamentsFromFirestore, getGamesFromFirestore, getCommunitiesFromFirestore } from '@/lib/tournamentStore';
+import type { Timestamp } from 'firebase/firestore';
 
 const BASE_URL = 'https://apnaesport.vercel.app';
+
+// Helper function to safely convert Firestore Timestamps
+const toDate = (timestamp: Timestamp | Date | undefined): Date => {
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    if (timestamp && typeof (timestamp as Timestamp).toDate === 'function') {
+        return (timestamp as Timestamp).toDate();
+    }
+    return new Date(); // Fallback to now
+};
+
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Static Routes
@@ -25,17 +38,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.8,
     },
-    {
-      url: `${BASE_URL}/community`,
+     {
+      url: `${BASE_URL}/creators`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
-      url: `${BASE_URL}/live-stats`,
+      url: `${BASE_URL}/community`,
       lastModified: new Date(),
       changeFrequency: 'daily',
-      priority: 0.7,
+      priority: 0.8,
     },
     {
       url: `${BASE_URL}/about`,
@@ -75,42 +88,44 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
   ];
 
-  // Dynamic Tournament Routes
-  const tournaments = await getTournamentsFromFirestore();
-  const tournamentRoutes: MetadataRoute.Sitemap = tournaments.map(tournament => {
-    const updatedAt = (tournament.updatedAt as any)?.toDate ? (tournament.updatedAt as any).toDate() : new Date();
-    return {
-        url: `${BASE_URL}/tournaments/${tournament.id}`,
-        lastModified: updatedAt,
-        changeFrequency: 'daily',
-        priority: 0.9,
-    }
-  });
+  try {
+    // Dynamic Tournament Routes
+    const tournaments = await getTournamentsFromFirestore();
+    const tournamentRoutes: MetadataRoute.Sitemap = tournaments.map(tournament => {
+        return {
+            url: `${BASE_URL}/tournaments/${tournament.id}`,
+            lastModified: toDate(tournament.updatedAt),
+            changeFrequency: 'daily',
+            priority: 0.9,
+        }
+    });
 
-  // Dynamic Game Routes
-  const games = await getGamesFromFirestore();
-  const gameRoutes: MetadataRoute.Sitemap = games.map(game => {
-    const updatedAt = (game.updatedAt as any)?.toDate ? (game.updatedAt as any).toDate() : new Date();
-    return {
-        url: `${BASE_URL}/games/${game.id}/tournaments`,
-        lastModified: updatedAt,
-        changeFrequency: 'weekly',
-        priority: 0.8,
-    }
-  });
+    // Dynamic Game Routes
+    const games = await getGamesFromFirestore();
+    const gameRoutes: MetadataRoute.Sitemap = games.map(game => {
+        return {
+            url: `${BASE_URL}/games/${game.id}/tournaments`,
+            lastModified: toDate(game.updatedAt),
+            changeFrequency: 'weekly',
+            priority: 0.8,
+        }
+    });
 
-  // Dynamic Community Routes
-  const communities = await getCommunitiesFromFirestore();
-  const communityRoutes: MetadataRoute.Sitemap = communities.map(community => {
-      const updatedAt = (community.updatedAt as any)?.toDate ? (community.updatedAt as any).toDate() : new Date();
-      return {
-          url: `${BASE_URL}/community/${community.id}`,
-          lastModified: updatedAt,
-          changeFrequency: 'daily',
-          priority: 0.7,
-      }
-  });
+    // Dynamic Community Routes
+    const communities = await getCommunitiesFromFirestore();
+    const communityRoutes: MetadataRoute.Sitemap = communities.map(community => {
+        return {
+            url: `${BASE_URL}/community/${community.id}`,
+            lastModified: toDate(community.updatedAt),
+            changeFrequency: 'daily',
+            priority: 0.7,
+        }
+    });
 
-
-  return [...staticRoutes, ...tournamentRoutes, ...gameRoutes, ...communityRoutes];
+    return [...staticRoutes, ...tournamentRoutes, ...gameRoutes, ...communityRoutes];
+  } catch (error) {
+    console.error("Error generating sitemap:", error);
+    // Return only static routes if there's an error fetching dynamic data
+    return staticRoutes;
+  }
 }
