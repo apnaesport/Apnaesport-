@@ -29,7 +29,7 @@ const serializeObject = (obj: any): any => {
 };
 
 export async function generateMetadata({ params }: CommunityPageProps, parent: ResolvingMetadata): Promise<Metadata> {
-  const { communityId } = params;
+  const communityId = params.communityId;
   const community = await getCommunityByIdFromFirestore(communityId);
   const previousImages = (await parent).openGraph?.images || [];
 
@@ -55,7 +55,7 @@ export async function generateMetadata({ params }: CommunityPageProps, parent: R
 }
 
 export default async function CommunityDetailPage({ params }: CommunityPageProps) {
-  const { communityId } = params;
+  const communityId = params.communityId;
 
   // We fetch initial data on the server
   const community = await getCommunityByIdFromFirestore(communityId);
