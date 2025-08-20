@@ -9,6 +9,8 @@ import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { generateApnaId } from "@/lib/tournamentStore";
+import { useToast } from "@/hooks/use-toast";
+import { Coins } from "lucide-react";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -37,6 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+  const { toast } = useToast();
 
   const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
@@ -87,6 +90,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 lastLogin: serverTimestamp()
             });
             userProfileData.points = (userProfileData.points || 0) + 5;
+            // Show toast for daily reward
+            toast({
+                title: (
+                    <div className="flex items-center gap-2">
+                        <Coins className="h-5 w-5 text-yellow-500" />
+                        <span>+5 AE Points!</span>
+                    </div>
+                ),
+                description: "Your daily login bonus has been added.",
+            });
         }
       }
 
@@ -126,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsAdmin(false);
     }
     setLoading(false);
-  }, []);
+  }, [toast]);
 
 
   useEffect(() => {

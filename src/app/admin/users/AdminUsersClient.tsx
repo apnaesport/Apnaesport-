@@ -4,7 +4,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { UserProfile } from "@/lib/types"; 
 import { Button } from "@/components/ui/button";
-import { Edit, Ban, ShieldCheck, Users, Loader2, ShieldAlert } from "lucide-react"; 
+import { Edit, Ban, ShieldCheck, Users, Loader2, ShieldAlert, Coins } from "lucide-react"; 
 import {
   Table,
   TableBody,
@@ -115,6 +115,7 @@ export default function AdminUsersClient() {
           <TableRow>
             <TableHead>User</TableHead>
             <TableHead>Email</TableHead>
+            <TableHead>AE Points</TableHead>
             <TableHead>Role</TableHead>
             <TableHead className="hidden md:table-cell">Joined</TableHead>
             <TableHead>Actions</TableHead>
@@ -131,6 +132,7 @@ export default function AdminUsersClient() {
                   </div>
                 </TableCell>
                 <TableCell><Skeleton className="h-5 w-40" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                 <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-9 w-28" /></TableCell>
@@ -154,6 +156,12 @@ export default function AdminUsersClient() {
                 </div>
               </TableCell>
               <TableCell>{user.email}</TableCell>
+              <TableCell>
+                  <div className="flex items-center gap-1 font-semibold">
+                      <Coins className="h-4 w-4 text-yellow-500" />
+                      {user.points || 0}
+                  </div>
+              </TableCell>
               <TableCell>
                 {user.isAdmin ? (
                   <Badge variant="destructive" className="whitespace-nowrap"><ShieldAlert className="mr-1 h-3 w-3"/>Admin</Badge>
@@ -208,7 +216,7 @@ export default function AdminUsersClient() {
             </TableRow>
           )) : (
              <TableRow>
-              <TableCell colSpan={5} className="text-center h-24">
+              <TableCell colSpan={6} className="text-center h-24">
                 No users found.
               </TableCell>
             </TableRow>

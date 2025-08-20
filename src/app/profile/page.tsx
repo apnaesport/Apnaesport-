@@ -191,14 +191,15 @@ export default function ProfilePage() {
               <CardTitle className="text-2xl">{user.displayName}</CardTitle>
               <CardDescription>{user.email}</CardDescription>
               
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 text-sm">
-                <div className="flex items-center text-muted-foreground">
+              <div className="flex flex-col items-center justify-center gap-2 mt-4 text-sm">
+                 <div className="flex items-center text-muted-foreground p-2 rounded-lg bg-muted/50 w-full justify-center">
+                  <Coins className="h-5 w-5 mr-2 text-yellow-500"/>
+                  <span className="font-bold text-xl text-foreground">{user.points || 0}</span>
+                  <span className="ml-1">AE Points</span>
+                </div>
+                <div className="flex items-center text-muted-foreground p-2 rounded-lg bg-muted/50 w-full justify-center">
                   <BadgeInfo className="h-4 w-4 mr-1 text-primary"/>
                   Apna ID: <span className="font-semibold text-foreground ml-1">{user.apnaId || 'N/A'}</span>
-                </div>
-                 <div className="flex items-center text-muted-foreground">
-                  <Coins className="h-4 w-4 mr-1 text-yellow-500"/>
-                  AE Points: <span className="font-semibold text-foreground ml-1">{user.points || 0}</span>
                 </div>
               </div>
 
