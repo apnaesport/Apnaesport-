@@ -73,7 +73,12 @@ export function QuickTournamentForm({ community }: QuickTournamentFormProps) {
 
         setIsSubmitting(true);
         try {
-            const tournamentId = await addQuickTournamentToFirestore(data, community, user);
+            const tournamentData = {
+                ...data,
+                mapName: data.mapName === 'any' ? undefined : data.mapName, // Handle 'any' value
+            };
+
+            const tournamentId = await addQuickTournamentToFirestore(tournamentData, community, user);
             
             // Auto-post announcement
             await addAnnouncement(community.id, {
@@ -124,7 +129,7 @@ export function QuickTournamentForm({ community }: QuickTournamentFormProps) {
                                 name="gameId"
                                 control={form.control}
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmitting}>
+                                    <Select onValueChange={field.onChange} value={field.value || ""} defaultValue={field.value || ""} disabled={isSubmitting}>
                                         <SelectTrigger><SelectValue placeholder="Select game..."/></SelectTrigger>
                                         <SelectContent>
                                             {availableGames.map(game => <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>)}
@@ -140,7 +145,7 @@ export function QuickTournamentForm({ community }: QuickTournamentFormProps) {
                                 name="teamSize"
                                 control={form.control}
                                 render={({ field }) => (
-                                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmitting}>
+                                    <Select onValueChange={field.onChange} value={field.value || "Solo"} defaultValue={field.value || "Solo"} disabled={isSubmitting}>
                                         <SelectTrigger><SelectValue placeholder="Select team size..."/></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="Solo">Solo</SelectItem>
@@ -159,10 +164,10 @@ export function QuickTournamentForm({ community }: QuickTournamentFormProps) {
                             name="mapName"
                             control={form.control}
                             render={({ field }) => (
-                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmitting || !selectedGame?.mapNames?.length}>
+                                <Select onValueChange={field.onChange} value={field.value || "any"} defaultValue={field.value || "any"} disabled={isSubmitting || !selectedGame?.mapNames?.length}>
                                     <SelectTrigger><SelectValue placeholder="Select map..."/></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="">Any</SelectItem>
+                                        <SelectItem value="any">Any</SelectItem>
                                         {selectedGame?.mapNames?.map(map => <SelectItem key={map} value={map}>{map}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
@@ -178,4 +183,3 @@ export function QuickTournamentForm({ community }: QuickTournamentFormProps) {
         </Card>
     );
 }
-
