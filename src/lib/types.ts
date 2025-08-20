@@ -268,7 +268,9 @@ export type CreatorApplicationStatus = "Pending" | "Approved" | "Rejected";
 export interface CreatorApplication {
     id: string;
     userId: string;
-    name: string;
+    name: string; // User's real name
+    creatorName: string; // Desired creator name
+    logoUrl?: string; // Creator logo
     email: string;
     photoURL?: string;
     channelUrl: string;
@@ -276,5 +278,5 @@ export interface CreatorApplication {
     message?: string;
     status: CreatorApplicationStatus;
     createdAt: Timestamp;
-    communityId?: string; // Added to link application to a community
+    communityId?: string;
 }

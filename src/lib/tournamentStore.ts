@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   doc,
@@ -811,7 +812,7 @@ export const updateAnnouncement = async (communityId: string, announcementId: st
 };
 
 export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
-    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
+    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
     await deleteDoc(announcementRef);
 };
 
@@ -920,8 +921,8 @@ export const approveCreatorApplicationInFirestore = async (app: CreatorApplicati
     const creatorRef = doc(db, CREATORS_COLLECTION, app.userId);
     const newCreatorData: Omit<Creator, 'id'> = {
         userId: app.userId,
-        name: app.name,
-        avatarUrl: app.photoURL,
+        name: app.creatorName, // Use creator name from application
+        avatarUrl: app.logoUrl || app.photoURL, // Use logo from application
         channelUrl: app.channelUrl,
         tags: app.tags,
         followers: "0", 

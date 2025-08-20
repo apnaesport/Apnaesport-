@@ -23,6 +23,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const applicationSchema = z.object({
+    creatorName: z.string().min(3, "Creator name must be at least 3 characters.").max(30, "Creator name is too long."),
+    logoUrl: z.string().url("Please enter a valid URL for the logo.").optional().or(z.literal('')),
     channelUrl: z.string().url("Please enter a valid URL (e.g., https://youtube.com/yourchannel)."),
     tags: z.string().min(2, "Please add at least one tag (e.g., FPS, MOBA).").max(50, "Tags are too long."),
     message: z.string().max(500, "Message cannot exceed 500 characters.").optional(),
@@ -82,7 +84,7 @@ export default function CreatorHubPage() {
 
   const form = useForm<ApplicationFormData>({
     resolver: zodResolver(applicationSchema),
-    defaultValues: { channelUrl: "", tags: "", message: "" },
+    defaultValues: { creatorName: user?.displayName || "", logoUrl: user?.photoURL || "", channelUrl: "", tags: "", message: "" },
   });
 
   const onSubmitApplication: SubmitHandler<ApplicationFormData> = async (data) => {
@@ -101,6 +103,7 @@ export default function CreatorHubPage() {
             name: user.displayName || 'Unknown',
             email: user.email || 'Unknown',
             photoURL: user.photoURL || '',
+            communityId: user.communityId,
             ...data
         };
         await submitCreatorApplicationInFirestore(appData);
@@ -154,6 +157,16 @@ export default function CreatorHubPage() {
               </DialogHeader>
               {user ? (
               <form onSubmit={form.handleSubmit(onSubmitApplication)} className="space-y-4">
+                  <div>
+                      <Label htmlFor="creatorName">Creator Name *</Label>
+                      <Input id="creatorName" {...form.register("creatorName")} placeholder="Your official creator name" />
+                      {form.formState.errors.creatorName && <p className="text-destructive text-xs mt-1">{form.formState.errors.creatorName.message}</p>}
+                  </div>
+                   <div>
+                      <Label htmlFor="logoUrl">Creator Logo URL</Label>
+                      <Input id="logoUrl" {...form.register("logoUrl")} placeholder="https://example.com/your-logo.png" />
+                      {form.formState.errors.logoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.logoUrl.message}</p>}
+                  </div>
                   <div>
                       <Label htmlFor="channelUrl">YouTube/Twitch Channel URL *</Label>
                       <Input id="channelUrl" {...form.register("channelUrl")} placeholder="https://youtube.com/c/YourChannel" />
@@ -257,5 +270,3 @@ export default function CreatorHubPage() {
     </div>
   );
 }
-
-    
