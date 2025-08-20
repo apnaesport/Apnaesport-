@@ -28,28 +28,25 @@ export function AdSenseBlock({
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (err) {
-        console.error("AdSense error:", err);
+        // This error is common in development and can be ignored.
+        // It happens when an ad slot is re-rendered.
       }
     }
-  }, [pathname]); // Re-run when the path changes.
+  }, [pathname]);
 
   return (
     <div
       key={pathname} // Force re-render on each navigation to get a fresh ad slot
       ref={adContainerRef}
       className={cn(
-        "ad-container flex items-center justify-center bg-muted/30 text-muted-foreground/50 border border-dashed border-border rounded-lg",
+        "ad-container bg-muted/20 border-border rounded-lg",
         "min-h-[90px] w-full",
         className
       )}
     >
-      <div className='flex items-center gap-2 text-xs'>
-        <Megaphone className='h-4 w-4'/>
-        <span>Advertisement</span>
-      </div>
       <ins
         className="adsbygoogle"
-        style={{ display: 'block', width: '100%', height: '100%', ...style }}
+        style={{ display: 'block', width: '100%', height: 'auto', ...style }}
         data-ad-client={AD_CLIENT_ID}
         data-ad-slot={AD_SLOT_ID}
         data-ad-format="auto"
