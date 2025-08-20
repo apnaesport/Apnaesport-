@@ -33,9 +33,12 @@ export type Game = {
   dataAiHint?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  matchTypes?: string[];
+  mapNames?: string[];
 };
 
 export type TournamentStatus = "Upcoming" | "Live" | "Ongoing" | "Completed" | "Cancelled";
+export type TeamSize = "Solo" | "Duo" | "Squad";
 
 export type Participant = {
   id: string;
@@ -81,7 +84,9 @@ export type Tournament = {
   entryFee: number; // Changed to number for AE points
   rules?: string;
   registrationInstructions?: string;
-  bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
+  matchType: string;
+  mapName?: string;
+  teamSize: TeamSize;
   matches?: Match[];
   featured?: boolean;
   organizer?: string;
@@ -103,10 +108,13 @@ export type TournamentFormDataUI = {
   maxParticipants: number;
   prizePool: number; // Changed to number
   entryFee: number; // Changed to number
-  bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
+  matchType: string;
+  mapName?: string;
+  teamSize: TeamSize;
   rules?: string;
   registrationInstructions?: string;
   featured?: boolean;
+  bannerImageUrl?: string;
   sponsorName?: string;
   sponsorLogoUrl?: string;
 };
@@ -258,3 +266,5 @@ export interface CreatorApplication {
     createdAt: Timestamp;
     communityId?: string; // Added to link application to a community
 }
+
+    

@@ -1,12 +1,12 @@
 
 "use client"; 
 
-import type { Tournament, Participant, Winner } from "@/lib/types";
+import type { Tournament, Participant, Winner, TeamSize } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle, Map, Swords, User as UserIcon, Users2 } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useMemo } from "react"; 
@@ -74,6 +74,12 @@ interface TournamentPageClientProps {
   tournamentId: string;
 }
 
+const teamSizeIcons: Record<TeamSize, React.ElementType> = {
+    Solo: UserIcon,
+    Duo: Users2,
+    Squad: Users,
+};
+
 export default function TournamentPageClient({ tournamentId }: TournamentPageClientProps) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,12 +125,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
   const isTournamentCreator = useMemo(() => user && tournament && tournament.organizerId === user.uid, [user, tournament]);
   
-  const canManageRoom = useMemo(() => {
-    if (!tournament?.startDate) return false;
-    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
-    return differenceInMinutes(startDate, new Date()) <= 15;
-  }, [tournament]);
-
   const registrationForm = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
     defaultValues: { gameUsername: "", inGameId: "", contactEmail: user?.email || "" }
@@ -335,6 +335,8 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;
 
+  const TeamIcon = tournament.teamSize ? teamSizeIcons[tournament.teamSize] : Users;
+
   return (
     <div className="space-y-8">
       <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
@@ -431,39 +433,53 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
                 <Card>
                 <CardHeader><CardTitle>Details</CardTitle></CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div className="flex items-start space-x-3">
-                        <CalendarDays className="h-6 w-6 text-primary mt-1 shrink-0" />
+                        <CalendarDays className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
-                            <p className="font-medium">Date & Time</p>
+                            <p className="font-semibold">Date & Time</p>
                             <p className="text-muted-foreground">{formattedStartDate}</p>
                         </div>
                     </div>
-                    <div className="flex items-start space-x-3">
-                        <Gamepad2 className="h-6 w-6 text-primary mt-1 shrink-0" />
+                     <div className="flex items-start space-x-3">
+                        <Gamepad2 className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
-                            <p className="font-medium">Game</p>
+                            <p className="font-semibold">Game</p>
                             <p className="text-muted-foreground">{tournament.gameName}</p>
                         </div>
                     </div>
-                    <div className="flex items-start space-x-3">
-                        <Trophy className="h-6 w-6 text-primary mt-1 shrink-0" />
+                     <div className="flex items-start space-x-3">
+                        <TeamIcon className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
-                            <p className="font-medium">Prize Pool</p>
+                            <p className="font-semibold">Team Size</p>
+                            <p className="text-muted-foreground">{tournament.teamSize}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-start space-x-3">
+                        <Swords className="h-5 w-5 text-primary mt-1 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Match Type</p>
+                            <p className="text-muted-foreground">{tournament.matchType}</p>
+                        </div>
+                    </div>
+                     <div className="flex items-start space-x-3">
+                        <Map className="h-5 w-5 text-primary mt-1 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Map</p>
+                            <p className="text-muted-foreground">{tournament.mapName || 'Not specified'}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-start space-x-3">
+                        <Trophy className="h-5 w-5 text-primary mt-1 shrink-0" />
+                        <div>
+                            <p className="font-semibold">Prize Pool</p>
                             <p className="text-muted-foreground flex items-center gap-1">{tournament.prizePool} <Coins className="h-4 w-4 text-yellow-500" /></p>
                         </div>
                     </div>
                     <div className="flex items-start space-x-3">
-                        <ListChecks className="h-6 w-6 text-primary mt-1 shrink-0" />
+                        <Coins className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
-                            <p className="font-medium">Format</p>
-                            <p className="text-muted-foreground">{tournament.bracketType}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-start space-x-3">
-                        <Coins className="h-6 w-6 text-primary mt-1 shrink-0" />
-                        <div>
-                            <p className="font-medium">Entry Fee</p>
+                            <p className="font-semibold">Entry Fee</p>
                             <p className="text-muted-foreground">{isFreeEntry ? 'Free' : `${tournament.entryFee} AE Points`}</p>
                         </div>
                     </div>
@@ -515,7 +531,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 <Card>
                 <CardHeader>
                     <CardTitle>Tournament Bracket</CardTitle>
-                    <CardDescription>{tournament.bracketType}</CardDescription>
+                    <CardDescription>{tournament.matchType}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <TournamentBracket tournament={tournament} />
@@ -859,3 +875,5 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     </div>
   );
 }
+
+    

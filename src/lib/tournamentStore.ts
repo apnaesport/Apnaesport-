@@ -120,7 +120,7 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 // --- Tournament Functions ---
 
 export const addTournamentToFirestore = async (
-    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'bannerImageUrl' | 'currency'> & { startDate: Date }, 
+    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bracketType'> & { startDate: Date }, 
     userId: string
 ): Promise<string> => {
   
@@ -147,7 +147,7 @@ export const addTournamentToFirestore = async (
       featured: tournamentData.featured || false,
       entryFee: tournamentData.entryFee || 0,
       prizePool: tournamentData.prizePool || 0,
-      bannerImageUrl: game.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
+      bannerImageUrl: tournamentData.bannerImageUrl || game.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
       sponsorName: tournamentData.sponsorName || null,
       sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
     };
@@ -885,3 +885,5 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+
+    

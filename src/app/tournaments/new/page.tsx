@@ -17,14 +17,15 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
-import type { Game, Tournament, TournamentFormDataUI } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck } from "lucide-react";
+import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 
 const tournamentSchema = z.object({
@@ -35,10 +36,13 @@ const tournamentSchema = z.object({
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
   prizePool: z.coerce.number().min(0, "Prize pool must be 0 or more."),
   entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more."),
-  bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
+  matchType: z.string({ required_error: "Match type is required."}),
+  mapName: z.string().optional(),
+  teamSize: z.enum(["Solo", "Duo", "Squad"], { required_error: "Team size is required." }),
   rules: z.string().optional(),
   registrationInstructions: z.string().optional(),
   featured: z.boolean().optional(),
+  bannerImageUrl: z.string().url("Must be a valid URL.").or(z.literal("")).optional(),
   sponsorName: z.string().optional(),
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
 });
@@ -65,14 +69,20 @@ export default function CreateTournamentPage() {
       maxParticipants: 16,
       prizePool: 0,
       entryFee: 0,
-      bracketType: "Single Elimination",
+      matchType: "",
+      mapName: "",
+      teamSize: "Solo",
       rules: "",
       registrationInstructions: "",
       featured: false,
+      bannerImageUrl: "",
       sponsorName: "",
       sponsorLogoUrl: "",
     },
   });
+  
+  const selectedGameId = form.watch("gameId");
+  const selectedGame = availableGames.find(g => g.id === selectedGameId);
 
   const fetchGames = useCallback(async () => {
     setIsLoadingGames(true);
@@ -126,16 +136,19 @@ export default function CreateTournamentPage() {
         }
     }
 
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bannerImageUrl'> & { startDate: Date } = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bracketType'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
       gameIconUrl: selectedGame.iconUrl,
+      bannerImageUrl: selectedGame.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       description: data.description,
       startDate: finalStartDate, 
       maxParticipants: data.maxParticipants,
       prizePool: data.prizePool || 0,
-      bracketType: data.bracketType,
+      matchType: data.matchType,
+      mapName: data.mapName,
+      teamSize: data.teamSize,
       rules: data.rules,
       registrationInstructions: data.registrationInstructions,
       organizerId: user.uid,
@@ -231,6 +244,36 @@ export default function CreateTournamentPage() {
               />
               {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
             </div>
+            
+            {selectedGame && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <Label htmlFor="matchType">Match Type</Label>
+                        <Controller name="matchType" control={form.control} render={({field}) => (
+                             <Select onValueChange={field.onChange} value={field.value} disabled={!selectedGame.matchTypes || selectedGame.matchTypes.length === 0}>
+                                <SelectTrigger id="matchType"><SelectValue placeholder="Select match type..."/></SelectTrigger>
+                                <SelectContent>
+                                    {selectedGame.matchTypes?.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        )} />
+                         {form.formState.errors.matchType && <p className="text-destructive text-xs mt-1">{form.formState.errors.matchType.message}</p>}
+                    </div>
+                     <div>
+                        <Label htmlFor="mapName">Map Name (Optional)</Label>
+                        <Controller name="mapName" control={form.control} render={({field}) => (
+                             <Select onValueChange={field.onChange} value={field.value} disabled={!selectedGame.mapNames || selectedGame.mapNames.length === 0}>
+                                <SelectTrigger id="mapName"><SelectValue placeholder="Select a map..."/></SelectTrigger>
+                                <SelectContent>
+                                     <SelectItem value="">Any / Not Specified</SelectItem>
+                                    {selectedGame.mapNames?.map(map => <SelectItem key={map} value={map}>{map}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        )} />
+                         {form.formState.errors.mapName && <p className="text-destructive text-xs mt-1">{form.formState.errors.mapName.message}</p>}
+                    </div>
+                </div>
+            )}
 
             <div>
               <Label htmlFor="description">Description</Label>
@@ -311,24 +354,24 @@ export default function CreateTournamentPage() {
                 {form.formState.errors.maxParticipants && <p className="text-destructive text-xs mt-1">{form.formState.errors.maxParticipants.message}</p>}
               </div>
               <div>
-                <Label htmlFor="bracketType">Bracket Type</Label>
+                <Label htmlFor="teamSize">Team Size</Label>
                  <Controller
-                    name="bracketType"
+                    name="teamSize"
                     control={form.control}
                     render={({ field }) => (
-                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isSubmittingForm}>
-                        <SelectTrigger id="bracketType">
-                        <SelectValue placeholder="Select bracket type..." />
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingForm}>
+                        <SelectTrigger id="teamSize">
+                        <SelectValue placeholder="Select team size..." />
                         </SelectTrigger>
                         <SelectContent>
-                        <SelectItem value="Single Elimination">Single Elimination</SelectItem>
-                        <SelectItem value="Double Elimination">Double Elimination</SelectItem>
-                        <SelectItem value="Round Robin">Round Robin</SelectItem>
+                          <SelectItem value="Solo">Solo (1 Player)</SelectItem>
+                          <SelectItem value="Duo">Duo (2 Players)</SelectItem>
+                          <SelectItem value="Squad">Squad (4 Players)</SelectItem>
                         </SelectContent>
                     </Select>
                     )}
                 />
-                {form.formState.errors.bracketType && <p className="text-destructive text-xs mt-1">{form.formState.errors.bracketType.message}</p>}
+                {form.formState.errors.teamSize && <p className="text-destructive text-xs mt-1">{form.formState.errors.teamSize.message}</p>}
               </div>
             </div>
 
@@ -363,45 +406,30 @@ export default function CreateTournamentPage() {
               {form.formState.errors.registrationInstructions && <p className="text-destructive text-xs mt-1">{form.formState.errors.registrationInstructions.message}</p>}
             </div>
             
-            {isAdmin && (
-                <div className="flex items-center space-x-2">
-                    <Controller
-                        name="featured"
-                        control={form.control}
-                        render={({ field }) => (
-                            <Checkbox
-                                id="featured"
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                                className="h-4 w-4 accent-primary"
-                                disabled={isSubmittingForm}
-                            />
-                        )}
-                    />
-                    <Label htmlFor="featured" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Feature this tournament?
-                    </Label>
-                </div>
-            )}
-
-            <Card className="mt-6 border-dashed border-primary/50">
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-primary" /> Sponsorship (Optional)
-                </CardTitle>
-                <CardDescription>Add sponsor details if this tournament is sponsored.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="sponsorName">Sponsor Name</Label>
-                  <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={isSubmittingForm} />
-                </div>
-                <div>
-                  <Label htmlFor="sponsorLogoUrl">Sponsor Logo URL</Label>
-                  <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={isSubmittingForm} />
-                  {form.formState.errors.sponsorLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.sponsorLogoUrl.message}</p>}
-                </div>
-              </CardContent>
+            <Card className="mt-6 border-dashed border-primary/50 relative bg-muted/30">
+              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
+                  <Lock className="h-8 w-8 text-primary mb-2"/>
+                  <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
+                  <p className="text-sm text-muted-foreground">This feature is available for premium users only.</p>
+              </div>
+              <div className="blur-sm select-none pointer-events-none">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" /> Sponsorship (Optional)
+                    </CardTitle>
+                    <CardDescription>Add sponsor details if this tournament is sponsored.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="sponsorName">Sponsor Name</Label>
+                        <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={true} />
+                    </div>
+                    <div>
+                        <Label htmlFor="sponsorLogoUrl">Sponsor Logo URL</Label>
+                        <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={true} />
+                    </div>
+                </CardContent>
+              </div>
             </Card>
 
 
@@ -415,3 +443,5 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
+    

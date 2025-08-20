@@ -45,6 +45,7 @@ import { getGamesFromFirestore, addGameToFirestore, updateGameInFirestore, delet
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 
 const gameSchema = z.object({
   id: z.string().optional(),
@@ -54,6 +55,8 @@ const gameSchema = z.object({
   iconFile: z.custom<FileList>().optional(),
   bannerFile: z.custom<FileList>().optional(),
   dataAiHint: z.string().max(30, "AI Hint too long (max 2 words recommended)").optional(),
+  matchTypes: z.string().min(1, "At least one match type is required.").optional(),
+  mapNames: z.string().min(1, "At least one map name is required.").optional(),
 });
 type GameFormData = z.infer<typeof gameSchema>;
 
@@ -86,7 +89,7 @@ export default function AdminGamesClient() {
 
   const form = useForm<GameFormData>({
     resolver: zodResolver(gameSchema),
-    defaultValues: { name: "", iconUrl: "", bannerUrl: "", dataAiHint: "" },
+    defaultValues: { name: "", iconUrl: "", bannerUrl: "", dataAiHint: "", matchTypes: "", mapNames: "" },
   });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'icon' | 'banner') => {
@@ -152,6 +155,8 @@ export default function AdminGamesClient() {
         iconUrl: finalIconUrl || `https://placehold.co/40x40.png?text=${data.name.substring(0,2)}`,
         bannerUrl: finalBannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name)}`,
         dataAiHint: data.dataAiHint || data.name.toLowerCase().split(" ").slice(0,2).join(" "),
+        matchTypes: data.matchTypes?.split(',').map(s => s.trim()).filter(Boolean) || [],
+        mapNames: data.mapNames?.split(',').map(s => s.trim()).filter(Boolean) || [],
       };
 
       if (editingGame && editingGame.id) {
@@ -181,6 +186,8 @@ export default function AdminGamesClient() {
       iconUrl: game.iconUrl,
       bannerUrl: game.bannerUrl || "",
       dataAiHint: game.dataAiHint || "",
+      matchTypes: game.matchTypes?.join(", ") || "",
+      mapNames: game.mapNames?.join(", ") || "",
     });
     setIconPreview(game.iconUrl);
     setBannerPreview(game.bannerUrl || null);
@@ -202,7 +209,7 @@ export default function AdminGamesClient() {
 
   const openNewGameDialog = () => {
     setEditingGame(null);
-    form.reset({ name: "", iconUrl: "", bannerUrl: "", dataAiHint:"" });
+    form.reset({ name: "", iconUrl: "", bannerUrl: "", dataAiHint:"", matchTypes: "", mapNames: "" });
     setIconPreview(null);
     setBannerPreview(null);
     setIsDialogOpen(true);
@@ -242,33 +249,51 @@ export default function AdminGamesClient() {
               {form.formState.errors.name && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.name.message}</p>}
             </div>
             
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="iconFile" className="text-right">Icon</Label>
-              <Input id="iconFile" type="file" {...form.register("iconFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')} disabled={isSubmitting}/>
-            </div>
-            {iconPreview && <div className="col-start-2 col-span-3"><Image src={iconPreview} alt="Icon preview" width={40} height={40} className="rounded-md border object-cover" data-ai-hint='game icon preview' unoptimized={iconPreview.startsWith('data:image')}/></div>}
-            <div className="grid grid-cols-4 items-center gap-4">
-                 <Label htmlFor="iconUrl" className="text-right">Or Icon URL</Label>
-                 <Input id="iconUrl" {...form.register("iconUrl")} className="col-span-3" placeholder="https://example.com/icon.png" disabled={isSubmitting}/>
-                 {form.formState.errors.iconUrl && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.iconUrl.message}</p>}
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="iconFile" className="text-right pt-2">Icon</Label>
+              <div className="col-span-3 space-y-2">
+                <Input id="iconFile" type="file" {...form.register("iconFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'icon')} disabled={isSubmitting}/>
+                {iconPreview && <Image src={iconPreview} alt="Icon preview" width={40} height={40} className="rounded-md border object-cover" data-ai-hint='game icon preview' unoptimized={iconPreview.startsWith('data:image')}/>}
+                 <Input id="iconUrl" {...form.register("iconUrl")} placeholder="Or enter Icon URL" disabled={isSubmitting}/>
+                 {form.formState.errors.iconUrl && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.iconUrl.message}</p>}
+              </div>
             </div>
 
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="bannerFile" className="text-right">Banner</Label>
-              <Input id="bannerFile" type="file" {...form.register("bannerFile")} className="col-span-3 file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isSubmitting}/>
-            </div>
-            {bannerPreview && <div className="col-start-2 col-span-3"><Image src={bannerPreview} alt="Banner preview" width={200} height={112} className="rounded-md border object-cover aspect-[16/9]" data-ai-hint='game banner preview' unoptimized={bannerPreview.startsWith('data:image')}/></div>}
-            <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="bannerUrl" className="text-right">Or Banner URL</Label>
-                <Input id="bannerUrl" {...form.register("bannerUrl")} className="col-span-3" placeholder="https://example.com/banner.png" disabled={isSubmitting}/>
-                {form.formState.errors.bannerUrl && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.bannerUrl.message}</p>}
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="bannerFile" className="text-right pt-2">Banner</Label>
+              <div className="col-span-3 space-y-2">
+                <Input id="bannerFile" type="file" {...form.register("bannerFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isSubmitting}/>
+                {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={200} height={112} className="rounded-md border object-cover aspect-[16/9]" data-ai-hint='game banner preview' unoptimized={bannerPreview.startsWith('data:image')}/>}
+                <Input id="bannerUrl" {...form.register("bannerUrl")} placeholder="Or enter Banner URL" disabled={isSubmitting}/>
+                {form.formState.errors.bannerUrl && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.bannerUrl.message}</p>}
+              </div>
             </div>
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="dataAiHint" className="text-right">AI Hint</Label>
-              <Input id="dataAiHint" {...form.register("dataAiHint")} className="col-span-3" placeholder="e.g. esports game, fps shooter" disabled={isSubmitting}/>
-              <p className="col-start-2 col-span-3 text-xs text-muted-foreground">Keywords for AI image search (max 2 words).</p>
-               {form.formState.errors.dataAiHint && <p className="col-span-4 text-destructive text-xs text-right mt-1">{form.formState.errors.dataAiHint.message}</p>}
+              <div className="col-span-3">
+                <Input id="dataAiHint" {...form.register("dataAiHint")} placeholder="e.g. esports game, fps shooter" disabled={isSubmitting}/>
+                <p className="text-xs text-muted-foreground">Keywords for AI image search (max 2 words).</p>
+                 {form.formState.errors.dataAiHint && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.dataAiHint.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="matchTypes" className="text-right pt-2">Match Types</Label>
+              <div className="col-span-3">
+                <Textarea id="matchTypes" {...form.register("matchTypes")} placeholder="e.g. Battle Royale, Clash Squad, TDM" disabled={isSubmitting}/>
+                <p className="text-xs text-muted-foreground">Comma-separated list of match types.</p>
+                {form.formState.errors.matchTypes && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.matchTypes.message}</p>}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="mapNames" className="text-right pt-2">Map Names</Label>
+              <div className="col-span-3">
+                <Textarea id="mapNames" {...form.register("mapNames")} placeholder="e.g. Erangel, Miramar, Sanhok" disabled={isSubmitting}/>
+                <p className="text-xs text-muted-foreground">Comma-separated list of available maps.</p>
+                {form.formState.errors.mapNames && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.mapNames.message}</p>}
+              </div>
             </div>
 
             <DialogFooter>
@@ -365,3 +390,5 @@ export default function AdminGamesClient() {
     </>
   );
 }
+
+    
