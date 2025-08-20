@@ -4,7 +4,6 @@
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useTheme } from '@/contexts/ThemeContext';
 
 interface AdSenseBlockProps {
   className?: string;
@@ -12,8 +11,7 @@ interface AdSenseBlockProps {
 }
 
 const AD_CLIENT_ID = "ca-pub-3791001029407994";
-// IMPORTANT: Replace this with your actual ad slot ID from your AdSense account.
-const AD_SLOT_ID = "5124493356";
+const AD_SLOT_ID = "5628628328"; // Updated with your official Ad Slot ID
 
 export function AdSenseBlock({
   className,
@@ -23,8 +21,8 @@ export function AdSenseBlock({
   const adContainerRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    // Only try to load an ad if the ref is available
-    if (adContainerRef.current) {
+    // Only try to load an ad if the ref is available and has a width
+    if (adContainerRef.current && adContainerRef.current.offsetWidth > 0) {
       try {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -48,7 +46,7 @@ export function AdSenseBlock({
         className="adsbygoogle"
         style={{ display: 'block', width: '100%', ...style }}
         data-ad-client={AD_CLIENT_ID}
-        data-ad-slot={AD_SLOT_ID} // Using the single Ad Slot ID
+        data-ad-slot={AD_SLOT_ID}
         data-ad-format="auto"
         data-full-width-responsive="true"
       ></ins>
