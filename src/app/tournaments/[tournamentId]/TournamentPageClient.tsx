@@ -381,7 +381,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
       </div>
        {/* AdSense Block */}
         <section className="flex justify-center">
-            <AdSenseBlock adSlot="YOUR_TOURNAMENT_PAGE_AD_SLOT_ID" className="w-full max-w-5xl" />
+            <AdSenseBlock adSlot="5124493356" className="w-full max-w-5xl" />
         </section>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">

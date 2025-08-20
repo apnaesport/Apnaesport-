@@ -42,11 +42,10 @@ export function AdSenseBlock({
     <div
       key={adKey}
       className={cn(
-        "adsbygoogle ad-container flex items-center justify-center bg-muted/50 text-muted-foreground",
+        "ad-container flex items-center justify-center bg-muted/50 text-muted-foreground",
         "min-h-[90px] w-full",
         className
       )}
-      style={style}
     >
       <ins
         className="adsbygoogle"

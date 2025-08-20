@@ -94,7 +94,7 @@ export default function DashboardPageClient({ stats: initialStats, allUsers, fea
             
             {/* AdSense Block */}
             <section className="flex justify-center">
-                <AdSenseBlock adSlot="YOUR_DASHBOARD_AD_SLOT_ID" className="w-full max-w-4xl" />
+                <AdSenseBlock adSlot="5124493356" className="w-full max-w-4xl" />
             </section>
 
             <section>
