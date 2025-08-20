@@ -36,7 +36,7 @@ export default function LandingPageClient() {
 
       {/* AdSense Block: Leaderboard below hero */}
       <section className="py-10 px-4 relative z-10 flex justify-center">
-        <AdSenseBlock adSlot="5124493356" className="w-full max-w-4xl" />
+        <AdSenseBlock className="w-full max-w-4xl" />
       </section>
       
       {!loadingSettings && settings?.showVideoSectionOnLanding && settings.landingPageVideoUrl && (
@@ -91,7 +91,7 @@ export default function LandingPageClient() {
       </section>
        {/* AdSense Block: Above footer */}
       <section className="py-10 px-4 relative z-10 flex justify-center">
-        <AdSenseBlock adSlot="5124493356" className="w-full max-w-5xl" />
+        <AdSenseBlock className="w-full max-w-5xl" />
       </section>
       <footer className="py-8 px-4 border-t border-white/10 text-center text-muted-foreground text-sm z-10 relative">
         <p>&copy; {new Date().getFullYear()} Apna Esport. All rights reserved.</p>

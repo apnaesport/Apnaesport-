@@ -7,40 +7,36 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface AdSenseBlockProps {
-  adSlot: string;
-  adFormat?: 'auto' | 'display' | 'in-article';
   className?: string;
   style?: React.CSSProperties;
 }
 
 const AD_CLIENT_ID = "ca-pub-3791001029407994";
+// IMPORTANT: Replace this with your actual ad slot ID from your AdSense account.
+const AD_SLOT_ID = "5124493356";
 
 export function AdSenseBlock({
-  adSlot,
-  adFormat = 'auto',
   className,
   style,
 }: AdSenseBlockProps) {
   const pathname = usePathname();
   const adContainerRef = useRef<HTMLDivElement>(null);
-  const isAdLoaded = useRef(false);
-
+  
   useEffect(() => {
-    // Only try to load an ad if the ref is available and an ad hasn't been loaded in it yet.
-    if (adContainerRef.current && !isAdLoaded.current) {
+    // Only try to load an ad if the ref is available
+    if (adContainerRef.current) {
       try {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
-        isAdLoaded.current = true; // Mark as loaded to prevent re-pushes
       } catch (err) {
         console.error("AdSense error:", err);
       }
     }
-  }, [pathname, adSlot]); // Re-run when the path or slot changes.
+  }, [pathname]); // Re-run when the path changes.
 
   return (
     <div
-      key={pathname + adSlot} // Force re-mount on path change
+      key={pathname} // Force re-mount on path change
       ref={adContainerRef}
       className={cn(
         "ad-container flex items-center justify-center bg-muted/50 text-muted-foreground",
@@ -52,8 +48,8 @@ export function AdSenseBlock({
         className="adsbygoogle"
         style={{ display: 'block', width: '100%', ...style }}
         data-ad-client={AD_CLIENT_ID}
-        data-ad-slot={adSlot}
-        data-ad-format={adFormat}
+        data-ad-slot={AD_SLOT_ID} // Using the single Ad Slot ID
+        data-ad-format="auto"
         data-full-width-responsive="true"
       ></ins>
     </div>

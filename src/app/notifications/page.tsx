@@ -129,7 +129,7 @@ export default function UserNotificationsPage() {
 
       {/* AdSense Block at the bottom */}
       <section className="flex justify-center mt-8">
-        <AdSenseBlock adSlot="5124493356" className="w-full max-w-4xl" />
+        <AdSenseBlock className="w-full max-w-4xl" />
       </section>
     </>
   );
