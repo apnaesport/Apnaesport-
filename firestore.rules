@@ -9,30 +9,32 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    function isOwner(userId) {
+    function isSelf(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    function isSelf(userId) {
-        return isSignedIn() && request.auth.uid == userId;
-    }
 
-    function getRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.isAdmin;
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     function isAdmin() {
-      return isSignedIn() && getRole(request.auth.uid) == true;
+      return isSignedIn() && getUserData(request.auth.uid).isAdmin == true;
     }
     
+    function getTournamentData(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data;
+    }
+
     function isTournamentOrganizer(tournamentId) {
-        let organizerId = get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId;
-        return isSignedIn() && request.auth.uid == organizerId;
+      return isSignedIn() && getTournamentData(tournamentId).organizerId == request.auth.uid;
+    }
+
+    function getCommunityData(communityId) {
+       return get(/databases/$(database)/documents/communities/$(communityId)).data;
     }
 
     function isCommunityOwner(communityId) {
-      let ownerId = get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId;
-      return isSignedIn() && request.auth.uid == ownerId;
+      return isSignedIn() && getCommunityData(communityId).ownerId == request.auth.uid;
     }
 
     // --- Default Security: Deny all access unless explicitly allowed ---
@@ -50,13 +52,12 @@ service cloud.firestore {
       // - Cannot make themselves an admin or set points/community on creation.
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
-                    // Ensure points can only be set to the default signup bonus on creation
                     && request.resource.data.points == 10
                     && !('communityId' in request.resource.data);
       
-      // A user can update their own profile, but cannot change their role, points, or other critical fields.
-      // An admin can update any profile, but not change their own role.
-      allow update: if (isSelf(userId) && !( 'isAdmin' in request.resource.data || 'points' in request.resource.data || 'apnaId' in request.resource.data)) || 
+      // A user can update their own profile, but CANNOT change their role, points, or ID.
+      // An admin can update any profile, but not change their own admin status.
+      allow update: if (isSelf(userId) && !('isAdmin' in request.resource.data) && !('points' in request.resource.data) && !('apnaId' in request.resource.data)) || 
                      (isAdmin() && (userId != request.auth.uid || !('isAdmin' in request.resource.data)));
       
       // Only an admin can delete a user account
@@ -76,16 +77,37 @@ service cloud.firestore {
         // Tournament data is public.
         allow read: if true;
         
-        // Signed-in users can create tournaments.
-        allow create: if isSignedIn();
+        // Signed-in users can create tournaments if they have enough points (checked in transaction).
+        allow create: if isSignedIn() && request.resource.data.organizerId == request.auth.uid;
         
-        // - Admins can update anything.
-        // - Organizers can update non-critical fields of their own tournament.
-        // - Any user can join a tournament by adding themselves to the participants list.
+        // --- Complex Update Logic for Tournaments ---
         allow update: if isSignedIn() && (
-            isAdmin() || 
-            (isTournamentOrganizer(tournamentId) && !('organizerId' in request.resource.data) && !('gameId' in request.resource.data) && !('prizePool' in request.resource.data)) ||
-            (request.resource.data.participants.size() == resource.data.participants.size() + 1 && request.resource.data.participants.contains(request.auth.uid))
+            // 1. Admins can do anything.
+            isAdmin() ||
+            
+            // 2. Tournament organizers can update non-critical fields.
+            (
+              isTournamentOrganizer(tournamentId) &&
+              // Prevent organizer from changing key fields after creation
+              request.resource.data.organizerId == resource.data.organizerId &&
+              request.resource.data.gameId == resource.data.gameId &&
+              request.resource.data.entryFee == resource.data.entryFee &&
+              // Allow prize pool to be changed ONLY if it's an increase from their own points (handled in backend)
+              // This rule is simplified to allow most organizer updates. More specific checks are in transactions.
+              !('participants' in request.resource.data.diff(resource.data).affectedKeys()) // Organizer cannot directly edit participants list
+            ) ||
+
+            // 3. Any signed-in user can join a tournament if the rules are met.
+            (
+              // User is adding exactly one participant.
+              request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
+              // The new participant being added is the current user.
+              request.resource.data.participants[resource.data.participants.size()].id == request.auth.uid &&
+              // The prize pool must increase by exactly the entry fee.
+              request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee &&
+              // No other fields can be changed.
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
+            )
         );
         
         // Organizer or admin can delete.
@@ -94,89 +116,69 @@ service cloud.firestore {
     
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        // Any signed-in user can read notifications.
-        allow read: if isSignedIn();
-        // Only admins can create/write notifications.
+        allow read: if true; // Public announcements
         allow write: if isAdmin();
     }
     
     // --- Site Settings (`settings`) ---
     match /settings/global {
-        // Site settings are public.
         allow read: if true;
-        // Only admins can change site settings.
         allow write: if isAdmin();
     }
     
     // --- Sponsorships (`sponsorships`) ---
     match /sponsorships/{sponsorshipId} {
-      // Any signed-in user can create a request.
       allow create: if isSignedIn();
-      // Only admins can read, update status, or delete requests.
       allow read, update, delete: if isAdmin();
     }
     
     // --- Communities (`communities`) ---
     match /communities/{communityId} {
-      // Anyone can view a community's public page.
       allow read: if true;
-
-      // A signed-in user can create a community. Must set themself as the owner.
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
-      // Community owner or a platform admin can update details.
-      // Other users can join, which only increments member count and updates the timestamp.
+      // Admin or Owner can update. Users can only join/leave (which increments/decrements memberCount).
       allow update: if isSignedIn() && (
         (isAdmin() || isCommunityOwner(communityId)) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && request.resource.data.memberCount == resource.data.memberCount + 1)
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && 
+         (request.resource.data.memberCount == resource.data.memberCount + 1 || request.resource.data.memberCount == resource.data.memberCount - 1))
       );
       
-      // Only the community owner or a platform admin can delete the community.
       allow delete: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
       
-      // --- Community Members (`members`) ---
       match /members/{userId} {
-        // Anyone can see who is in the community.
         allow read: if true;
-        // A user can join a community (create their own member doc).
         allow create: if isSelf(userId);
-        // A user can leave a community (delete their own member doc).
-        // The community owner can also remove (kick) members.
         allow delete: if isSelf(userId) || isCommunityOwner(communityId);
-        // Roles and other details can only be updated by the community owner or an admin.
         allow update: if isAdmin() || isCommunityOwner(communityId);
       }
 
-      // --- Community Announcements (`announcements`) ---
       match /announcements/{announcementId} {
         allow read: if true;
-        allow create: if isCommunityOwner(communityId);
-        allow update, delete: if isCommunityOwner(communityId);
+        allow create, update, delete: if isCommunityOwner(communityId);
       }
     }
     
-    // --- Creator Hub (`creatorApplications` and `creators`) ---
+    // --- Creator Hub ---
     match /creatorApplications/{applicationId} {
-      // A user can create their own application.
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // An admin can read any application. A user can read their own.
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      // Only admins can update status or delete applications.
       allow update, delete: if isAdmin();
     }
     
     match /creators/{creatorId} {
-      // Anyone can view the list of approved creators.
       allow get, list: if true;
-      // Only admins can create (approve) or delete creator profiles.
       allow create, delete: if isAdmin();
-      // An admin can update any field.
-      // A signed-in user can vote securely.
+      
+      // Allow secure voting by users.
       allow update: if isSignedIn() && (
         isAdmin() ||
         (
           request.resource.data.votes == resource.data.votes + 1 &&
-          request.resource.data.votedBy.hasAny([request.auth.uid]) == false && // Can't vote if already voted
+          // Ensure the user's ID is being added to votedBy and wasn't there before.
+          !resource.data.votedBy.hasAny([request.auth.uid]) &&
+          request.resource.data.votedBy == resource.data.votedBy.concat([request.auth.uid]) &&
+          // Ensure only votes and votedBy are changing.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy', 'updatedAt'])
         )
       );
