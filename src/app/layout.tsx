@@ -20,8 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
 
   const siteName = settings?.siteName || 'Apna Esport';
   const defaultTitle = "Apna Esport | Play, Compete & Win in Esports Tournaments";
-  const defaultDescription = "Join Apna Esport (or apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games, play online matches, and connect with the esports community.";
-  const keywords = ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments", "apna esport login", "apna esport registration"];
+  const defaultDescription = "Join Apna Esport (or apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games like BGMI and Free Fire, play online matches, earn AE Points, and connect with the esports community.";
+  const keywords = ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments", "apna esport login", "apna esport registration", "AE Points", "Apna ID"];
 
   return {
     title: {

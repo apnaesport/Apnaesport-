@@ -4,13 +4,13 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn, Megaphone } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Community, CommunityMember, SiteSettings, Creator } from '@/lib/types';
-import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore, getCreatorById } from '@/lib/tournamentStore';
+import type { Community, CommunityMember, SiteSettings, Creator, Announcement } from '@/lib/types';
+import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore, getCreatorById, listenToAnnouncements, addAnnouncement, deleteAnnouncement, updateAnnouncement } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,14 +37,15 @@ import {
   DialogTrigger,
   DialogClose
 } from "@/components/ui/dialog";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { PageTitle } from '@/components/shared/PageTitle';
 import Link from 'next/link';
-
+import { Textarea } from '@/components/ui/textarea';
+import { QuickTournamentForm } from './QuickTournamentForm';
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -56,6 +57,57 @@ const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
 };
+
+const AnnouncementForm = ({ communityId, ownerId }: { communityId: string, ownerId: string }) => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [content, setContent] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!content.trim() || !user || user.uid !== ownerId) return;
+        setIsSubmitting(true);
+        try {
+            await addAnnouncement(communityId, {
+                authorId: user.uid,
+                authorName: user.displayName || 'Owner',
+                content,
+                isAuto: false,
+            });
+            setContent('');
+            toast({ title: 'Announcement Posted!' });
+        } catch (error) {
+            toast({ title: 'Error', description: 'Could not post announcement.', variant: 'destructive' });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Post an Announcement</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <Textarea
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder="What's on your mind?"
+                        required
+                        disabled={isSubmitting}
+                    />
+                    <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Post
+                    </Button>
+                </form>
+            </CardContent>
+        </Card>
+    );
+};
+
 
 const MemberList = ({ members }: { members: CommunityMember[] }) => {
     if (!members || members.length === 0) {
@@ -79,17 +131,76 @@ const MemberList = ({ members }: { members: CommunityMember[] }) => {
     );
 };
 
-const AnnouncementCard = ({ icon: Icon, title, text }: { icon: React.ElementType, title: string, text: string }) => (
-    <Card className="border-l-4 border-l-primary">
-        <CardHeader className="flex flex-row items-center gap-4 space-y-0 p-4">
-            <Icon className="h-6 w-6 text-primary" />
-            <div>
-                <CardTitle className="text-base">{title}</CardTitle>
-                <CardDescription className="text-sm">{text}</CardDescription>
-            </div>
-        </CardHeader>
-    </Card>
-)
+const AnnouncementCard = ({ announcement, isOwner }: { announcement: Announcement; isOwner: boolean }) => {
+    const { toast } = useToast();
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedContent, setEditedContent] = useState(announcement.content);
+    const [isUpdating, setIsUpdating] = useState(false);
+    
+    const timeSinceCreation = announcement.createdAt ? (new Date().getTime() - announcement.createdAt.toDate().getTime()) / (1000 * 60) : Infinity;
+    const canEdit = isOwner && timeSinceCreation < 20;
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to delete this announcement?')) return;
+        try {
+            await deleteAnnouncement(announcement.communityId, announcement.id);
+            toast({ title: 'Announcement Deleted' });
+        } catch (error) {
+            toast({ title: 'Error', description: 'Could not delete announcement.', variant: 'destructive' });
+        }
+    };
+    
+    const handleUpdate = async () => {
+        if (!editedContent.trim()) return;
+        setIsUpdating(true);
+        try {
+            await updateAnnouncement(announcement.communityId, announcement.id, { content: editedContent });
+            toast({ title: "Announcement Updated" });
+            setIsEditing(false);
+        } catch (error) {
+            toast({ title: "Error", description: "Could not update announcement.", variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    return (
+        <Card className="border-l-4 border-l-primary relative">
+            <CardHeader className="flex flex-row items-center gap-4 space-y-0 p-4">
+                <Megaphone className="h-6 w-6 text-primary" />
+                <div>
+                    <CardTitle className="text-base">{announcement.isAuto ? "New Tournament" : "Announcement"}</CardTitle>
+                    <CardDescription className="text-xs">
+                        By {announcement.authorName} - {announcement.createdAt ? formatDistanceToNow(announcement.createdAt.toDate(), { addSuffix: true }) : ''}
+                    </CardDescription>
+                </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0 pl-14">
+                {isEditing ? (
+                    <div className="space-y-2">
+                        <Textarea value={editedContent} onChange={(e) => setEditedContent(e.target.value)} disabled={isUpdating} />
+                        <div className="flex gap-2">
+                            <Button size="sm" onClick={handleUpdate} disabled={isUpdating}>
+                                {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Save
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)} disabled={isUpdating}>Cancel</Button>
+                        </div>
+                    </div>
+                ) : (
+                    <p className="text-sm whitespace-pre-wrap">{announcement.content}</p>
+                )}
+            </CardContent>
+             {isOwner && !announcement.isAuto && (
+                <div className="absolute top-2 right-2 flex gap-1">
+                    {canEdit && <Button variant="ghost" size="sm" onClick={() => setIsEditing(true)}>Edit</Button>}
+                    <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive">Delete</Button>
+                </div>
+            )}
+        </Card>
+    );
+};
+
 
 const ManageCommunityDialog = ({ community }: { community: Community }) => {
     const { toast } = useToast();
@@ -226,6 +337,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const router = useRouter();
     const [community, setCommunity] = useState<Community>(initialCommunity);
     const [members, setMembers] = useState<CommunityMember[]>(initialMembers);
+    const [announcements, setAnnouncements] = useState<Announcement[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIsCreator, setOwnerIsCreator] = useState(false);
@@ -234,7 +346,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
 
     useEffect(() => {
         setIsLoading(false);
-        const unsubscribe = listenToCommunityById(communityId, async (liveCommunity) => {
+        const unsubscribeCommunity = listenToCommunityById(communityId, async (liveCommunity) => {
             if (liveCommunity) {
                 const serializableLiveCommunity = {
                     ...liveCommunity,
@@ -257,7 +369,13 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 notFound();
             }
         });
-        return () => unsubscribe();
+        
+        const unsubscribeAnnouncements = listenToAnnouncements(communityId, setAnnouncements);
+
+        return () => {
+            unsubscribeCommunity();
+            unsubscribeAnnouncements();
+        };
     }, [communityId, community.memberCount]);
 
     const isMember = useMemo(() => user?.communityId === community.id, [user, community]);
@@ -418,22 +536,20 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
             <Tabs defaultValue="home" className="w-full">
                 <TabsList>
                     <TabsTrigger value="home"><Home className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
-                    <TabsTrigger value="tournaments" disabled>Tournaments</TabsTrigger>
+                    <TabsTrigger value="tournaments">Quick Tournaments</TabsTrigger>
                     <TabsTrigger value="members"><Users className="mr-2 h-4 w-4"/>Members ({members.length})</TabsTrigger>
-                    <TabsTrigger value="media" disabled><Camera className="mr-2 h-4 w-4"/>Media</TabsTrigger>
                     <TabsTrigger value="leaderboard" disabled>Leaderboard</TabsTrigger>
                 </TabsList>
                 <TabsContent value="home" className="mt-4 space-y-4">
-                    <AnnouncementCard 
-                        icon={Medal}
-                        title={`Welcome to ${community.name}!`}
-                        text="We have new tournaments every weekend. Stay tuned for rewards and events!"
-                    />
-                     <AnnouncementCard 
-                        icon={BarChart3}
-                        title="Update"
-                        text="New community point system introduced! Earn XP by joining tournaments."
-                    />
+                    {isOwner && <AnnouncementForm communityId={communityId} ownerId={community.ownerId} />}
+                     {announcements.length > 0 ? (
+                        announcements.map(ann => <AnnouncementCard key={ann.id} announcement={ann} isOwner={isOwner} />)
+                    ) : (
+                        <p className="text-muted-foreground text-center py-6">No announcements yet.</p>
+                    )}
+                </TabsContent>
+                <TabsContent value="tournaments" className="mt-4">
+                    <QuickTournamentForm community={community} />
                 </TabsContent>
                  <TabsContent value="members" className="mt-4">
                     <Card>
@@ -448,5 +564,3 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
         </div>
     );
 }
-
-    

@@ -24,7 +24,7 @@ import {
   runTransaction
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -781,6 +781,92 @@ export const deleteCommunityFromFirestore = async (communityId: string): Promise
 };
 
 
+// --- Community Announcement Functions ---
+
+export const listenToAnnouncements = (communityId: string, callback: (announcements: Announcement[]) => void) => {
+    const announcementsRef = collection(db, COMMUNITIES_COLLECTION, communityId, 'announcements');
+    const q = query(announcementsRef, orderBy('createdAt', 'desc'));
+
+    return onSnapshot(q, (snapshot) => {
+        const announcements = snapshot.docs.map(doc => ({
+            id: doc.id,
+            communityId,
+            ...doc.data()
+        } as Announcement));
+        callback(announcements);
+    });
+};
+
+export const addAnnouncement = async (communityId: string, data: Omit<Announcement, 'id' | 'communityId' | 'createdAt'>) => {
+    const announcementsRef = collection(db, COMMUNITIES_COLLECTION, communityId, 'announcements');
+    await addDoc(announcementsRef, {
+        ...data,
+        createdAt: serverTimestamp(),
+    });
+};
+
+export const updateAnnouncement = async (communityId: string, announcementId: string, data: Partial<Announcement>) => {
+    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
+    await updateDoc(announcementRef, data);
+};
+
+export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
+    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
+    await deleteDoc(announcementRef);
+};
+
+// --- Quick Tournament for Community ---
+
+export const addQuickTournamentToFirestore = async (
+    data: { name: string, gameId: string, mapName?: string, teamSize: TeamSize, time: string },
+    community: Community,
+    owner: UserProfile
+): Promise<string> => {
+    const game = await getGameByIdFromFirestore(data.gameId);
+    if (!game) throw new Error("Selected game not found.");
+
+    const [hours, minutes] = data.time.split(':').map(Number);
+    const startDate = new Date();
+    startDate.setHours(hours, minutes, 0, 0);
+
+    if (startDate < new Date()) {
+        throw new Error("Cannot create a tournament for a past time.");
+    }
+
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'currency' | 'bracketType'> = {
+        name: data.name,
+        gameId: data.gameId,
+        gameName: game.name,
+        gameIconUrl: game.iconUrl,
+        bannerImageUrl: game.bannerUrl,
+        description: `A quick tournament for the ${community.name} community.`,
+        startDate: startDate,
+        maxParticipants: 50,
+        prizePool: 0, // Starts at 0, funded by entry fees
+        entryFee: 10, // Default entry fee for quick tournaments
+        matchType: game.matchTypes?.[0] || 'Battle Royale',
+        mapName: data.mapName || game.mapNames?.[0] || 'Not specified',
+        teamSize: data.teamSize,
+        organizer: community.name,
+        organizerId: owner.uid,
+        participants: [],
+        matches: [],
+        featured: false,
+        rules: "Standard community tournament rules apply. Be respectful.",
+    };
+
+    const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
+        ...newTournamentData,
+        startDate: Timestamp.fromDate(startDate),
+        status: getTournamentStatus({ ...newTournamentData, status: 'Upcoming' }),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+    });
+
+    return docRef.id;
+}
+
+
 // --- Creator Functions ---
 
 export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt' | 'status'>): Promise<string> => {
@@ -922,4 +1008,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-

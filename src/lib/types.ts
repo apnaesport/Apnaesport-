@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -217,6 +218,17 @@ export interface Community {
     updatedAt: Timestamp;
 }
 
+export interface Announcement {
+    id: string;
+    communityId: string;
+    authorId: string;
+    authorName: string;
+    content: string;
+    isAuto: boolean;
+    createdAt: Timestamp;
+    expiresAt?: Timestamp;
+}
+
 export type CommunityPostType = "Announcement" | "Media" | "General";
 
 export interface CommunityPost {
@@ -266,5 +278,3 @@ export interface CreatorApplication {
     createdAt: Timestamp;
     communityId?: string; // Added to link application to a community
 }
-
-    
