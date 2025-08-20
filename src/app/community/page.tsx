@@ -56,7 +56,7 @@ const CommunityCard = ({ community, settings, isMember }: CommunityCardProps) =>
 
     return (
         <Card className="overflow-hidden shadow-lg hover:shadow-primary/20 transition-all duration-300 group flex flex-col h-full">
-            <CardHeader className="relative p-0 h-40">
+            <CardHeader className="relative p-0 h-36 sm:h-40">
                 <ImageWithFallback
                     src={bannerSrc}
                     fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(community.name)}`}
@@ -290,14 +290,14 @@ export default function CommunityHubPage() {
                         // Add state and onChange later
                     />
                 </div>
-                <Button variant="outline">
+                <Button variant="outline" className="w-full md:w-auto">
                     <Filter className="mr-2 h-4 w-4" /> Filter
                 </Button>
             </div>
 
             {isLoading || loadingSettings ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {Array.from({ length: 6 }).map((_, i) => (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {Array.from({ length: 8 }).map((_, i) => (
                        <Card key={i}>
                            <Skeleton className="h-40 w-full"/>
                            <CardContent className="p-4 space-y-2">
@@ -311,7 +311,7 @@ export default function CommunityHubPage() {
                     ))}
                 </div>
             ) : communities.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {communities.map(community => (
                         <CommunityCard key={community.id} community={community} settings={settings} isMember={user?.communityId === community.id} />
                     ))}

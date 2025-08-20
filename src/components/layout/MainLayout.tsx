@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import type { ReactNode } from "react";
@@ -61,10 +60,10 @@ const MyCommunityCard = () => {
         return (
             <Card className="bg-card/50">
                 <CardHeader className="p-3">
-                    <CardTitle className="text-base">No Community Joined</CardTitle>
+                    <CardTitle className="text-base truncate">No Community</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
-                    <p className="text-sm text-muted-foreground mb-3">Join a community to connect with other players.</p>
+                    <p className="text-sm text-muted-foreground mb-3">Join a community to connect with others.</p>
                     <Button asChild size="sm" className="w-full">
                         <Link href="/community">
                             <Users className="mr-2 h-4 w-4" /> Explore
@@ -86,7 +85,7 @@ const MyCommunityCard = () => {
                     <CardTitle className="text-base">Community Error</CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 pt-0">
-                    <p className="text-sm text-muted-foreground">Could not load your community details. You may need to leave and rejoin.</p>
+                    <p className="text-sm text-muted-foreground">Could not load details. Try re-joining.</p>
                 </CardContent>
             </Card>
         );
@@ -96,7 +95,7 @@ const MyCommunityCard = () => {
         <Card className="bg-card/50">
             <CardHeader className="p-3">
                 <CardTitle className="text-sm flex items-center justify-between">
-                    <span>My Community</span>
+                    <span className="truncate">My Community</span>
                     <Badge variant="outline">Member</Badge>
                 </CardTitle>
             </CardHeader>
@@ -110,8 +109,8 @@ const MyCommunityCard = () => {
                         className="rounded-md"
                         data-ai-hint="community logo"
                     />
-                    <div>
-                        <p className="font-semibold group-hover:text-primary transition-colors line-clamp-1">{community.name}</p>
+                    <div className="overflow-hidden">
+                        <p className="font-semibold group-hover:text-primary transition-colors truncate">{community.name}</p>
                         <p className="text-xs text-muted-foreground">Click to view</p>
                     </div>
                 </Link>

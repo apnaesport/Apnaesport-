@@ -272,7 +272,7 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
     return (
         <Dialog>
             <DialogTrigger asChild>
-                <Button variant="outline"><Shield className="mr-2 h-4 w-4" /> Manage Community</Button>
+                <Button variant="outline"><Shield className="mr-2 h-4 w-4" /> Manage</Button>
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
@@ -456,7 +456,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     return (
         <div className="space-y-6">
             <header className="rounded-lg overflow-hidden shadow-lg bg-card border">
-                <div className="h-32 sm:h-40 bg-gradient-to-r from-orange-400 to-rose-500 relative">
+                <div className="h-32 sm:h-48 bg-gradient-to-r from-orange-400 to-rose-500 relative">
                      <ImageWithFallback
                         src={bannerSrc}
                         fallbackSrc={`https://placehold.co/1200x300.png?text=${encodeURIComponent(community.name)}`}
@@ -478,10 +478,10 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                                 data-ai-hint="gaming community logo"
                             />
                         </div>
-                        <div className="flex-grow">
-                            <div className="flex justify-between items-start">
+                        <div className="flex-grow space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
                                 <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
                                             <Users2 className="h-7 w-7 text-primary" /> {community.name}
                                         </h1>
@@ -491,14 +491,14 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                                             </Badge>
                                         )}
                                     </div>
-                                    <p className="text-sm text-muted-foreground">Joined: {format(createdAtDate, "MMM dd, yyyy")} | Members: {community.memberCount}</p>
+                                    <p className="text-sm text-muted-foreground mt-1">Joined: {format(createdAtDate, "MMM dd, yyyy")} | Members: {community.memberCount}</p>
                                 </div>
-                                <div className="shrink-0 flex items-center gap-2">
+                                <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto">
                                      {isOwner && <ManageCommunityDialog community={community} />}
                                     {isMember ? (
                                         <AlertDialog>
                                             <AlertDialogTrigger asChild>
-                                                <Button variant="destructive" disabled={isProcessing || isOwner}>
+                                                <Button variant="destructive" disabled={isProcessing || isOwner} className="flex-grow">
                                                     {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                                     Leave
                                                 </Button>
@@ -517,14 +517,14 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                                             </AlertDialogContent>
                                         </AlertDialog>
                                     ) : (
-                                        <Button onClick={handleJoinCommunity} disabled={isProcessing || !!user?.communityId}>
+                                        <Button onClick={handleJoinCommunity} disabled={isProcessing || !!user?.communityId} className="flex-grow">
                                             {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
                                             {user?.communityId ? 'Already in a community' : 'Join Community'}
                                         </Button>
                                     )}
                                 </div>
                             </div>
-                            <div className="mt-3">
+                            <div>
                                 <p className="text-sm font-semibold">Level {community.level} <span className="text-muted-foreground font-normal">({community.points} / {community.level * 500} XP)</span></p>
                                 <Progress value={xpPercentage} className="h-2 mt-1"/>
                             </div>
