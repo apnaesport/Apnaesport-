@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Edit3, LogIn, Save, Loader2, Gamepad2, FileText } from "lucide-react";
+import { Shield, Edit3, LogIn, Save, Loader2, Gamepad2, FileText, BadgeInfo, Coins } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -190,6 +190,18 @@ export default function ProfilePage() {
               </Avatar>
               <CardTitle className="text-2xl">{user.displayName}</CardTitle>
               <CardDescription>{user.email}</CardDescription>
+              
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 text-sm">
+                <div className="flex items-center text-muted-foreground">
+                  <BadgeInfo className="h-4 w-4 mr-1 text-primary"/>
+                  Apna ID: <span className="font-semibold text-foreground ml-1">{user.apnaId || 'N/A'}</span>
+                </div>
+                 <div className="flex items-center text-muted-foreground">
+                  <Coins className="h-4 w-4 mr-1 text-yellow-500"/>
+                  AE Points: <span className="font-semibold text-foreground ml-1">{user.points || 0}</span>
+                </div>
+              </div>
+
               {user.isAdmin && (
                 <div className="mt-2 flex items-center justify-center text-destructive">
                   <Shield className="h-4 w-4 mr-1" /> Admin Account

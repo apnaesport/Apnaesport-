@@ -24,6 +24,7 @@ import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { generateApnaId } from "@/lib/tournamentStore";
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -60,6 +61,8 @@ export function RegisterForm() {
       await sendEmailVerification(user);
 
       await updateFirebaseProfile(user, { displayName: values.name });
+      
+      const newApnaId = await generateApnaId();
 
       const userIsAdmin = values.email === ADMIN_EMAIL;
       await setDoc(doc(db, "users", user.uid), {
@@ -74,15 +77,17 @@ export function RegisterForm() {
         bio: "",
         favoriteGameIds: [],
         streamingChannelUrl: "",
-        points: 0, 
+        points: 10, // Signup bonus
         communityId: null,
+        apnaId: newApnaId, // Assign new Apna ID
+        lastLogin: serverTimestamp() as Timestamp, // Set initial login time
       });
 
       toast({
         title: "Registration Successful! Please Verify Your Email.",
         description: (
           <div>
-            <p>A verification email has been sent to your inbox.</p>
+            <p>A verification email has been sent to your inbox. You've also received 10 AE Points!</p>
             <p className="font-bold mt-2">Please check your spam folder and mark it as "not spam".</p>
           </div>
         ),

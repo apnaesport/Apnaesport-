@@ -18,7 +18,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu, Bell, Sun, Moon, Laptop } from "lucide-react";
+import { LogOut, User, LayoutDashboard, Settings, ShieldCheck, Menu, Bell, Sun, Moon, Laptop, Coins } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/components/shared/Logo";
 import { SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
@@ -50,12 +50,19 @@ export function Header() {
       
       <div className="flex items-center gap-2 sm:gap-4">
         {user && (
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/notifications" title="Notifications">
-              <Bell className="h-5 w-5" />
-              <span className="sr-only">Notifications</span>
-            </Link>
-          </Button>
+          <>
+            <div className="hidden sm:flex items-center gap-2 rounded-full bg-secondary/50 px-3 py-1.5 text-sm font-semibold">
+              <Coins className="h-4 w-4 text-yellow-500" />
+              <span>{user.points || 0}</span>
+              <span className="hidden lg:inline">AE Points</span>
+            </div>
+            <Button variant="ghost" size="icon" asChild>
+              <Link href="/notifications" title="Notifications">
+                <Bell className="h-5 w-5" />
+                <span className="sr-only">Notifications</span>
+              </Link>
+            </Button>
+          </>
         )}
         {loading ? (
           <Skeleton className="h-10 w-10 rounded-full" />
@@ -77,6 +84,9 @@ export function Header() {
                   <p className="text-sm font-medium leading-none">{user.displayName}</p>
                   <p className="text-xs leading-none text-muted-foreground">
                     {user.email}
+                  </p>
+                   <p className="text-xs leading-none text-muted-foreground mt-1 pt-1 border-t">
+                    Apna ID: {user.apnaId || 'N/A'}
                   </p>
                 </div>
               </DropdownMenuLabel>

@@ -3,11 +3,12 @@
 
 import type { User as FirebaseUser } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, type Timestamp, updateDoc, increment } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import { generateApnaId } from "@/lib/tournamentStore";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -19,6 +20,17 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+// Helper to check if a day has passed
+const isNewDay = (lastLogin: Timestamp | Date | undefined): boolean => {
+    if (!lastLogin) return true;
+    const lastLoginDate = lastLogin instanceof Date ? lastLogin : lastLogin.toDate();
+    const today = new Date();
+    
+    // Check if the last login was before the start of today
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return lastLoginDate.getTime() < startOfToday.getTime();
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUserState] = useState<UserProfile | null>(null);
@@ -42,6 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (!userDocSnap.exists()) {
         const userIsAdmin = firebaseUser.email === ADMIN_EMAIL;
+        const newApnaId = await generateApnaId();
         const initialProfileData: Partial<UserProfile> = {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User",
@@ -55,7 +68,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           favoriteGameIds: [],
           streamingChannelUrl: "",
           communityId: null,
-          points: 0, 
+          points: 10, // Signup bonus
+          apnaId: newApnaId,
+          lastLogin: serverTimestamp() as Timestamp,
         };
         await setDoc(userDocRef, initialProfileData);
         userDocSnap = await getDoc(userDocRef);
@@ -64,6 +79,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let userProfileData: Partial<UserProfile> = {};
       if (userDocSnap.exists()) {
         userProfileData = userDocSnap.data() as Partial<UserProfile>;
+        
+        // Award daily login bonus if it's a new day
+        if (isNewDay(userProfileData.lastLogin)) {
+            await updateDoc(userDocRef, {
+                points: increment(5),
+                lastLogin: serverTimestamp()
+            });
+            userProfileData.points = (userProfileData.points || 0) + 5;
+        }
       }
 
       const profile: UserProfile = {
@@ -91,6 +115,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         phoneNumber: firebaseUser.phoneNumber,
         providerId: firebaseUser.providerId,
         createdAt: userProfileData.createdAt,
+        apnaId: userProfileData.apnaId,
+        lastLogin: userProfileData.lastLogin
       };
       setUserState(profile);
       setIsAdmin(profile.isAdmin || false);

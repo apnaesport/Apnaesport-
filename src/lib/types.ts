@@ -16,11 +16,13 @@ export interface UserProfile extends Partial<FirebaseUser> {
   bio?: string;
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
-  communityId?: string | null; // Added
-  points?: number;
+  communityId?: string | null;
+  points: number; // Renamed to represent AE Points
   wins?: number;
   kills?: number;
   deaths?: number;
+  apnaId?: string; // New Apna Esport ID
+  lastLogin?: Timestamp; // For daily login bonus
 }
 
 export type Game = {
@@ -127,6 +129,8 @@ export interface SiteSettings {
   basePlayerCount?: number;
   defaultCommunityLogoUrl?: string;
   defaultCommunityBannerUrl?: string;
+  showVideoSectionOnLanding?: boolean; // Added
+  landingPageVideoUrl?: string; // Added
   updatedAt?: Timestamp;
 }
 
@@ -251,5 +255,3 @@ export interface CreatorApplication {
     createdAt: Timestamp;
     communityId?: string; // Added to link application to a community
 }
-
-    

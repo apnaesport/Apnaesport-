@@ -347,6 +347,22 @@ export const getNotificationsFromFirestore = async (target?: NotificationTarget)
 };
 
 // --- User Functions ---
+
+export const generateApnaId = async (): Promise<string> => {
+    let newId;
+    let isUnique = false;
+    while (!isUnique) {
+        const randomNum = Math.floor(100000 + Math.random() * 900000);
+        newId = `AE${randomNum}`;
+        const q = query(collection(db, USERS_COLLECTION), where("apnaId", "==", newId));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            isUnique = true;
+        }
+    }
+    return newId;
+};
+
 export const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
   if (!userId) return null;
   const userRef = doc(db, USERS_COLLECTION, userId);
@@ -368,6 +384,8 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       wins: data.wins || 0,
       kills: data.kills || 0,
       deaths: data.deaths || 0,
+      apnaId: data.apnaId,
+      lastLogin: data.lastLogin as Timestamp,
     } as UserProfile;
   }
   return null;
@@ -393,6 +411,8 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       wins: data.wins || 0,
       kills: data.kills || 0,
       deaths: data.deaths || 0,
+      apnaId: data.apnaId,
+      lastLogin: data.lastLogin as Timestamp,
     };
   });
 };
@@ -787,5 +807,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-
-    
