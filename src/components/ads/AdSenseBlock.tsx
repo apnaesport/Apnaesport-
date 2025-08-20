@@ -22,32 +22,19 @@ export function AdSenseBlock({
   style,
 }: AdSenseBlockProps) {
   const pathname = usePathname();
-  const { resolvedTheme } = useTheme();
-  const adContainerRef = useRef<HTMLDivElement>(null);
-
-
-  const adKey = useMemo(() => {
-    // Re-render the ad when the path or theme changes
-    return `${pathname}-${resolvedTheme}`;
-  }, [pathname, resolvedTheme]);
 
   useEffect(() => {
-    // Only push the ad if the container has rendered and has a width.
-    // This prevents the "availableWidth=0" error.
-    if (adContainerRef.current && adContainerRef.current.offsetWidth > 0) {
       try {
         // @ts-ignore
         (window.adsbygoogle = window.adsbygoogle || []).push({});
       } catch (err) {
         console.error("AdSense error:", err);
       }
-    }
-  }, [adKey, adContainerRef]); // Re-run when the key or ref changes.
+  }, [pathname]); // Re-run when the path changes.
 
   return (
     <div
-      key={adKey}
-      ref={adContainerRef}
+      key={pathname} // Force re-mount on path change
       className={cn(
         "ad-container flex items-center justify-center bg-muted/50 text-muted-foreground",
         "min-h-[90px] w-full",
