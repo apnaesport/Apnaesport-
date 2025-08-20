@@ -1,19 +1,18 @@
 
-
 "use client"; 
 
-import type { Tournament, Participant } from "@/lib/types";
+import type { Tournament, Participant, Winner } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, DollarSign, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useMemo } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { listenToTournamentById, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction } from "@/lib/tournamentStore"; 
+import { listenToTournamentById, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction, addParticipantToTournamentFirestore, awardTournamentWinners } from "@/lib/tournamentStore"; 
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -42,13 +41,15 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const registrationSchema = z.object({
   gameUsername: z.string().min(2, "In-game username is required."),
@@ -58,6 +59,16 @@ const registrationSchema = z.object({
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
 
+const winnerSchema = z.object({
+    first: z.string().min(1, "1st place winner is required."),
+    second: z.string().min(1, "2nd place winner is required."),
+    third: z.string().min(1, "3rd place winner is required."),
+}).refine(data => new Set([data.first, data.second, data.third]).size === 3, {
+    message: "Each winner must be a unique participant.",
+    path: ["first"], 
+});
+
+type WinnerFormData = z.infer<typeof winnerSchema>;
 
 interface TournamentPageClientProps {
   tournamentId: string;
@@ -67,7 +78,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  const { user, isAdmin, loading: authLoading } = useAuth(); 
+  const { user, isAdmin, loading: authLoading, refreshUser } = useAuth(); 
   const router = useRouter(); 
   const { toast } = useToast();
   
@@ -75,6 +86,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRegistered, setIsRegistered] = useState(false);
   const [isUpdatingRoom, setIsUpdatingRoom] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
   const [roomCode, setRoomCode] = useState("");
   const [roomPassword, setRoomPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -117,6 +129,12 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     resolver: zodResolver(registrationSchema),
     defaultValues: { gameUsername: "", inGameId: "", contactEmail: user?.email || "" }
   });
+
+  const winnerForm = useForm<WinnerFormData>({
+    resolver: zodResolver(winnerSchema),
+    defaultValues: { first: "", second: "", third: "" },
+  });
+
 
   useEffect(() => {
     if (tournament?.startDate) {
@@ -161,13 +179,11 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         toast({ title: "Registration Closed", description: "This tournament is not currently open for registration.", variant: "destructive" });
         return;
     }
-
-    if (tournament.entryFee && tournament.entryFee > 0) {
-        toast({
-            title: "Premium Tournament",
-            description: `Entry Fee: ${tournament.entryFee} ${tournament.currency || 'USD'}. Payment system not implemented in prototype. Joining for free for now.`,
-            duration: 5000,
-        });
+    
+    const entryFee = tournament.entryFee || 0;
+    if ((user.points || 0) < entryFee) {
+        toast({ title: "Insufficient Points", description: `You need ${entryFee} AE Points to join this tournament.`, variant: "destructive"});
+        return;
     }
 
     setIsJoining(true);
@@ -181,13 +197,12 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         contactEmail: data.contactEmail || undefined,
       };
       
-      const updatedParticipants = [...tournament.participants, newParticipant];
-      
-      await updateTournamentInFirestore(tournament.id, { participants: updatedParticipants });
+      await addParticipantToTournamentFirestore(tournament.id, newParticipant, entryFee);
+      await refreshUser();
       
       toast({
         title: "Successfully Registered!",
-        description: `You have joined ${tournament.name}.`,
+        description: `You have joined ${tournament.name}. ${entryFee > 0 ? `${entryFee} AE points deducted.` : ''}`,
       });
       setIsRegistrationOpen(false); // Close dialog on success
       registrationForm.reset();
@@ -240,6 +255,36 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     toast({ title: "Copied!", description: "Password copied to clipboard." });
   }
 
+  const handleEndTournament: SubmitHandler<WinnerFormData> = async (data) => {
+      if (!tournament || !isTournamentCreator || tournament.participants.length < 3) return;
+      setIsEnding(true);
+
+      const firstWinner = tournament.participants.find(p => p.id === data.first);
+      const secondWinner = tournament.participants.find(p => p.id === data.second);
+      const thirdWinner = tournament.participants.find(p => p.id === data.third);
+      
+      if (!firstWinner || !secondWinner || !thirdWinner) {
+          toast({ title: "Error", description: "Could not find all selected winners.", variant: "destructive"});
+          setIsEnding(false);
+          return;
+      }
+
+      try {
+          await awardTournamentWinners(tournament.id, {
+              first: firstWinner,
+              second: secondWinner,
+              third: thirdWinner
+          }, tournament.prizePool);
+          toast({ title: "Tournament Ended!", description: "Winners have been declared and prizes distributed." });
+          winnerForm.reset();
+      } catch (error: any) {
+          toast({ title: "Error", description: error.message || "Failed to end tournament.", variant: "destructive" });
+      } finally {
+          setIsEnding(false);
+      }
+  };
+
+
   const getStartDate = (): Date => {
     if (!tournament?.startDate) return new Date();
     return tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
@@ -282,7 +327,11 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     );
   }
 
-  const isPremium = tournament.entryFee && tournament.entryFee > 0;
+  const isFreeEntry = tournament.entryFee <= 0;
+
+  const canManageRoom = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Upcoming');
+  const canEndTournament = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Ongoing');
+
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;
 
@@ -304,9 +353,9 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
           <div className="flex items-center gap-2 mb-2">
             <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
-             {isPremium && (
+             {!isFreeEntry && (
                 <Badge variant="outline" className="bg-primary/90 text-primary-foreground border-primary-foreground/50 text-xs sm:text-sm px-2 sm:px-3 py-1">
-                    <DollarSign className="h-3 w-3 mr-1" /> Premium
+                    <Coins className="h-3 w-3 mr-1" /> {tournament.entryFee} AE Entry
                 </Badge>
             )}
           </div>
@@ -331,11 +380,12 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             <ScrollArea className="w-full whitespace-nowrap pb-2">
                 <TabsList className="inline-flex w-auto">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
+                {tournament.winners && tournament.winners.length > 0 && <TabsTrigger value="winners">Winners</TabsTrigger>}
                 <TabsTrigger value="bracket">Bracket</TabsTrigger>
                 <TabsTrigger value="participants">Participants ({tournament.participants.length})</TabsTrigger>
                 <TabsTrigger value="rules">Rules</TabsTrigger>
                 {tournament.registrationInstructions && <TabsTrigger value="howToJoin">How to Join</TabsTrigger>}
-                {isTournamentCreator && <TabsTrigger value="manageRoom">Manage Room</TabsTrigger>}
+                {isTournamentCreator && <TabsTrigger value="manage">Manage</TabsTrigger>}
                 </TabsList>
                 <ScrollBar orientation="horizontal" />
             </ScrollArea>
@@ -400,7 +450,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                         <Trophy className="h-6 w-6 text-primary mt-1 shrink-0" />
                         <div>
                             <p className="font-medium">Prize Pool</p>
-                            <p className="text-muted-foreground">{tournament.prizePool || "Not specified"}</p>
+                            <p className="text-muted-foreground flex items-center gap-1">{tournament.prizePool} <Coins className="h-4 w-4 text-yellow-500" /></p>
                         </div>
                     </div>
                     <div className="flex items-start space-x-3">
@@ -410,18 +460,56 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                             <p className="text-muted-foreground">{tournament.bracketType}</p>
                         </div>
                     </div>
-                    {isPremium && (
-                        <div className="flex items-start space-x-3">
-                            <DollarSign className="h-6 w-6 text-primary mt-1 shrink-0" />
-                            <div>
-                                <p className="font-medium">Entry Fee</p>
-                                <p className="text-muted-foreground">{tournament.entryFee} {tournament.currency}</p>
-                            </div>
+                    <div className="flex items-start space-x-3">
+                        <Coins className="h-6 w-6 text-primary mt-1 shrink-0" />
+                        <div>
+                            <p className="font-medium">Entry Fee</p>
+                            <p className="text-muted-foreground">{isFreeEntry ? 'Free' : `${tournament.entryFee} AE Points`}</p>
                         </div>
-                    )}
+                    </div>
                 </CardContent>
                 </Card>
             </TabsContent>
+            
+             {tournament.winners && tournament.winners.length > 0 && (
+                <TabsContent value="winners" className="mt-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Tournament Winners</CardTitle>
+                            <CardDescription>Congratulations to the top performers!</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-4">
+                                {tournament.winners.sort((a,b) => a.rank - b.rank).map((winner, index) => (
+                                     <div key={winner.participant.id} className={cn("flex items-center gap-4 p-4 rounded-lg border", 
+                                        winner.rank === 1 && "border-yellow-400 bg-yellow-400/10",
+                                        winner.rank === 2 && "border-slate-400 bg-slate-400/10",
+                                        winner.rank === 3 && "border-orange-500 bg-orange-500/10"
+                                     )}>
+                                        <Trophy className={cn("h-8 w-8", 
+                                            winner.rank === 1 && "text-yellow-400",
+                                            winner.rank === 2 && "text-slate-400",
+                                            winner.rank === 3 && "text-orange-500"
+                                        )} />
+                                        <Avatar className="h-12 w-12">
+                                            <AvatarImage src={winner.participant.avatarUrl} alt={winner.participant.name} />
+                                            <AvatarFallback>{winner.participant.name.substring(0, 2)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-grow">
+                                            <p className="font-bold text-lg">{winner.rank}{winner.rank === 1 ? 'st' : winner.rank === 2 ? 'nd' : 'rd'} Place</p>
+                                            <p className="text-muted-foreground">{winner.participant.name}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-lg flex items-center gap-1.5">{winner.prize} <Coins className="h-5 w-5 text-yellow-500" /></p>
+                                            <p className="text-muted-foreground text-sm">Prize</p>
+                                        </div>
+                                     </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            )}
 
             <TabsContent value="bracket" className="mt-6">
                 <Card>
@@ -506,43 +594,124 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             </TabsContent>
             
             {isTournamentCreator && (
-                <TabsContent value="manageRoom" className="mt-6">
+                <TabsContent value="manage" className="mt-6 space-y-6">
+                
+                {canManageRoom && (
                 <Card>
                     <CardHeader>
                     <CardTitle className="flex items-center gap-2"><KeyRound className="h-5 w-5 text-primary" /> Manage Room Details</CardTitle>
                     <CardDescription>Add the room ID and password here. This will only be visible to registered participants.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                    {canManageRoom ? (
                         <form onSubmit={handleUpdateRoomDetails} className="space-y-4">
                             <div>
                             <Label htmlFor="roomCode">Room Code / ID</Label>
-                            <Input id="roomCode" value={roomCode} onChange={e => setRoomCode(e.target.value)} disabled={isUpdatingRoom} />
+                            <Input id="roomCode" defaultValue={tournament.roomCode} onChange={e => setRoomCode(e.target.value)} disabled={isUpdatingRoom} />
                             </div>
                             <div>
                             <Label htmlFor="roomPassword">Room Password</Label>
-                            <Input id="roomPassword" value={roomPassword} onChange={e => setRoomPassword(e.target.value)} disabled={isUpdatingRoom} />
+                            <Input id="roomPassword" defaultValue={tournament.roomPassword} onChange={e => setRoomPassword(e.target.value)} disabled={isUpdatingRoom} />
                             </div>
                             <Button type="submit" disabled={isUpdatingRoom}>
                             {isUpdatingRoom ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                             {isUpdatingRoom ? "Saving..." : "Save Room Details"}
                             </Button>
                         </form>
-                    ) : (
-                        <div className="flex flex-col items-center text-center p-6 border-2 border-dashed rounded-lg bg-muted/50">
-                            <Lock className="h-12 w-12 text-muted-foreground mb-4" />
-                            <h3 className="font-semibold text-lg">Room Management Locked</h3>
-                            {timeUntilStart !== null && timeUntilStart > 0 ? (
-                                <p className="text-muted-foreground">
-                                    You can add room details {formatDistanceToNow(getStartDate(), { includeSeconds: false, addSuffix: true})}.
-                                </p>
-                            ) : (
-                                <p className="text-muted-foreground">The start time has passed, but management is still available.</p>
-                            )}
-                            
-                        </div>
-                    )}
                     </CardContent>
+                </Card>
+                )}
+
+                {canEndTournament && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" /> Declare Winners</CardTitle>
+                            <CardDescription>End the tournament and distribute the AE Points prize pool to the winners.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {tournament.participants.length >= 3 ? (
+                                <form onSubmit={winnerForm.handleSubmit(handleEndTournament)} className="space-y-4">
+                                     <div>
+                                        <Label>1st Place Winner</Label>
+                                        <Controller
+                                            name="first"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 1st place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.first && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.first.message}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>2nd Place Winner</Label>
+                                        <Controller
+                                            name="second"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 2nd place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.second && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.second.message}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>3rd Place Winner</Label>
+                                        <Controller
+                                            name="third"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 3rd place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.third && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.third.message}</p>}
+                                    </div>
+                                    <Button type="submit" disabled={isEnding}>
+                                        {isEnding && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                        End Tournament & Distribute Prizes
+                                    </Button>
+                                </form>
+                            ) : (
+                                <p className="text-muted-foreground">You need at least 3 participants to declare winners.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                <Card>
+                  <CardHeader><CardTitle>Admin Actions</CardTitle></CardHeader>
+                  <CardContent className="space-y-2">
+                      <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                              <Button variant="destructive" className="w-full" disabled={isDeleting}>
+                                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                  {isDeleting ? "Deleting..." : "Delete Tournament"}
+                              </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                              <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                  This action cannot be undone. This will permanently delete the tournament
+                                  "{tournament.name}" and all of its associated data.
+                              </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={handleDeleteTournament} disabled={isDeleting}>
+                                  {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                  Delete
+                              </AlertDialogAction>
+                              </AlertDialogFooter>
+                          </AlertDialogContent>
+                      </AlertDialog>
+                  </CardContent>
                 </Card>
                 </TabsContent>
             )}
@@ -568,9 +737,9 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 {tournament.status === "Completed" && "Tournament Ended"}
                 {tournament.status === "Cancelled" && "Tournament Cancelled"}
                 </CardTitle>
-                {isPremium && (
-                <CardDescription className="text-primary-foreground/90">
-                    Entry: {tournament.entryFee} {tournament.currency}
+                {!isFreeEntry && (
+                <CardDescription className="text-primary-foreground/90 flex items-center gap-1">
+                    Entry Fee: {tournament.entryFee} <Coins className="h-4 w-4" />
                 </CardDescription>
                 )}
             </CardHeader>
@@ -607,7 +776,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             <DialogContent>
                 <DialogHeader>
                 <DialogTitle>Register for {tournament.name}</DialogTitle>
-                <DialogDescription>Enter your in-game details to complete your registration.</DialogDescription>
+                <DialogDescription>Enter your in-game details to complete your registration. An entry fee of {tournament.entryFee} AE points will be deducted.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
                 <div>
@@ -685,42 +854,8 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             </Card>
             )}
 
-
-            {(isAdmin || isTournamentCreator) && tournament.status !== "Completed" && (
-            <Card>
-                <CardHeader><CardTitle>Admin Actions</CardTitle></CardHeader>
-                <CardContent className="space-y-2">
-                    <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                            <Button variant="destructive" className="w-full" disabled={isDeleting}>
-                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {isDeleting ? "Deleting..." : "Delete Tournament"}
-                            </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                            <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the tournament
-                                "{tournament.name}" and all of its associated data.
-                            </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDeleteTournament} disabled={isDeleting}>
-                                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                Delete
-                            </AlertDialogAction>
-                            </AlertDialogFooter>
-                        </AlertDialogContent>
-                    </AlertDialog>
-                </CardContent>
-            </Card>
-            )}
         </div>
         </div>
     </div>
   );
 }
-
-    

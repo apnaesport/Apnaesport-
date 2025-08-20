@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, Gamepad2, Eye, DollarSign } from "lucide-react";
+import { CalendarDays, Users, Gamepad2, Eye, Coins } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -51,7 +51,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
     }
   };
   
-  const isPremium = tournament.entryFee && tournament.entryFee > 0;
+  const isFreeEntry = !tournament.entryFee || tournament.entryFee <= 0;
 
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
@@ -74,9 +74,9 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             >
             {tournament.status}
             </Badge>
-            {isPremium && (
+            {!isFreeEntry && (
                 <Badge variant="outline" className="bg-primary/80 text-primary-foreground border-primary-foreground/50">
-                    <DollarSign className="h-3 w-3 mr-1" /> Premium
+                    <Coins className="h-3 w-3 mr-1" /> {tournament.entryFee} Entry
                 </Badge>
             )}
         </div>
@@ -104,9 +104,9 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
             <span>{tournament.participants.length} / {tournament.maxParticipants} Participants</span>
           </div>
            <div className="flex items-center text-muted-foreground">
-            <DollarSign className="h-4 w-4 mr-2 text-primary" />
+            <Coins className="h-4 w-4 mr-2 text-yellow-500" />
             <span>
-                {isPremium ? `${tournament.entryFee} ${tournament.currency || 'USD'} Entry` : "Free Entry"}
+                {tournament.prizePool > 0 ? `${tournament.prizePool} AE Points Prize Pool` : "No Prize Pool"}
             </span>
           </div>
         </div>

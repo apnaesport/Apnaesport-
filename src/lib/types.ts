@@ -17,12 +17,12 @@ export interface UserProfile extends Partial<FirebaseUser> {
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
   communityId?: string | null;
-  points: number; // Renamed to represent AE Points
+  points: number;
   wins?: number;
   kills?: number;
   deaths?: number;
-  apnaId?: string; // New Apna Esport ID
-  lastLogin?: Timestamp; // For daily login bonus
+  apnaId?: string;
+  lastLogin?: Timestamp;
 }
 
 export type Game = {
@@ -58,6 +58,12 @@ export type Match = {
   highlightUrl?: string;
 };
 
+export type Winner = {
+    rank: 1 | 2 | 3;
+    participant: Participant;
+    prize: number;
+};
+
 export type Tournament = {
   id: string;
   name: string;
@@ -71,7 +77,8 @@ export type Tournament = {
   endDate?: Date | Timestamp;
   participants: Participant[];
   maxParticipants: number;
-  prizePool?: string;
+  prizePool: number; // Changed to number for AE points
+  entryFee: number; // Changed to number for AE points
   rules?: string;
   registrationInstructions?: string;
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
@@ -81,12 +88,11 @@ export type Tournament = {
   organizerId?: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
-  entryFee?: number;
-  currency?: string;
   sponsorName?: string;
   sponsorLogoUrl?: string;
   roomCode?: string;
   roomPassword?: string;
+  winners?: Winner[];
 };
 
 export type TournamentFormDataUI = {
@@ -95,15 +101,12 @@ export type TournamentFormDataUI = {
   description: string;
   startDate: Date;
   maxParticipants: number;
-  prizePool?: string;
+  prizePool: number; // Changed to number
+  entryFee: number; // Changed to number
   bracketType: "Single Elimination" | "Double Elimination" | "Round Robin";
   rules?: string;
   registrationInstructions?: string;
-  bannerImageFile?: FileList;
-  bannerImageDataUri?: string;
   featured?: boolean;
-  entryFee?: number;
-  currency?: string;
   sponsorName?: string;
   sponsorLogoUrl?: string;
 };
@@ -129,8 +132,8 @@ export interface SiteSettings {
   basePlayerCount?: number;
   defaultCommunityLogoUrl?: string;
   defaultCommunityBannerUrl?: string;
-  showVideoSectionOnLanding?: boolean; // Added
-  landingPageVideoUrl?: string; // Added
+  showVideoSectionOnLanding?: boolean;
+  landingPageVideoUrl?: string;
   updatedAt?: Timestamp;
 }
 

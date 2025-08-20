@@ -18,12 +18,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, DollarSign, ShieldCheck } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 
 const tournamentSchema = z.object({
@@ -32,34 +33,27 @@ const tournamentSchema = z.object({
   description: z.string().min(20, "Description must be at least 20 characters.").max(500, "Description must be 500 characters or less."),
   startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
-  prizePool: z.string().optional(),
+  prizePool: z.coerce.number().min(0, "Prize pool must be 0 or more."),
+  entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more."),
   bracketType: z.enum(["Single Elimination", "Double Elimination", "Round Robin"], { required_error: "Bracket type is required."}),
   rules: z.string().optional(),
   registrationInstructions: z.string().optional(),
-  bannerImageFile: z.custom<FileList>().optional(), 
-  bannerImageDataUri: z.string().optional(),
-  entryFee: z.coerce.number().min(0, "Entry fee cannot be negative.").optional(),
-  currency: z.string().optional(),
   featured: z.boolean().optional(),
   sponsorName: z.string().optional(),
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
-}).refine(data => (data.entryFee && data.entryFee > 0) ? !!data.currency : true, {
-  message: "Currency is required if entry fee is set.",
-  path: ["currency"],
 });
 
 
 export default function CreateTournamentPage() {
-  const { user, isAdmin, loading: authLoading } = useAuth();
+  const { user, isAdmin, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
-  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
-  const defaultCurrency = "USD"; 
+  const TOURNAMENT_CREATION_FEE = 40;
 
   const form = useForm<TournamentFormDataUI>({
     resolver: zodResolver(tournamentSchema),
@@ -69,13 +63,11 @@ export default function CreateTournamentPage() {
       description: "",
       startDate: undefined,
       maxParticipants: 16,
-      prizePool: "",
+      prizePool: 0,
+      entryFee: 0,
       bracketType: "Single Elimination",
       rules: "",
       registrationInstructions: "",
-      bannerImageDataUri: "",
-      entryFee: 0,
-      currency: defaultCurrency,
       featured: false,
       sponsorName: "",
       sponsorLogoUrl: "",
@@ -105,27 +97,16 @@ export default function CreateTournamentPage() {
   }, [user, fetchGames]);
 
 
-  const handleBannerImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const dataUri = reader.result as string;
-        form.setValue("bannerImageDataUri", dataUri);
-        setBannerPreview(dataUri);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      form.setValue("bannerImageDataUri", "");
-      setBannerPreview(null);
-    }
-  };
-
   const onSubmit: SubmitHandler<TournamentFormDataUI> = async (data) => {
     if (!user) {
       toast({ title: "Authentication Error", description: "You must be logged in to create a tournament.", variant: "destructive" });
       return;
     }
+     if ((user.points || 0) < TOURNAMENT_CREATION_FEE) {
+        toast({ title: "Insufficient Points", description: `You need ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`, variant: "destructive" });
+        return;
+    }
+
     setIsSubmittingForm(true);
 
     const selectedGame = availableGames.find(g => g.id === data.gameId);
@@ -134,7 +115,6 @@ export default function CreateTournamentPage() {
       setIsSubmittingForm(false);
       return;
     }
-
     
     let finalStartDate = data.startDate;
     if (finalStartDate && finalStartDate.getHours() === 0 && finalStartDate.getMinutes() === 0 && finalStartDate.getSeconds() === 0) {
@@ -146,7 +126,7 @@ export default function CreateTournamentPage() {
         }
     }
 
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status'> & { startDate: Date } = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bannerImageUrl'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
@@ -154,32 +134,31 @@ export default function CreateTournamentPage() {
       description: data.description,
       startDate: finalStartDate, 
       maxParticipants: data.maxParticipants,
-      prizePool: data.prizePool,
+      prizePool: data.prizePool || 0,
       bracketType: data.bracketType,
       rules: data.rules,
       registrationInstructions: data.registrationInstructions,
-      bannerImageUrl: data.bannerImageDataUri || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       organizerId: user.uid,
       organizer: user.displayName || user.email || "Unknown Organizer",
       participants: [], 
       matches: [], 
       featured: data.featured || false,
       entryFee: data.entryFee || 0,
-      currency: data.entryFee && data.entryFee > 0 ? data.currency || defaultCurrency : undefined,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     };
     
     try {
-      const createdTournamentId = await addTournamentToFirestore(newTournamentData); 
+      const createdTournamentId = await addTournamentToFirestore(newTournamentData, user.uid); 
+      await refreshUser();
       toast({
         title: "Tournament Created!",
-        description: `"${data.name}" has been successfully created.`,
+        description: `"${data.name}" is live. ${TOURNAMENT_CREATION_FEE} AE Points were deducted.`,
       });
       router.push(`/tournaments/${createdTournamentId}`); 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating tournament:", error);
-      toast({ title: "Creation Failed", description: "Could not create tournament. Please try again.", variant: "destructive" });
+      toast({ title: "Creation Failed", description: error.message || "Could not create tournament.", variant: "destructive" });
     } finally {
       setIsSubmittingForm(false);
     }
@@ -218,6 +197,13 @@ export default function CreateTournamentPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <Alert>
+                <Coins className="h-4 w-4" />
+                <AlertTitle>Creation Fee: {TOURNAMENT_CREATION_FEE} AE Points</AlertTitle>
+                <AlertDescription>
+                    This amount will be deducted from your balance of {user.points} AE Points upon creation.
+                </AlertDescription>
+            </Alert>
             <div>
               <Label htmlFor="name">Tournament Name</Label>
               <Input id="name" {...form.register("name")} disabled={isSubmittingForm} />
@@ -244,24 +230,6 @@ export default function CreateTournamentPage() {
                 )}
               />
               {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
-            </div>
-            
-            <div>
-              <Label htmlFor="bannerImageFile">Tournament Banner Image</Label>
-              <Input 
-                id="bannerImageFile" 
-                type="file" 
-                accept="image/png, image/jpeg, image/webp" 
-                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
-                onChange={handleBannerImageChange} 
-                disabled={isSubmittingForm}
-              />
-              {bannerPreview && (
-                <div className="mt-4 relative w-full aspect-[16/9] rounded-md overflow-hidden border">
-                  <Image src={bannerPreview} alt="Banner preview" layout="fill" objectFit="cover" data-ai-hint="tournament banner preview" unoptimized />
-                </div>
-              )}
-               <p className="text-xs text-muted-foreground mt-1">Optional. Recommended aspect ratio 16:9. Max file size 2MB.</p>
             </div>
 
             <div>
@@ -366,44 +334,22 @@ export default function CreateTournamentPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                <div>
-                <Label htmlFor="entryFee">Entry Fee (0 for free)</Label>
+                <Label htmlFor="entryFee">Entry Fee (in AE Points)</Label>
                 <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="entryFee" type="number" step="0.01" {...form.register("entryFee")} className="pl-8" disabled={isSubmittingForm}/>
+                    <Coins className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-500" />
+                    <Input id="entryFee" type="number" step="1" {...form.register("entryFee")} className="pl-9" disabled={isSubmittingForm}/>
                 </div>
                 {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
               </div>
               <div>
-                <Label htmlFor="currency">Currency</Label>
-                <Controller
-                    name="currency"
-                    control={form.control}
-                    render={({ field }) => (
-                        <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value} 
-                            defaultValue={field.value} 
-                            disabled={isSubmittingForm || (form.watch("entryFee") || 0) === 0}
-                        >
-                            <SelectTrigger id="currency">
-                                <SelectValue placeholder="Select currency..."/>
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="USD">USD ($)</SelectItem>
-                                <SelectItem value="EUR">EUR (€)</SelectItem>
-                                <SelectItem value="GBP">GBP (£)</SelectItem>
-                                <SelectItem value="INR">INR (₹)</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    )}
-                />
-                {form.formState.errors.currency && <p className="text-destructive text-xs mt-1">{form.formState.errors.currency.message}</p>}
+                <Label htmlFor="prizePool">Total Prize Pool (AE Points)</Label>
+                 <div className="relative">
+                    <Coins className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-500" />
+                    <Input id="prizePool" type="number" step="1" {...form.register("prizePool")} className="pl-9" placeholder="e.g., 1000" disabled={isSubmittingForm} />
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">This amount will be increased by entry fees collected.</p>
+                {form.formState.errors.prizePool && <p className="text-destructive text-xs mt-1">{form.formState.errors.prizePool.message}</p>}
               </div>
-            </div>
-
-            <div>
-              <Label htmlFor="prizePool">Prize Pool (Optional)</Label>
-              <Input id="prizePool" {...form.register("prizePool")} placeholder="e.g., $1000, In-game items" disabled={isSubmittingForm} />
             </div>
 
             <div>
@@ -459,7 +405,7 @@ export default function CreateTournamentPage() {
             </Card>
 
 
-            <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading} className="w-full md:w-auto">
+            <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading || (user.points || 0) < TOURNAMENT_CREATION_FEE} className="w-full md:w-auto">
               {isSubmittingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" /> }
               {isSubmittingForm ? "Creating..." : "Create Tournament"}
             </Button>

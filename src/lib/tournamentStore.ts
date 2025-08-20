@@ -24,7 +24,7 @@ import {
   runTransaction
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -37,11 +37,16 @@ const COMMUNITIES_COLLECTION = "communities";
 const CREATORS_COLLECTION = "creators";
 const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 
+const TOURNAMENT_CREATION_FEE = 40;
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
     const startTime = tournament.startDate.getTime();
     const endTime = tournament.endDate ? tournament.endDate.getTime() : null;
+
+    if (tournament.status === 'Completed' || tournament.status === 'Cancelled') {
+        return tournament.status;
+    }
 
     if (endTime && now.getTime() > endTime) {
         return "Completed";
@@ -114,24 +119,46 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 
 // --- Tournament Functions ---
 
-export const addTournamentToFirestore = async (tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status'> & { startDate: Date }): Promise<string> => {
-  const { startDate, ...restData } = tournamentData;
-  const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
-    ...restData,
-    startDate: Timestamp.fromDate(startDate),
-    status: getTournamentStatus({ ...restData, startDate }),
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    matches: tournamentData.matches || [],
-    featured: tournamentData.featured || false,
-    entryFee: tournamentData.entryFee || 0,
-    currency: tournamentData.entryFee && tournamentData.entryFee > 0 ? tournamentData.currency || 'USD' : null,
-    bannerImageUrl: tournamentData.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
-    sponsorName: tournamentData.sponsorName || null,
-    sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
+export const addTournamentToFirestore = async (
+    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'bannerImageUrl' | 'currency'> & { startDate: Date }, 
+    userId: string
+): Promise<string> => {
+  
+  const userRef = doc(db, USERS_COLLECTION, userId);
+
+  return runTransaction(db, async (transaction) => {
+    const userDoc = await transaction.get(userRef);
+    if (!userDoc.exists() || (userDoc.data().points || 0) < TOURNAMENT_CREATION_FEE) {
+      throw new Error(`You need at least ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`);
+    }
+
+    const { startDate, ...restData } = tournamentData;
+    const game = await getGameByIdFromFirestore(tournamentData.gameId);
+    if (!game) throw new Error("Selected game not found.");
+
+    const newTournamentDocRef = doc(collection(db, TOURNAMENTS_COLLECTION));
+    const newTournamentData = {
+      ...restData,
+      startDate: Timestamp.fromDate(startDate),
+      status: getTournamentStatus({ ...restData, startDate, status: 'Upcoming' }),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      matches: tournamentData.matches || [],
+      featured: tournamentData.featured || false,
+      entryFee: tournamentData.entryFee || 0,
+      prizePool: tournamentData.prizePool || 0,
+      bannerImageUrl: game.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
+      sponsorName: tournamentData.sponsorName || null,
+      sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
+    };
+
+    transaction.set(newTournamentDocRef, newTournamentData);
+    transaction.update(userRef, { points: increment(-TOURNAMENT_CREATION_FEE) });
+
+    return newTournamentDocRef.id;
   });
- return docRef.id;
 };
+
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [];
@@ -177,7 +204,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
       entryFee: data.entryFee || 0,
-      currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
+      prizePool: data.prizePool || 0,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
@@ -230,7 +257,7 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       updatedAt: data.updatedAt as Timestamp,
       matches: matches,
       entryFee: data.entryFee || 0,
-      currency: data.currency || (data.entryFee > 0 ? 'USD' : null),
+      prizePool: data.prizePool || 0,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
     } as Tournament;
@@ -294,28 +321,79 @@ export const deleteTournamentFromFirestore = async (tournamentId: string): Promi
   await deleteDoc(doc(db, TOURNAMENTS_COLLECTION, tournamentId));
 };
 
-export const addParticipantToTournamentFirestore = async (tournamentId: string, participant: Participant): Promise<void> => {
-  const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-  const tournamentSnap = await getDoc(tournamentRef);
+export const addParticipantToTournamentFirestore = async (tournamentId: string, participant: Participant, fee: number): Promise<void> => {
+  return runTransaction(db, async (transaction) => {
+    const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+    const userRef = doc(db, USERS_COLLECTION, participant.id);
 
-  if (tournamentSnap.exists()) {
+    const tournamentSnap = await transaction.get(tournamentRef);
+    const userSnap = await transaction.get(userRef);
+
+    if (!tournamentSnap.exists()) throw new Error("Tournament not found");
+    if (!userSnap.exists()) throw new Error("User not found");
+
     const tournamentData = tournamentSnap.data() as Tournament;
-    const currentParticipants = tournamentData.participants || [];
+    const userData = userSnap.data() as UserProfile;
 
-    if (currentParticipants.find(p => p.id === participant.id)) {
+    if (tournamentData.participants.find(p => p.id === participant.id)) {
       throw new Error("Participant already registered");
     }
-    if (currentParticipants.length >= tournamentData.maxParticipants) {
+    if (tournamentData.participants.length >= tournamentData.maxParticipants) {
       throw new Error("Tournament is full");
     }
-    await updateDoc(tournamentRef, {
-        participants: arrayUnion(participant),
-        updatedAt: serverTimestamp()
+    if (userData.points < fee) {
+      throw new Error("Insufficient AE Points to join.");
+    }
+    
+    // Deduct points from user
+    transaction.update(userRef, { points: increment(-fee) });
+    // Add participant to tournament and increase prize pool
+    transaction.update(tournamentRef, {
+      participants: arrayUnion(participant),
+      prizePool: increment(fee),
+      updatedAt: serverTimestamp()
     });
-  } else {
-    throw new Error("Tournament not found");
-  }
+  });
 };
+
+export const awardTournamentWinners = async (
+    tournamentId: string, 
+    winners: { first: Participant, second: Participant, third: Participant },
+    prizePool: number
+): Promise<void> => {
+    const batch = writeBatch(db);
+
+    const prizeDistribution = {
+        first: Math.floor(prizePool * 0.5),
+        second: Math.floor(prizePool * 0.3),
+        third: Math.floor(prizePool * 0.2)
+    };
+    
+    const finalWinners: Winner[] = [];
+
+    // First Place
+    const firstRef = doc(db, USERS_COLLECTION, winners.first.id);
+    batch.update(firstRef, { points: increment(prizeDistribution.first) });
+    finalWinners.push({ rank: 1, participant: winners.first, prize: prizeDistribution.first });
+    
+    // Second Place
+    const secondRef = doc(db, USERS_COLLECTION, winners.second.id);
+    batch.update(secondRef, { points: increment(prizeDistribution.second) });
+    finalWinners.push({ rank: 2, participant: winners.second, prize: prizeDistribution.second });
+
+    // Third Place
+    const thirdRef = doc(db, USERS_COLLECTION, winners.third.id);
+    batch.update(thirdRef, { points: increment(prizeDistribution.third) });
+    finalWinners.push({ rank: 3, participant: winners.third, prize: prizeDistribution.third });
+
+    // Update tournament doc
+    const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+    batch.update(tournamentRef, { status: "Completed", winners: finalWinners });
+
+    await batch.commit();
+};
+
+
 
 // --- Notification Functions ---
 
