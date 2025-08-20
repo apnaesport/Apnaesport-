@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -23,6 +23,8 @@ export function AdSenseBlock({
 }: AdSenseBlockProps) {
   const pathname = usePathname();
   const { resolvedTheme } = useTheme();
+  const adContainerRef = useRef<HTMLDivElement>(null);
+
 
   const adKey = useMemo(() => {
     // Re-render the ad when the path or theme changes
@@ -30,17 +32,22 @@ export function AdSenseBlock({
   }, [pathname, resolvedTheme]);
 
   useEffect(() => {
-    try {
-      // @ts-ignore
-      (window.adsbygoogle = window.adsbygoogle || []).push({});
-    } catch (err) {
-      console.error("AdSense error:", err);
+    // Only push the ad if the container has rendered and has a width.
+    // This prevents the "availableWidth=0" error.
+    if (adContainerRef.current && adContainerRef.current.offsetWidth > 0) {
+      try {
+        // @ts-ignore
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch (err) {
+        console.error("AdSense error:", err);
+      }
     }
-  }, [adKey]); // Dependency on the key ensures the ad reloads on navigation
+  }, [adKey, adContainerRef]); // Re-run when the key or ref changes.
 
   return (
     <div
       key={adKey}
+      ref={adContainerRef}
       className={cn(
         "ad-container flex items-center justify-center bg-muted/50 text-muted-foreground",
         "min-h-[90px] w-full",
@@ -49,7 +56,7 @@ export function AdSenseBlock({
     >
       <ins
         className="adsbygoogle"
-        style={{ display: 'block', ...style }}
+        style={{ display: 'block', width: '100%', ...style }}
         data-ad-client={AD_CLIENT_ID}
         data-ad-slot={adSlot}
         data-ad-format={adFormat}
