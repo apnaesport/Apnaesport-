@@ -215,19 +215,20 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   };
 
   const handleDeleteTournament = async () => {
-    if (!tournament) return;
+    if (!tournament || !user) return;
     setIsDeleting(true);
     try {
-      await deleteTournamentAction(tournament.id);
+      await deleteTournamentAction(tournament, user.uid);
+      await refreshUser(); // Refresh organizer's points after penalty
       toast({
         title: "Tournament Deleted",
-        description: `"${tournament.name}" has been removed.`,
+        description: `"${tournament.name}" has been removed. Player entry fees refunded.`,
         variant: "destructive",
       });
       router.push("/tournaments");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting tournament:", error);
-      toast({ title: "Delete Failed", description: "Could not delete tournament.", variant: "destructive"});
+      toast({ title: "Delete Failed", description: error.message || "Could not delete tournament.", variant: "destructive"});
     } finally {
       setIsDeleting(false);
     }
@@ -274,7 +275,8 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
               first: firstWinner,
               second: secondWinner,
               third: thirdWinner
-          }, tournament.prizePool);
+          });
+          await refreshUser(); // Refresh organizer points
           toast({ title: "Tournament Ended!", description: "Winners have been declared and prizes distributed." });
           winnerForm.reset();
       } catch (error: any) {
@@ -715,7 +717,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                               <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                               <AlertDialogDescription>
                                   This action cannot be undone. This will permanently delete the tournament
-                                  "{tournament.name}" and all of its associated data.
+                                  "{tournament.name}" and all of its associated data. Player entry fees will be refunded, and you will be charged a 5 AE Point penalty.
                               </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -875,5 +877,3 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     </div>
   );
 }
-
-    

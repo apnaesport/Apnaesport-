@@ -38,6 +38,8 @@ const CREATORS_COLLECTION = "creators";
 const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 
 const TOURNAMENT_CREATION_FEE = 40;
+const TOURNAMENT_DELETION_PENALTY = 5;
+const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
@@ -317,8 +319,25 @@ export const updateTournamentInFirestore = async (tournamentId: string, tourname
   await updateDoc(docRef, updateData);
 };
 
-export const deleteTournamentFromFirestore = async (tournamentId: string): Promise<void> => {
-  await deleteDoc(doc(db, TOURNAMENTS_COLLECTION, tournamentId));
+export const deleteTournamentFromFirestore = async (tournament: Tournament, organizerId: string): Promise<void> => {
+    return runTransaction(db, async (transaction) => {
+        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
+        const organizerRef = doc(db, USERS_COLLECTION, organizerId);
+
+        // 1. Penalize the organizer
+        transaction.update(organizerRef, { points: increment(-TOURNAMENT_DELETION_PENALTY) });
+        
+        // 2. Refund all participants
+        if (tournament.participants && tournament.participants.length > 0 && tournament.entryFee > 0) {
+            for (const participant of tournament.participants) {
+                const participantRef = doc(db, USERS_COLLECTION, participant.id);
+                transaction.update(participantRef, { points: increment(tournament.entryFee) });
+            }
+        }
+        
+        // 3. Delete the tournament document
+        transaction.delete(tournamentRef);
+    });
 };
 
 export const addParticipantToTournamentFirestore = async (tournamentId: string, participant: Participant, fee: number): Promise<void> => {
@@ -358,39 +377,57 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
 
 export const awardTournamentWinners = async (
     tournamentId: string, 
-    winners: { first: Participant, second: Participant, third: Participant },
-    prizePool: number
+    winners: { first: Participant, second: Participant, third: Participant }
 ): Promise<void> => {
-    const batch = writeBatch(db);
+    return runTransaction(db, async (transaction) => {
+        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+        const tournamentDoc = await transaction.get(tournamentRef);
 
-    const prizeDistribution = {
-        first: Math.floor(prizePool * 0.5),
-        second: Math.floor(prizePool * 0.3),
-        third: Math.floor(prizePool * 0.2)
-    };
-    
-    const finalWinners: Winner[] = [];
+        if (!tournamentDoc.exists()) {
+            throw new Error("Tournament not found.");
+        }
+        const tournamentData = tournamentDoc.data() as Tournament;
 
-    // First Place
-    const firstRef = doc(db, USERS_COLLECTION, winners.first.id);
-    batch.update(firstRef, { points: increment(prizeDistribution.first) });
-    finalWinners.push({ rank: 1, participant: winners.first, prize: prizeDistribution.first });
-    
-    // Second Place
-    const secondRef = doc(db, USERS_COLLECTION, winners.second.id);
-    batch.update(secondRef, { points: increment(prizeDistribution.second) });
-    finalWinners.push({ rank: 2, participant: winners.second, prize: prizeDistribution.second });
+        const prizePool = tournamentData.prizePool || 0;
+        const prizeDistribution = {
+            first: Math.floor(prizePool * 0.5),
+            second: Math.floor(prizePool * 0.3),
+            third: Math.floor(prizePool * 0.2)
+        };
+        const totalWinnerPrize = prizeDistribution.first + prizeDistribution.second + prizeDistribution.third;
+        
+        const finalWinners: Winner[] = [];
 
-    // Third Place
-    const thirdRef = doc(db, USERS_COLLECTION, winners.third.id);
-    batch.update(thirdRef, { points: increment(prizeDistribution.third) });
-    finalWinners.push({ rank: 3, participant: winners.third, prize: prizeDistribution.third });
+        // Award winners
+        const firstRef = doc(db, USERS_COLLECTION, winners.first.id);
+        transaction.update(firstRef, { points: increment(prizeDistribution.first) });
+        finalWinners.push({ rank: 1, participant: winners.first, prize: prizeDistribution.first });
+        
+        const secondRef = doc(db, USERS_COLLECTION, winners.second.id);
+        transaction.update(secondRef, { points: increment(prizeDistribution.second) });
+        finalWinners.push({ rank: 2, participant: winners.second, prize: prizeDistribution.second });
 
-    // Update tournament doc
-    const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-    batch.update(tournamentRef, { status: "Completed", winners: finalWinners });
+        const thirdRef = doc(db, USERS_COLLECTION, winners.third.id);
+        transaction.update(thirdRef, { points: increment(prizeDistribution.third) });
+        finalWinners.push({ rank: 3, participant: winners.third, prize: prizeDistribution.third });
 
-    await batch.commit();
+        // Calculate and award organizer's cut
+        const totalEntryFees = (tournamentData.entryFee || 0) * tournamentData.participants.length;
+        const remainingAfterPrizes = totalEntryFees - totalWinnerPrize;
+        
+        if (remainingAfterPrizes > 0 && tournamentData.organizerId) {
+            const platformCut = Math.floor(remainingAfterPrizes * PLATFORM_FEE_PERCENTAGE);
+            const organizerCut = remainingAfterPrizes - platformCut;
+
+            if (organizerCut > 0) {
+                const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
+                transaction.update(organizerRef, { points: increment(organizerCut) });
+            }
+        }
+
+        // Update tournament doc
+        transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
+    });
 };
 
 
@@ -886,4 +923,3 @@ export const getTournamentsForGame = (gameId: string) => getTournamentsFromFires
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
 
-    
