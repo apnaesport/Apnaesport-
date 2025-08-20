@@ -63,8 +63,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Google AdSense */}
+        <Script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID || 'ca-pub-3791001029407994'}`}
+          crossOrigin="anonymous"
+          strategy="afterInteractive"
+        />
         {/* Google Tag Manager */}
-        <Script id="google-tag-manager-head">
+        <Script id="google-tag-manager-head" strategy="afterInteractive">
           {`
             (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
             new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
@@ -76,8 +83,8 @@ export default function RootLayout({
         {/* End Google Tag Manager */}
         
         {/* Google tag (gtag.js) */}
-        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-WQ4H7M6M3F"></Script>
-        <Script id="google-analytics">
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-WQ4H7M6M3F" strategy="afterInteractive"></Script>
+        <Script id="google-analytics" strategy="afterInteractive">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}

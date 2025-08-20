@@ -15,6 +15,7 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { AdSenseBlock } from '@/components/ads/AdSenseBlock';
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -89,6 +90,11 @@ export default function DashboardPageClient({ stats: initialStats, allUsers, fea
                     <StatsCard key={stat.title} item={stat} />
                 ))}
                 </div>
+            </section>
+            
+            {/* AdSense Block */}
+            <section className="flex justify-center">
+                <AdSenseBlock adSlot="YOUR_DASHBOARD_AD_SLOT_ID" className="w-full max-w-4xl" />
             </section>
 
             <section>
