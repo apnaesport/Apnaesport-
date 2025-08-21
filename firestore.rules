@@ -87,19 +87,24 @@ service cloud.firestore {
         
         // Complex update logic for tournaments.
         allow update: if isSignedIn() && (
-            // Admins can update anything.
+            // Condition 1: Admins can update anything.
             isAdmin() ||
             
-            // Tournament organizers can update specific non-critical fields.
+            // Condition 2: Tournament organizers can update specific non-critical fields.
+            // They cannot change the organizer, game, prize pool, entry fee, or participants list directly.
             (isTournamentOrganizer(tournamentId) && 
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'prizePool', 'entryFee', 'participants'])) ||
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'prizePool', 'entryFee', 'participants', 'winners'])) ||
 
-            // Any user can join a tournament by adding themselves to the participants list,
-            // which also correctly increments the prize pool. This is a transactional update.
+            // Condition 3: Any signed-in user can join a tournament.
+            // This is a secure transactional check for adding a participant.
             (
+                // The new participants array must be exactly one larger than the old one.
                 request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
-                request.resource.data.participants.get(request.resource.data.participants.size() - 1).id == request.auth.uid &&
+                // The new participant being added must be the currently authenticated user.
+                request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
+                // The prize pool must be correctly incremented by the entry fee.
                 request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee &&
+                // No other fields besides participants, prizePool, and the update timestamp can be changed.
                 request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
             )
         );
