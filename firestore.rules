@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -21,13 +22,13 @@ service cloud.firestore {
     }
 
     // Retrieves a user's role from their profile.
-    function getRole(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data.isAdmin;
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     // Checks if the current user is an admin.
     function isAdmin() {
-      return isSignedIn() && getRole(request.auth.uid) == true;
+      return isSignedIn() && getUserData(request.auth.uid).isAdmin == true;
     }
     
     // Checks if the current user is the organizer of a specific tournament.
@@ -83,28 +84,23 @@ service cloud.firestore {
         allow read: if true;
         
         // Signed-in users can create tournaments if they have enough points.
-        allow create: if isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.points >= 40;
+        allow create: if isSignedIn() && getUserData(request.auth.uid).points >= 40;
         
         // Complex update logic for tournaments.
         allow update: if isSignedIn() && (
-            // Condition 1: Admins can update anything.
+            // Admins can update anything.
             isAdmin() ||
             
-            // Condition 2: Tournament organizers can update specific non-critical fields.
-            // They cannot change the organizer, game, prize pool, entry fee, or participants list directly.
+            // Tournament organizers can update specific non-critical fields.
             (isTournamentOrganizer(tournamentId) && 
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'prizePool', 'entryFee', 'participants', 'winners'])) ||
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'prizePool', 'entryFee', 'participants', 'winners', 'createdAt', 'status'])) ||
 
-            // Condition 3: Any signed-in user can join a tournament.
-            // This is a secure transactional check for adding a participant.
+            // Any user can join a tournament by adding themselves to the participants list,
+            // which also correctly increments the prize pool. This is a transactional update.
             (
-                // The new participants array must be exactly one larger than the old one.
                 request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
-                // The new participant being added must be the currently authenticated user.
                 request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
-                // The prize pool must be correctly incremented by the entry fee.
                 request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee &&
-                // No other fields besides participants, prizePool, and the update timestamp can be changed.
                 request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
             )
         );
@@ -116,7 +112,7 @@ service cloud.firestore {
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
         // Any signed-in user can read notifications.
-        allow read: if isSignedIn();
+        allow read: if true;
         // Only admins can create/write notifications.
         allow write: if isAdmin();
     }

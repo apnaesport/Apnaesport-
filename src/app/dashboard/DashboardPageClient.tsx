@@ -19,38 +19,25 @@ import { AdSenseBlock } from '@/components/ads/AdSenseBlock';
 
 interface DashboardPageClientProps {
     stats: StatItem[];
-    allUsers: UserProfile[];
     featuredTournament?: Tournament;
     liveTournaments: Tournament[];
     allGames: Game[];
 }
 
-export default function DashboardPageClient({ stats: initialStats, allUsers, featuredTournament, liveTournaments, allGames }: DashboardPageClientProps) {
+export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames }: DashboardPageClientProps) {
     const { user } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const adContainerRef = useRef<HTMLDivElement>(null);
 
-    const currentUserRanking = useMemo(() => {
-        if (!user || allUsers.length === 0) {
-            return { rank: 'N/A', points: 0 };
-        }
-        const sortedUsers = [...allUsers].sort((a, b) => (b.points || 0) - (a.points || 0));
-        const userIndex = sortedUsers.findIndex(p => p.uid === user.uid);
-        if (userIndex !== -1) {
-            return { rank: userIndex + 1, points: sortedUsers[userIndex].points || 0 };
-        }
-        return { rank: 'N/A', points: user?.points || 0 };
-    }, [user, allUsers]);
-
     const stats = useMemo(() => {
         const userRankStat: StatItem = { 
-            title: "Your Rank (Overall)", 
-            value: currentUserRanking.rank === 'N/A' ? 'N/A' : `#${currentUserRanking.rank}`, 
+            title: "Your AE Points", 
+            value: user?.points ?? 0,
             icon: "BarChart3", 
-            change: `${currentUserRanking.points} points` 
+            change: `Your Rank: N/A` // Rank calculation removed for performance
         };
         return [...initialStats, userRankStat];
-    }, [initialStats, currentUserRanking]);
+    }, [initialStats, user]);
     
     
     const recommendedTournaments: Tournament[] = [];

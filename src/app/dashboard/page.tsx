@@ -6,11 +6,13 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, LucideIconName, SiteSettings, UserProfile } from "@/lib/types";
-import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
+import { getTournamentsFromFirestore, getGamesFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore, getUserProfileFromFirestore } from "@/lib/tournamentStore";
 import { Heart, Megaphone } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import DashboardPageClient from "./DashboardPageClient";
+import { auth } from "@/lib/firebase";
+import { get } from "http";
 
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
@@ -31,7 +33,7 @@ export default async function DashboardPage() {
   const [tournaments, games, users, settings] = await Promise.all([
     getTournamentsFromFirestore(),
     getGamesFromFirestore(),
-    getAllUsersFromFirestore(),
+    getAllUsersFromFirestore(), // This is still needed for Total Players stat
     getSiteSettingsFromFirestore(),
   ]);
 
@@ -69,7 +71,7 @@ export default async function DashboardPage() {
   ];
   
   const serializableGames = games.map(serializeObjectWithTimestamps);
-  const serializableUsers = users.map(serializeObjectWithTimestamps);
+  // We no longer pass all users to the client, as it's inefficient.
   const serializableFeaturedTournament = featuredTournament ? serializeObjectWithTimestamps(featuredTournament) : undefined;
   const serializableLiveTournaments = liveTournaments.map(serializeObjectWithTimestamps);
 
@@ -77,7 +79,6 @@ export default async function DashboardPage() {
   return (
      <DashboardPageClient 
         stats={stats}
-        allUsers={serializableUsers}
         featuredTournament={serializableFeaturedTournament}
         liveTournaments={serializableLiveTournaments}
         allGames={serializableGames}
