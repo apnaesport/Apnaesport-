@@ -15,7 +15,7 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AdSenseBlock } from '@/components/ads/AdSenseBlock';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -79,9 +79,9 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                 </div>
             </section>
             
-            {/* AdSense Block */}
+            {/* Adsterra Block */}
             <section className="flex justify-center">
-                <AdSenseBlock className="w-full max-w-4xl" />
+                <AdsterraBlock className="w-full max-w-4xl" />
             </section>
 
             <section>

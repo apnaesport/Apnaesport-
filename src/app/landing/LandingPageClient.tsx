@@ -7,7 +7,7 @@ import { LandingCTAButtons } from "@/components/layout/LandingCTAButtons";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdSenseBlock } from '@/components/ads/AdSenseBlock';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
 
 export default function LandingPageClient() {
   const { settings, loadingSettings } = useSiteSettings();
@@ -34,9 +34,9 @@ export default function LandingPageClient() {
         </div>
       </section>
 
-      {/* AdSense Block: Leaderboard below hero */}
+      {/* Adsterra Block: Leaderboard below hero */}
       <section className="py-10 px-4 relative z-10 flex justify-center">
-        <AdSenseBlock className="w-full max-w-4xl" />
+        <AdsterraBlock className="w-full max-w-4xl" />
       </section>
       
       {!loadingSettings && settings?.showVideoSectionOnLanding && settings.landingPageVideoUrl && (
@@ -89,9 +89,9 @@ export default function LandingPageClient() {
           <LandingCTAButtons />
         </div>
       </section>
-       {/* AdSense Block: Above footer */}
+       {/* Adsterra Block: Above footer */}
       <section className="py-10 px-4 relative z-10 flex justify-center">
-        <AdSenseBlock className="w-full max-w-5xl" />
+        <AdsterraBlock className="w-full max-w-5xl" />
       </section>
       <footer className="py-8 px-4 border-t border-white/10 text-center text-muted-foreground text-sm z-10 relative">
         <p>&copy; {new Date().getFullYear()} Apna Esport. All rights reserved.</p>

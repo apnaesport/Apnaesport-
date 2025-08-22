@@ -13,7 +13,7 @@ import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { AdSenseBlock } from '@/components/ads/AdSenseBlock';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
 
 const NotificationIcon = ({ type, className }: { type: NotificationType, className?: string }) => {
   const iconProps = { className: cn("h-5 w-5", className) };
@@ -127,9 +127,9 @@ export default function UserNotificationsPage() {
         </Card>
       )}
 
-      {/* AdSense Block at the bottom */}
+      {/* Adsterra Block at the bottom */}
       <section className="flex justify-center mt-8">
-        <AdSenseBlock className="w-full max-w-4xl" />
+        <AdsterraBlock className="w-full max-w-4xl" />
       </section>
     </>
   );

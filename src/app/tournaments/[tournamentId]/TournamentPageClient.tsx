@@ -50,7 +50,7 @@ import { PageTitle } from "@/components/shared/PageTitle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { AdSenseBlock } from "@/components/ads/AdSenseBlock";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 const registrationSchema = z.object({
   gameUsername: z.string().min(2, "In-game username is required."),
@@ -379,9 +379,9 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
           </div>
         </div>
       </div>
-       {/* AdSense Block */}
+       {/* Adsterra Block */}
         <section className="flex justify-center">
-            <AdSenseBlock className="w-full max-w-5xl" />
+            <AdsterraBlock className="w-full max-w-5xl" />
         </section>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">

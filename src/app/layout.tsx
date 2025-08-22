@@ -32,9 +32,6 @@ export async function generateMetadata(): Promise<Metadata> {
     keywords: keywords,
     verification: {
       google: "TSL2LK5j2gIj78fs8OcZ-GlswqLrFURzzeFiV88pYho",
-      other: {
-        "google-adsense-account": "ca-pub-3791001029407994",
-      }
     },
     icons: {
       icon: settings?.faviconUrl || "/favicon.ico", 
@@ -63,13 +60,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Google AdSense */}
-        <Script
-          async
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3791001029407994`}
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
         {/* Google Tag Manager */}
         <Script id="google-tag-manager-head" strategy="afterInteractive">
           {`
