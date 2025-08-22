@@ -57,7 +57,7 @@ export function RegisterForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Send verification email
+      // Send verification email before creating the Firestore doc
       await sendEmailVerification(user);
 
       await updateFirebaseProfile(user, { displayName: values.name });
@@ -65,22 +65,24 @@ export function RegisterForm() {
       const newApnaId = await generateApnaId();
 
       const userIsAdmin = values.email === ADMIN_EMAIL;
+      
+      // Create user profile in Firestore
       await setDoc(doc(db, "users", user.uid), {
         uid: user.uid,
         displayName: values.name,
         email: values.email,
         photoURL: null,
         isAdmin: userIsAdmin,
-        emailVerified: user.emailVerified,
-        createdAt: serverTimestamp() as Timestamp,
-        updatedAt: serverTimestamp() as Timestamp,
+        emailVerified: user.emailVerified, // This will be false initially
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
         bio: "",
         favoriteGameIds: [],
         streamingChannelUrl: "",
         points: 10, // Signup bonus
         communityId: null,
-        apnaId: newApnaId, // Assign new Apna ID
-        lastLogin: serverTimestamp() as Timestamp, // Set initial login time
+        apnaId: newApnaId,
+        lastLogin: serverTimestamp(),
       });
 
       toast({
@@ -93,8 +95,12 @@ export function RegisterForm() {
         ),
         duration: 10000,
       });
+
+      // Sign out the user immediately after registration.
+      // They must log in again after verifying their email.
       await auth.signOut();
       router.push("/auth/login");
+
     } catch (error: any) {
       let errorMessage = "An unexpected error occurred. Please try again.";
        if (error.code === "auth/email-already-in-use") {
