@@ -34,6 +34,8 @@ const settingsSchema = z.object({
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
   defaultCommunityLogoUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   defaultCommunityBannerUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  adsEnabled: z.boolean().optional(),
+  adsterraNativeAdKey: z.string().optional(),
 });
 
 
@@ -48,6 +50,8 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   basePlayerCount: 0,
   defaultCommunityLogoUrl: "",
   defaultCommunityBannerUrl: "",
+  adsEnabled: false,
+  adsterraNativeAdKey: "",
 };
 
 function AdminSettingsPageContent() {
@@ -97,16 +101,9 @@ function AdminSettingsPageContent() {
     setIsSaving(true);
     try {
       const settingsToSave = {
-        siteName: data.siteName,
-        siteDescription: data.siteDescription,
-        maintenanceMode: data.maintenanceMode,
-        allowRegistrations: data.allowRegistrations,
-        faviconUrl: data.faviconUrl,
-        downloadAppLink: data.downloadAppLink,
+        ...data,
         defaultTheme: theme,
         basePlayerCount: Number(data.basePlayerCount) || 0,
-        defaultCommunityLogoUrl: data.defaultCommunityLogoUrl,
-        defaultCommunityBannerUrl: data.defaultCommunityBannerUrl,
       };
 
       await saveSiteSettingsToFirestore(settingsToSave);
@@ -271,12 +268,30 @@ function AdminSettingsPageContent() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Shield className="mr-2 h-5 w-5 text-primary" /> Security &amp; API Settings 
+            <DollarSign className="mr-2 h-5 w-5 text-primary" /> Monetization Settings
           </CardTitle>
-          <CardDescription>Manage API keys and security configurations.</CardDescription>
+          <CardDescription>Manage ads and other monetization features.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-muted-foreground">API key management and advanced security settings will appear here. (Placeholder)</p>
+           <Controller
+            name="adsEnabled"
+            control={form.control}
+            render={({ field }) => (
+              <div className="flex items-center justify-between p-2 border rounded-md">
+                <div>
+                  <Label htmlFor="adsEnabledSwitch" className="font-medium">Enable Ads</Label>
+                  <p className="text-sm text-muted-foreground">Globally enable or disable all Adsterra ad blocks.</p>
+                </div>
+                <Switch id="adsEnabledSwitch" checked={field.value} onCheckedChange={field.onChange} disabled={isSaving}/>
+              </div>
+            )}
+          />
+           <div className="space-y-2">
+            <Label htmlFor="adsterraNativeAdKey">Adsterra Native Ad Key</Label>
+            <Input id="adsterraNativeAdKey" {...form.register("adsterraNativeAdKey")} placeholder="Enter your Adsterra ad key..." disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">This key will be used for all native banner ad blocks on the site.</p>
+            {form.formState.errors.adsterraNativeAdKey && <p className="text-destructive text-xs mt-1">{form.formState.errors.adsterraNativeAdKey.message as string}</p>}
+          </div>
         </CardContent>
       </Card>
 

@@ -5,26 +5,31 @@ import React, { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import Script from 'next/script';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 
 interface AdsterraBlockProps {
   className?: string;
   style?: React.CSSProperties;
 }
 
-// NOTE: Replace this with your actual Adsterra Native Banner key
-const ADSTERRA_KEY = "d4a961623b0286b24578b978e80651da";
-
 export function AdsterraBlock({ className, style }: AdsterraBlockProps) {
   const adContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const { settings, loadingSettings } = useSiteSettings();
+
+  const adsEnabled = settings?.adsEnabled ?? false;
+  const adKey = settings?.adsterraNativeAdKey ?? "";
 
   // The key forces the component to re-render on navigation, which helps
   // some ad scripts re-initialize properly.
-  const componentKey = `${pathname}-${ADSTERRA_KEY}`;
+  const componentKey = `${pathname}-${adKey}`;
 
   useEffect(() => {
-    // This effect ensures the ad script is re-evaluated if it exists on the window object.
-    // Some ad networks need this to properly load ads on client-side navigation.
+    if (loadingSettings || !adsEnabled || !adKey) {
+        if (adContainerRef.current) adContainerRef.current.innerHTML = '';
+        return;
+    }
+
     const container = adContainerRef.current;
     if (container) {
       // Create a new script element to re-trigger the ad loading process
@@ -33,7 +38,7 @@ export function AdsterraBlock({ className, style }: AdsterraBlockProps) {
       
       const adOptions = `
         atOptions = {
-          'key' : '${ADSTERRA_KEY}',
+          'key' : '${adKey}',
           'format' : 'iframe',
           'height' : 90,
           'width' : 728,
@@ -44,14 +49,18 @@ export function AdsterraBlock({ className, style }: AdsterraBlockProps) {
 
       const invokeScript = document.createElement('script');
       invokeScript.type = 'text/javascript';
-      invokeScript.src = `//www.profitabledisplaynetwork.com/${ADSTERRA_KEY}/invoke.js`;
+      invokeScript.src = `//www.profitabledisplaynetwork.com/${adKey}/invoke.js`;
       
       // Clear previous ads and append new scripts
       container.innerHTML = '';
       container.appendChild(script);
       container.appendChild(invokeScript);
     }
-  }, [componentKey]); // Re-run when the key changes
+  }, [componentKey, adsEnabled, adKey, loadingSettings]);
+
+  if (loadingSettings || !adsEnabled || !adKey) {
+    return null; // Don't render anything if ads are disabled or key is missing
+  }
 
   return (
     <div

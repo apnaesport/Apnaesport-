@@ -569,8 +569,9 @@ export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | nul
 
 export const saveSiteSettingsToFirestore = async (settingsData: Partial<SiteSettings>): Promise<void> => {
   const docRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
+  const { id, ...dataToSave } = settingsData;
   await setDoc(docRef, {
-    ...settingsData,
+    ...dataToSave,
     updatedAt: serverTimestamp(),
   }, { merge: true });
 };

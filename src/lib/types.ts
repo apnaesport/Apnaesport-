@@ -144,6 +144,8 @@ export interface SiteSettings {
   showVideoSectionOnLanding?: boolean;
   landingPageVideoUrl?: string;
   updatedAt?: Timestamp;
+  adsEnabled?: boolean;
+  adsterraNativeAdKey?: string;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
