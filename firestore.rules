@@ -11,17 +11,12 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Checks if the requesting user is the owner of a specific document.
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-
     // A more secure check to ensure the user is updating their own document.
     function isSelf(userId) {
-        return request.auth.uid == userId;
+        return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Retrieves a user's role from their profile.
+    // Retrieves a user's data from their profile.
     function getUserData(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
@@ -38,31 +33,33 @@ service cloud.firestore {
 
     // Checks if the current user is the owner of a specific community.
     function isCommunityOwner(communityId) {
-      return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
+      let ownerId = get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId;
+      return isSignedIn() && request.auth.uid == ownerId;
     }
-
-    // --- Default Security: Deny all access unless explicitly allowed ---
+    
+    // --- Default Security Rule ---
+    // By default, deny all read and write access to all documents.
+    // This ensures that we must explicitly grant permission for any action.
     match /{document=**} {
       allow read, write: if false;
     }
 
     // --- User Profiles (`users`) ---
     match /users/{userId} {
-      // Anyone can read public profile data (e.g., for leaderboards or participant lists).
-      // `read` covers both `get` (single document) and `list` (collection query).
+      // Allow anyone to read public user profiles.
+      // This is needed for displaying participant names, leaderboards, etc.
       allow read: if true;
 
-      // A user can create their own profile document.
-      // - Must match the authenticated user's ID.
-      // - Cannot make themselves an admin or set points/community on creation.
+      // Allow a user to create their own profile document.
+      // They must be creating a document that matches their own UID.
+      // They cannot grant themselves admin privileges or set custom points on creation.
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
-                    // Ensure points can only be set to the default signup bonus on creation.
                     && request.resource.data.points == 10
                     && !('communityId' in request.resource.data);
       
-      // A user can update their own profile, but cannot change their role, points, or other critical fields.
-      // An admin can update any profile, but not demote themselves if they are the primary admin.
+      // Allow a user to update their own profile, but not critical fields.
+      // Admins can update any profile but cannot change their own admin status.
       allow update: if (isSelf(userId) && !('isAdmin' in request.resource.data || 'points' in request.resource.data || 'apnaId' in request.resource.data)) || 
                      (isAdmin() && (userId != request.auth.uid || !('isAdmin' in request.resource.data)));
       
@@ -72,7 +69,7 @@ service cloud.firestore {
 
     // --- Games (`games`) ---
     match /games/{gameId} {
-      // Game data is public and readable by anyone.
+      // Game data is public and must be readable by everyone for browsing.
       allow read: if true;
       // Only admins can create, update, or delete games.
       allow write: if isAdmin();
@@ -80,10 +77,11 @@ service cloud.firestore {
     
     // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
-        // Tournament data is public and readable by anyone.
+        // Tournament data is public and must be readable by everyone.
+        // This is critical for the dashboard and tournament list pages.
         allow read: if true;
         
-        // Signed-in users can create tournaments if they have enough points.
+        // A signed-in user can create a tournament if they have enough points.
         allow create: if isSignedIn() && getUserData(request.auth.uid).points >= 40;
         
         // Complex update logic for tournaments.
@@ -95,8 +93,8 @@ service cloud.firestore {
             (isTournamentOrganizer(tournamentId) && 
               !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'prizePool', 'entryFee', 'participants', 'winners', 'createdAt', 'status'])) ||
 
-            // Any user can join a tournament by adding themselves to the participants list,
-            // which also correctly increments the prize pool. This is a transactional update.
+            // A signed-in user can join a tournament by adding themselves to the participants list.
+            // This is a secure transactional update that also increments the prize pool.
             (
                 request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
                 request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
@@ -105,13 +103,13 @@ service cloud.firestore {
             )
         );
         
-        // Organizer or admin can delete a tournament.
+        // An organizer or an admin can delete a tournament.
         allow delete: if isSignedIn() && (isAdmin() || isTournamentOrganizer(tournamentId));
     }
     
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        // Any signed-in user can read notifications.
+        // Notifications are public for all users to see announcements.
         allow read: if true;
         // Only admins can create/write notifications.
         allow write: if isAdmin();
@@ -119,7 +117,7 @@ service cloud.firestore {
     
     // --- Site Settings (`settings`) ---
     match /settings/global {
-        // Site settings are public and readable by anyone.
+        // Site settings are public and must be readable by everyone.
         allow read: if true;
         // Only admins can change site settings.
         allow write: if isAdmin();
@@ -135,14 +133,14 @@ service cloud.firestore {
     
     // --- Communities (`communities`) ---
     match /communities/{communityId} {
-      // Anyone can view a community's public page.
+      // Community pages are public and readable by anyone.
       allow read: if true;
 
       // A signed-in user can create a community, setting themself as the owner.
       allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
-      // Community owner or a platform admin can update details.
-      // Other users can join, which only increments member count.
+      // Community owners or admins can update details.
+      // Other users can join, which only increments the member count.
       allow update: if isSignedIn() && (
         (isAdmin() || isCommunityOwner(communityId)) ||
         (
@@ -151,27 +149,26 @@ service cloud.firestore {
         )
       );
       
-      // Only the community owner or a platform admin can delete the community.
+      // Only the community owner or an admin can delete the community.
       allow delete: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
       
       // --- Community Members (`members`) ---
       match /members/{userId} {
-        // Anyone can see who is in the community.
+        // Allow anyone to see the list of community members.
         allow read: if true;
-        // A user can join a community (create their own member doc).
+        // A user can create their own member document when joining.
         allow create: if isSelf(userId);
-        // A user can leave a community (delete their own member doc).
-        // The community owner can also remove (kick) members.
+        // A user can leave, or an owner can kick a member.
         allow delete: if isSelf(userId) || isCommunityOwner(communityId);
-        // Roles and other details can only be updated by the community owner or an admin.
+        // Only the owner or an admin can update member details (e.g., change roles).
         allow update: if isAdmin() || isCommunityOwner(communityId);
       }
 
       // --- Community Announcements (`announcements`) ---
       match /announcements/{announcementId} {
-        // Announcements are public.
+        // Announcements are public within a community.
         allow read: if true;
-        // Only the owner can create, update, or delete announcements.
+        // Only the owner can write (create, update, delete) announcements.
         allow write: if isCommunityOwner(communityId);
       }
     }
@@ -182,24 +179,23 @@ service cloud.firestore {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // An admin can read any application. A user can read their own.
       allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
-      // Only admins can update status or delete applications.
+      // Only admins can update or delete applications.
       allow update, delete: if isAdmin();
     }
     
     match /creators/{creatorId} {
-      // Anyone can view the list of approved creators.
+      // Creator profiles are public.
       allow read: if true;
       // Only admins can create (approve) or delete creator profiles.
       allow create, delete: if isAdmin();
-      // An admin can update any field.
-      // A signed-in user can vote securely.
+      // An admin can update any field. A user can vote securely.
       allow update: if isSignedIn() && (
         isAdmin() ||
         (
           request.resource.data.votes == resource.data.votes + 1 &&
-          // Ensure the user is not already in the votedBy array.
+          // Ensure the user has not already voted.
           !resource.data.votedBy.hasAny([request.auth.uid]) && 
-          // Ensure only votes and votedBy are being changed.
+          // Ensure only 'votes' and 'votedBy' fields are being changed.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy', 'updatedAt'])
         )
       );
