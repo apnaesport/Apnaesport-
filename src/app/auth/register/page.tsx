@@ -16,13 +16,15 @@ export default function RegisterPage() {
   const redirectPath = searchParams.get("redirect") || "/dashboard";
 
   useEffect(() => {
+    // If the user is already logged in, redirect them.
     if (!loading && user) {
       router.replace(redirectPath);
     }
   }, [user, loading, router, redirectPath]);
 
-  if (loading || user) { // Also show loading if user object exists, to wait for redirect
-    return <LoadingSpinner fullPage text="Checking session..." />;
+  // Show a loading spinner while checking auth state or if user is logged in and waiting for redirect
+  if (loading || user) {
+    return <LoadingSpinner fullPage text="Verifying session..." />;
   }
   
   return (

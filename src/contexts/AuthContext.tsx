@@ -45,10 +45,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (firebaseUser) {
       // Don't allow login if email is not verified
       if (!firebaseUser.emailVerified) {
+        // This is a critical case. The user is technically logged into Firebase Auth,
+        // but our app doesn't consider them logged in. We sign them out to prevent a stuck state.
+        await auth.signOut();
         setUserState(null);
         setIsAdmin(false);
         setLoading(false);
-        // Do not automatically sign out here, let login form handle it
         return;
       }
 
