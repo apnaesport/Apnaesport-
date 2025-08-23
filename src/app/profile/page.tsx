@@ -44,6 +44,7 @@ const statusColors: Record<CreatorApplication['status'], string> = {
     Pending: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
     Approved: "bg-green-500/20 text-green-500 border-green-500/30",
     Rejected: "bg-red-500/20 text-red-500 border-red-500/30",
+    Archived: "bg-gray-500/20 text-muted-foreground border-gray-500/30",
 };
 
 export default function ProfilePage() {

@@ -27,7 +27,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
-       if (!firebaseUser.emailVerified) {
+      if (!firebaseUser.emailVerified) {
         await auth.signOut();
         setUser(null);
         setLoading(false);
