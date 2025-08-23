@@ -1,5 +1,4 @@
 
-
 import {
   collection,
   doc,
@@ -41,6 +40,7 @@ const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
 const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
+const DAILY_LOGIN_BONUS = 5;
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
@@ -505,6 +505,29 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
     } as UserProfile;
   }
   return null;
+};
+
+// Helper function to check if a day has passed
+const isNewDay = (lastLogin: Timestamp | Date | undefined): boolean => {
+    if (!lastLogin) return true;
+    const lastLoginDate = lastLogin instanceof Date ? lastLogin : lastLogin.toDate();
+    const today = new Date();
+    
+    // Check if the last login was before the start of today
+    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    return lastLoginDate.getTime() < startOfToday.getTime();
+};
+
+export const checkForDailyLoginBonus = async (user: UserProfile): Promise<boolean> => {
+    if (isNewDay(user.lastLogin)) {
+        const userRef = doc(db, USERS_COLLECTION, user.uid);
+        await updateDoc(userRef, {
+            points: increment(DAILY_LOGIN_BONUS),
+            lastLogin: serverTimestamp()
+        });
+        return true; // Bonus was awarded
+    }
+    return false; // Not a new day, no bonus awarded
 };
 
 

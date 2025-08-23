@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import { checkForDailyLoginBonus } from "@/lib/tournamentStore";
+import { useToast } from "@/hooks/use-toast";
+import { Coins } from "lucide-react";
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -25,9 +28,28 @@ interface DashboardPageClientProps {
 }
 
 export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames }: DashboardPageClientProps) {
-    const { user } = useAuth();
+    const { user, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
+    const { toast } = useToast();
     const adContainerRef = useRef<HTMLDivElement>(null);
+
+    // This effect handles the daily login bonus check when the user visits the dashboard.
+    useEffect(() => {
+        const checkBonus = async () => {
+            if (user) {
+                const bonusAwarded = await checkForDailyLoginBonus(user);
+                if (bonusAwarded) {
+                    toast({
+                        title: ( <div className="flex items-center gap-2"><Coins className="h-5 w-5 text-yellow-500" /><span>+5 AE Points!</span></div>),
+                        description: "Your daily login bonus has been added.",
+                    });
+                    await refreshUser(); // Refresh user data to show new points total
+                }
+            }
+        };
+        checkBonus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.uid]); // Rerun only if the user ID changes
 
     const stats = useMemo(() => {
         const userRankStat: StatItem = { 
