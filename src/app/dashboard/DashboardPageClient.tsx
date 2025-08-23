@@ -32,11 +32,13 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     const { settings, loadingSettings } = useSiteSettings();
     const { toast } = useToast();
     const adContainerRef = useRef<HTMLDivElement>(null);
+    const hasCheckedBonus = useRef(false);
 
     // This effect handles the daily login bonus check when the user visits the dashboard.
     useEffect(() => {
         const checkBonus = async () => {
-            if (user) {
+            if (user && !hasCheckedBonus.current) {
+                hasCheckedBonus.current = true; // Prevent re-checking on re-renders
                 const bonusAwarded = await checkForDailyLoginBonus(user);
                 if (bonusAwarded) {
                     toast({
@@ -49,7 +51,7 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
         };
         checkBonus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.uid]); // Rerun only if the user ID changes
+    }, [user]); 
 
     const stats = useMemo(() => {
         const userRankStat: StatItem = { 

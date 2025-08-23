@@ -5,37 +5,31 @@ import type { User as FirebaseUser } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import { generateApnaId } from "@/lib/tournamentStore";
-import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
   logout: () => Promise<void>;
-  setUser: (user: UserProfile | null) => void;
   refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUserState] = useState<UserProfile | null>(null);
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
-  const { toast } = useToast();
 
-  const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
+  const handleUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
+      // Only proceed if email is verified. This is crucial.
       if (!firebaseUser.emailVerified) {
-        // This handles users who have registered but not verified their email.
-        // We treat them as logged out from the app's perspective.
-        setUserState(null);
-        setIsAdmin(false);
+        await auth.signOut(); // Ensure user is logged out if email is not verified
+        setUser(null);
         setLoading(false);
         return;
       }
@@ -44,79 +38,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
-        const userProfileData = userDocSnap.data() as UserProfile;
-        setUserState(userProfileData);
-        setIsAdmin(userProfileData.isAdmin || false);
+        setUser(userDocSnap.data() as UserProfile);
       } else {
-        // This case is rare but handles when a user is in Auth but not Firestore.
-        // It creates a Firestore profile for them.
-        console.warn("User exists in Auth but not Firestore. Creating profile now.");
-        const userIsAdmin = firebaseUser.email === ADMIN_EMAIL;
-        const newApnaId = await generateApnaId();
-        const newProfile: UserProfile = {
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName || "New User",
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL || null,
-          isAdmin: userIsAdmin,
-          emailVerified: firebaseUser.emailVerified,
-          createdAt: serverTimestamp() as Timestamp,
-          bio: "",
-          favoriteGameIds: [],
-          streamingChannelUrl: "",
-          communityId: null,
-          points: 10, // Initial signup bonus
-          apnaId: newApnaId,
-          lastLogin: serverTimestamp() as Timestamp,
+        // This is a fallback and shouldn't normally happen with the new register flow.
+        const newUserProfile: UserProfile = {
+            uid: firebaseUser.uid,
+            displayName: firebaseUser.displayName,
+            email: firebaseUser.email,
+            photoURL: firebaseUser.photoURL,
+            isAdmin: false,
+            emailVerified: firebaseUser.emailVerified,
+            points: 10,
+            createdAt: serverTimestamp() as Timestamp,
         };
-        await setDoc(userDocRef, newProfile);
-        setUserState(newProfile);
-        setIsAdmin(newProfile.isAdmin || false);
+        await setDoc(userDocRef, newUserProfile);
+        setUser(newUserProfile);
       }
     } else {
-      // No Firebase user, so clear local state
-      setUserState(null);
-      setIsAdmin(false);
+      setUser(null);
     }
     setLoading(false);
   }, []);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-      fetchAndSetUser(fbUser);
-    });
-    return () => unsubscribe();
-  }, [fetchAndSetUser]);
 
   const logout = useCallback(async () => {
-    setLoading(true);
     await auth.signOut();
-    setUserState(null);
-    setIsAdmin(false);
-    setLoading(false);
+    setUser(null);
     router.push("/auth/login");
   }, [router]);
-  
-  const setContextUser = useCallback((updatedUser: UserProfile | null) => {
-    setUserState(updatedUser);
-    if (updatedUser) {
-      setIsAdmin(updatedUser.isAdmin || false);
-    } else {
-      setIsAdmin(false);
-    }
-  }, []);
 
   const refreshUser = useCallback(async () => {
-    const currentUser = auth.currentUser;
-    if (currentUser) {
-      setLoading(true); // Indicate loading state
-      await currentUser.reload(); // Reload Firebase Auth user data
-      await fetchAndSetUser(auth.currentUser); 
+    const firebaseUser = auth.currentUser;
+    if (firebaseUser) {
+        await firebaseUser.reload();
+        await handleUser(firebaseUser);
     }
-  }, [fetchAndSetUser]);
+  }, [handleUser]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, handleUser);
+    return () => unsubscribe();
+  }, [handleUser]);
+  
+  const isAdmin = user?.isAdmin || false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, logout, setUser: setContextUser, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

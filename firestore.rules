@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,42 +6,39 @@ service cloud.firestore {
 
     // --- Helper Functions ---
 
-    // Checks if a user is signed in. Does NOT check for email verification here,
-    // as unverified users need to be able to create their own profile.
+    // Checks if a user is signed in and their email is verified.
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && request.auth.token.email_verified == true;
     }
 
-    // Checks if the requesting user's email is verified.
-    // This is used for actions AFTER the user has a profile.
-    function isVerified() {
-      return isSignedIn() && request.auth.token.email_verified == true;
-    }
-
-    // A secure check to ensure the user is updating their own document.
-    function isSelf(userId) {
+    // Checks if the requesting user is the owner of a specific document.
+    function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
+    
+    // A more secure check to ensure the document ID matches the authenticated user's ID.
+    function isSelf(userId) {
+        return request.auth.uid == userId;
+    }
 
-    // Retrieves user data.
+    // Retrieves a user's data from their profile.
     function getUserData(userId) {
       return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
     // Checks if the current user is an admin.
     function isAdmin() {
-      // Use isVerified() here to ensure only verified users can be admins.
-      return isVerified() && getUserData(request.auth.uid).isAdmin == true;
+      return isSignedIn() && getUserData(request.auth.uid).isAdmin == true;
     }
-
+    
     // Checks if the current user is the organizer of a specific tournament.
     function isTournamentOrganizer(tournamentId) {
-      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
+        return isSignedIn() && get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
     }
 
     // Checks if the current user is the owner of a specific community.
     function isCommunityOwner(communityId) {
-      return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
+      return isSignedIn() && get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
     }
 
     // --- Default Security: Deny all access unless explicitly allowed ---
@@ -51,32 +49,21 @@ service cloud.firestore {
     // --- User Profiles (`users`) ---
     match /users/{userId} {
       // Anyone can read public profile data (e.g., for leaderboards or participant lists).
-      // `read` covers both `get` (single document) and `list` (collection query).
       allow read: if true;
 
-      // A user can create their own profile document.
-      // This is the only place we use `isSignedIn()` instead of `isVerified()`.
-      allow create: if isSelf(userId)
+      // A user can create their own profile document, ONLY when signing up.
+      // This rule ensures the document ID matches the authenticated user's ID.
+      // Allows setting default points and ensures isAdmin is false.
+      allow create: if isSelf(userId) 
                     && request.resource.data.isAdmin == false
-                    && request.resource.data.points == 10
-                    && !('communityId' in request.resource.data)
-                    && request.resource.data.uid == userId;
+                    && request.resource.data.points == 10;
       
-      // A user can update their own profile, but with restrictions.
-      allow update: if isVerified() && (
-        // Admins can update any profile.
-        isAdmin() ||
-        // A user can update their own profile...
-        (isSelf(userId) &&
-          // but they cannot change these protected fields.
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'createdAt', 'uid'])
-        ) ||
-        // Allow updating only lastLogin and points for the daily bonus.
-        (isSelf(userId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin', 'points', 'updatedAt']) &&
-          request.resource.data.points == resource.data.points + 5 // Enforce daily bonus increment
-        )
-      );
+      // A user can update their own non-critical profile info.
+      // An admin can update any profile.
+      // Daily login bonus update is also permitted.
+      allow update: if (isSelf(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'communityId'])) || 
+                     (isSelf(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin', 'points', 'updatedAt']) && request.resource.data.points == resource.data.points + 5) ||
+                     isAdmin();
       
       // Only an admin can delete a user account.
       allow delete: if isAdmin();
@@ -95,19 +82,13 @@ service cloud.firestore {
         // Tournament data is public and readable by anyone.
         allow read: if true;
         
-        // Verified users can create tournaments if they have enough points.
-        allow create: if isVerified() && getUserData(request.auth.uid).points >= 40;
+        // Signed-in users can create tournaments if they have enough points.
+        allow create: if isSignedIn() && getUserData(request.auth.uid).points >= 40;
         
         // Complex update logic for tournaments.
-        allow update: if isVerified() && (
-            // Admins can update anything.
-            isAdmin() ||
-            
-            // Tournament organizers can update specific non-critical fields.
-            (isTournamentOrganizer(tournamentId) && 
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'createdAt', 'status'])) ||
-
-            // Any user can join a tournament by adding themselves to the participants list.
+        allow update: if isSignedIn() && (
+            isAdmin() || 
+            (isTournamentOrganizer(tournamentId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'participants', 'winners', 'createdAt', 'status'])) ||
             (
                 request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
                 request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
@@ -116,12 +97,12 @@ service cloud.firestore {
         );
         
         // Organizer or admin can delete a tournament.
-        allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
+        allow delete: if isSignedIn() && (isAdmin() || isTournamentOrganizer(tournamentId));
     }
     
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        // Any verified user can read notifications.
+        // Public announcements are readable by anyone.
         allow read: if true;
         // Only admins can create/write notifications.
         allow write: if isAdmin();
@@ -137,8 +118,8 @@ service cloud.firestore {
     
     // --- Sponsorships (`sponsorships`) ---
     match /sponsorships/{sponsorshipId} {
-      // Any verified user can create a request.
-      allow create: if isVerified();
+      // Any signed-in user can create a request.
+      allow create: if isSignedIn();
       // Only admins can read, update status, or delete requests.
       allow read, update, delete: if isAdmin();
     }
@@ -148,21 +129,15 @@ service cloud.firestore {
       // Anyone can view a community's public page.
       allow read: if true;
 
-      // A verified user can create a community, setting themself as the owner.
-      allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
+      // A signed-in user can create a community, setting themself as the owner.
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
       
       // Community owner or a platform admin can update details.
-      // Other users can join, which only increments member count.
-      allow update: if isVerified() && (
-        (isAdmin() || isCommunityOwner(communityId)) ||
-        (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && 
-          request.resource.data.memberCount == resource.data.memberCount + 1
-        )
-      );
+      // Joining/leaving logic is handled by member documents.
+      allow update: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
       
       // Only the community owner or a platform admin can delete the community.
-      allow delete: if isVerified() && (isAdmin() || isCommunityOwner(communityId));
+      allow delete: if isSignedIn() && (isAdmin() || isCommunityOwner(communityId));
       
       // --- Community Members (`members`) ---
       match /members/{userId} {
@@ -171,8 +146,7 @@ service cloud.firestore {
         // A user can join a community (create their own member doc).
         allow create: if isSelf(userId);
         // A user can leave a community (delete their own member doc).
-        // The community owner can also remove (kick) members.
-        allow delete: if isSelf(userId) || isCommunityOwner(communityId);
+        allow delete: if isSelf(userId);
         // Roles and other details can only be updated by the community owner or an admin.
         allow update: if isAdmin() || isCommunityOwner(communityId);
       }
@@ -189,9 +163,9 @@ service cloud.firestore {
     // --- Creator Hub (`creatorApplications` and `creators`) ---
     match /creatorApplications/{applicationId} {
       // A user can create their own application.
-      allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       // An admin can read any application. A user can read their own.
-      allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
       // Only admins can update status or delete applications.
       allow update, delete: if isAdmin();
     }
@@ -203,7 +177,7 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       // An admin can update any field.
       // A signed-in user can vote securely.
-      allow update: if isVerified() && (
+      allow update: if isSignedIn() && (
         isAdmin() ||
         (
           request.resource.data.votes == resource.data.votes + 1 &&

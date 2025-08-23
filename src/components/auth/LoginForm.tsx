@@ -22,6 +22,7 @@ import { auth } from "@/lib/firebase";
 import Link from "next/link";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -31,6 +32,7 @@ const formSchema = z.object({
 export function LoginForm() {
   const router = useRouter();
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showVerificationAlert, setShowVerificationAlert] = useState(false);
@@ -62,7 +64,7 @@ export function LoginForm() {
             variant: "destructive",
         });
     } finally {
-      await auth.signOut();
+      await auth.signOut(); // Ensure user is fully logged out to retry login later
       setIsLoading(false);
     }
   };
@@ -77,16 +79,18 @@ export function LoginForm() {
       if (!userCredential.user.emailVerified) {
         setUnverifiedUser(userCredential.user);
         setShowVerificationAlert(true);
-        // Do not sign out here immediately, let the user decide to resend.
         setIsLoading(false);
         return;
       }
 
+      // Instead of an immediate redirect, we now refresh the context
+      // The useEffect on the login page will handle the redirect once the user state is confirmed
+      await refreshUser(); 
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
-      router.push("/dashboard");
+      // The redirect is handled by the page component now
 
     } catch (error: any) {
       let errorMessage = "An unexpected error occurred. Please try again.";
