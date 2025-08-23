@@ -265,7 +265,7 @@ export default function CreateTournamentPage() {
                              <Select onValueChange={field.onChange} value={field.value} disabled={!selectedGame.mapNames || selectedGame.mapNames.length === 0}>
                                 <SelectTrigger id="mapName"><SelectValue placeholder="Select a map..."/></SelectTrigger>
                                 <SelectContent>
-                                     <SelectItem value="">Any / Not Specified</SelectItem>
+                                     <SelectItem value="any">Any / Not Specified</SelectItem>
                                     {selectedGame.mapNames?.map(map => <SelectItem key={map} value={map}>{map}</SelectItem>)}
                                 </SelectContent>
                             </Select>
