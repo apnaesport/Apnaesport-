@@ -265,7 +265,7 @@ export interface Creator {
     communityName?: string | null;
 }
 
-export type CreatorApplicationStatus = "Pending" | "Approved" | "Rejected";
+export type CreatorApplicationStatus = "Pending" | "Approved" | "Rejected" | "Archived";
 
 export interface CreatorApplication {
     id: string;

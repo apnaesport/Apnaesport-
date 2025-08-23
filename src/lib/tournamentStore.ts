@@ -985,7 +985,28 @@ export const getCreatorById = async (creatorId: string): Promise<Creator | null>
 }
 
 export const deleteCreatorFromFirestore = async (creatorId: string): Promise<void> => {
-    await deleteDoc(doc(db, CREATORS_COLLECTION, creatorId));
+    const batch = writeBatch(db);
+
+    // Delete the creator document
+    const creatorRef = doc(db, CREATORS_COLLECTION, creatorId);
+    batch.delete(creatorRef);
+    
+    // Find and archive the corresponding 'Approved' application
+    const appsQuery = query(
+        collection(db, CREATOR_APPLICATIONS_COLLECTION),
+        where("userId", "==", creatorId),
+        where("status", "==", "Approved"),
+        limit(1)
+    );
+    
+    const appSnapshot = await getDocs(appsQuery);
+    if (!appSnapshot.empty) {
+        const appDoc = appSnapshot.docs[0];
+        const appRef = doc(db, CREATOR_APPLICATIONS_COLLECTION, appDoc.id);
+        batch.update(appRef, { status: "Archived" });
+    }
+
+    await batch.commit();
 };
 
 // Real-time listeners for creators
