@@ -3,7 +3,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createUserWithEmailAndPassword, updateProfile as updateFirebaseProfile, sendEmailVerification } from "firebase/auth";
-import { doc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -19,12 +18,13 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { auth, db, ADMIN_EMAIL } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { generateApnaId } from "@/lib/tournamentStore";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -54,46 +54,33 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
     try {
+      // Step 1: Create the user in Firebase Authentication
       const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
       const user = userCredential.user;
 
-      // Send verification email before creating the Firestore doc
+      // Step 2: Update their display name in Firebase Auth
+      await updateFirebaseProfile(user, { displayName: values.name });
+
+      // Step 3: Send the verification email
       await sendEmailVerification(user);
 
-      await updateFirebaseProfile(user, { displayName: values.name });
-      
-      const newApnaId = await generateApnaId();
-
-      const userIsAdmin = values.email === ADMIN_EMAIL;
-      
-      // Create user profile in Firestore
-      await setDoc(doc(db, "users", user.uid), {
-        uid: user.uid,
-        displayName: values.name,
-        email: values.email,
-        photoURL: null,
-        isAdmin: userIsAdmin,
-        emailVerified: user.emailVerified, // This will be false initially
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        bio: "",
-        favoriteGameIds: [],
-        streamingChannelUrl: "",
-        points: 10, // Signup bonus
-        communityId: null,
-        apnaId: newApnaId,
-        lastLogin: serverTimestamp(),
-      });
+      // The Firestore document will be created upon first login after verification.
 
       toast({
-        title: "Registration Successful! Please Verify Your Email.",
-        description: (
-          <div>
-            <p>A verification email has been sent to your inbox. You've also received 10 AE Points!</p>
-            <p className="font-bold mt-2">Please check your spam folder and mark it as "not spam".</p>
+        title: (
+          <div className="flex items-center gap-2">
+            <MailCheck className="h-5 w-5 text-green-500" />
+            <span>Please Verify Your Email!</span>
           </div>
         ),
-        duration: 10000,
+        description: (
+          <div className="space-y-2">
+            <p>Registration successful. We've sent a secure verification link to your email.</p>
+            <p className="font-bold">Important: Please check your spam folder.</p>
+            <p>You have been awarded 10 AE Points, which will be available after you log in.</p>
+          </div>
+        ),
+        duration: 15000, // Keep toast on screen longer
       });
 
       // Sign out the user immediately after registration.
@@ -121,6 +108,12 @@ export function RegisterForm() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Alert variant="default" className="border-primary/30 bg-primary/10">
+          <AlertTitle className="font-semibold">Secure Registration</AlertTitle>
+          <AlertDescription className="text-muted-foreground">
+              Your information is protected. We will send a verification link to your email to activate your account.
+          </AlertDescription>
+        </Alert>
         <FormField
           control={form.control}
           name="name"

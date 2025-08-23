@@ -8,6 +8,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { auth, db } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
+import { generateApnaId } from "@/lib/tournamentStore";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -24,23 +25,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  const handleUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
+  const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
-      // Only proceed if email is verified. This is crucial.
-      if (!firebaseUser.emailVerified) {
-        await auth.signOut(); // Ensure user is logged out if email is not verified
+       if (!firebaseUser.emailVerified) {
+        await auth.signOut();
         setUser(null);
         setLoading(false);
         return;
       }
-
+      
       const userDocRef = doc(db, "users", firebaseUser.uid);
       const userDocSnap = await getDoc(userDocRef);
 
       if (userDocSnap.exists()) {
-        setUser(userDocSnap.data() as UserProfile);
+        const userProfile = userDocSnap.data() as UserProfile;
+        // Update last login time
+        await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
+        setUser(userProfile);
       } else {
-        // This is a fallback and shouldn't normally happen with the new register flow.
+        // This is a new, verified user. Create their profile.
+        const newApnaId = await generateApnaId();
         const newUserProfile: UserProfile = {
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName,
@@ -50,6 +54,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             emailVerified: firebaseUser.emailVerified,
             points: 10,
             createdAt: serverTimestamp() as Timestamp,
+            updatedAt: serverTimestamp() as Timestamp,
+            lastLogin: serverTimestamp() as Timestamp,
+            apnaId: newApnaId,
+            bio: "",
+            favoriteGameIds: [],
         };
         await setDoc(userDocRef, newUserProfile);
         setUser(newUserProfile);
@@ -70,14 +79,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const firebaseUser = auth.currentUser;
     if (firebaseUser) {
         await firebaseUser.reload();
-        await handleUser(firebaseUser);
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        if (userDocSnap.exists()) {
+          setUser(userDocSnap.data() as UserProfile);
+        }
     }
-  }, [handleUser]);
+  }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, handleUser);
+    const unsubscribe = onAuthStateChanged(auth, fetchAndSetUser);
     return () => unsubscribe();
-  }, [handleUser]);
+  }, [fetchAndSetUser]);
   
   const isAdmin = user?.isAdmin || false;
 
