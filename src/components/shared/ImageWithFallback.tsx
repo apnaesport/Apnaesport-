@@ -4,6 +4,7 @@
 import Image, { type ImageProps } from "next/image";
 import type { StaticImport } from "next/dist/shared/lib/get-img-props";
 import { forwardRef, useMemo } from "react";
+import { Coins } from "lucide-react"; // Import a default icon
 
 interface ImageWithFallbackProps extends Omit<ImageProps, 'onError'> {
   fallbackSrc: string | StaticImport | null;
@@ -18,7 +19,7 @@ export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackP
 
     const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const fallbackUrl = typeof fallbackSrc === 'string' ? fallbackSrc : (fallbackSrc as StaticImport)?.src;
-        if (e.currentTarget.src !== fallbackUrl) {
+        if (fallbackUrl && e.currentTarget.src !== fallbackUrl) {
             e.currentTarget.src = fallbackUrl;
             if (onError) {
                 onError(e);
@@ -28,8 +29,8 @@ export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackP
 
     const finalSrc = src || fallbackSrc;
     if (!finalSrc) {
-        // If both src and fallbackSrc are missing, render a placeholder or nothing
-        return <div className="w-full h-full bg-muted" />; // Simple placeholder
+        // If both src and fallbackSrc are missing, render a placeholder icon
+        return <Coins className="w-full h-full text-muted-foreground" />;
     }
     
     const finalAlt = alt || 'Apna Esport placeholder image';

@@ -15,9 +15,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 export default function RewardsPage() {
     const { user, loading: authLoading } = useAuth();
+    const { settings, loadingSettings } = useSiteSettings();
     const { toast } = useToast();
     const [transactions, setTransactions] = useState<PointTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +31,7 @@ export default function RewardsPage() {
             const userTransactions = await getPointTransactions(userId);
             setTransactions(userTransactions);
         } catch (error) {
+            console.error("Error loading transaction history:", error);
             toast({ title: "Error", description: "Could not load transaction history.", variant: "destructive"});
         } finally {
             setIsLoading(false);
@@ -42,7 +46,7 @@ export default function RewardsPage() {
         }
     }, [user, authLoading, fetchTransactions]);
 
-    if (authLoading) {
+    if (authLoading || loadingSettings) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)]">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -61,20 +65,39 @@ export default function RewardsPage() {
             </div>
         );
     }
+    
+    const aeCoinLogo = settings?.aeCoinLogoUrl;
 
     return (
         <div className="space-y-8">
             <PageTitle title="My Rewards" subtitle="Track your AE Points and see your transaction history." />
 
-            <Card className="bg-gradient-to-r from-primary/80 to-accent/80 text-primary-foreground shadow-lg">
-                <CardHeader>
-                    <CardTitle className="text-xl">Your Balance</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center gap-4">
-                    <Coins className="h-12 w-12" />
-                    <div>
-                        <p className="text-4xl font-bold">{user.points || 0}</p>
-                        <p className="text-sm opacity-90">AE Points</p>
+            <Card className="bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600 text-white shadow-lg overflow-hidden">
+                <CardContent className="p-6 flex items-center gap-6 relative">
+                    <div className="absolute -right-10 -top-10 w-48 h-48 opacity-20">
+                         <ImageWithFallback
+                            src={aeCoinLogo || ''}
+                            fallbackSrc="/coin-fallback.svg"
+                            alt="AE Coin"
+                            width={192}
+                            height={192}
+                            className="drop-shadow-lg"
+                        />
+                    </div>
+                    <div className="relative">
+                         <ImageWithFallback
+                            src={aeCoinLogo || ''}
+                            fallbackSrc="/coin-fallback.svg"
+                            alt="AE Coin"
+                            width={80}
+                            height={80}
+                            className="drop-shadow-lg"
+                        />
+                    </div>
+                    <div className="relative">
+                        <CardDescription className="text-yellow-200 text-sm">Your Balance</CardDescription>
+                        <CardTitle className="text-4xl sm:text-5xl font-bold tracking-tight">{user.points || 0}</CardTitle>
+                        <p className="font-semibold opacity-90">Apna Coins</p>
                     </div>
                 </CardContent>
             </Card>
@@ -91,18 +114,18 @@ export default function RewardsPage() {
                         </div>
                     ) : transactions.length > 0 ? (
                         <ScrollArea className="h-96">
-                            <div className="space-y-4">
+                            <div className="space-y-4 pr-4">
                                 {transactions.map(tx => (
-                                    <div key={tx.id} className="flex items-center justify-between p-3 rounded-md border bg-card hover:bg-muted/50">
-                                        <div className="flex items-center gap-3">
+                                    <div key={tx.id} className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
+                                        <div className="flex items-center gap-4">
                                             <div className={cn(
-                                                "grid place-items-center h-8 w-8 rounded-full",
-                                                tx.type === 'credit' ? 'bg-green-500/20 text-green-500' : 'bg-red-500/20 text-red-500'
+                                                "grid place-items-center h-10 w-10 rounded-full",
+                                                tx.type === 'credit' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'
                                             )}>
-                                                {tx.type === 'credit' ? <ArrowUp className="h-4 w-4"/> : <ArrowDown className="h-4 w-4"/>}
+                                                {tx.type === 'credit' ? <ArrowUp className="h-5 w-5"/> : <ArrowDown className="h-5 w-5"/>}
                                             </div>
                                             <div>
-                                                <p className="font-semibold">{tx.reason}</p>
+                                                <p className="font-semibold text-foreground">{tx.reason}</p>
                                                 <p className="text-xs text-muted-foreground">{formatDistanceToNow(tx.createdAt.toDate(), { addSuffix: true })}</p>
                                             </div>
                                         </div>
@@ -117,8 +140,10 @@ export default function RewardsPage() {
                             </div>
                         </ScrollArea>
                     ) : (
-                        <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                        <div className="text-center py-10 border-2 border-dashed rounded-lg flex flex-col items-center justify-center">
+                             <Coins className="h-12 w-12 text-muted-foreground mb-4"/>
                             <p className="text-muted-foreground">No transactions yet.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Start playing tournaments to earn points!</p>
                         </div>
                     )}
                 </CardContent>
