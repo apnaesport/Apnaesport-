@@ -1,112 +1,227 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if a user is signed in and verified
+    // --- Helper Functions ---
+
+    // Checks if a user is signed in. Does NOT check for email verification here,
+    // as unverified users need to be able to create their own profile.
     function isSignedIn() {
-      return request.auth != null && request.auth.token.email_verified;
+      return request.auth != null;
     }
 
-    // Helper function to check if the user is an admin
-    function isAdmin() {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    // Checks if the requesting user's email is verified.
+    // This is used for actions AFTER the user has a profile.
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
     }
-    
-    // Helper function to check if the user is the owner of a document
-    function isOwner(userId) {
+
+    // A secure check to ensure the user is updating their own document.
+    function isSelf(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Publicly readable collections
-    match /games/{gameId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    // Retrieves user data.
+    function getUserData(userId) {
+      return get(/databases/$(database)/documents/users/$(userId)).data;
     }
 
-    match /tournaments/{tournamentId} {
-      allow read: if true;
-      // Allow creation for any signed-in user
-      allow create: if isSignedIn();
-      // Allow updates only by the tournament organizer or an admin
-      allow update: if isSignedIn() && (resource.data.organizerId == request.auth.uid || isAdmin());
-       // Allow deletion only by the tournament organizer or an admin
-      allow delete: if isSignedIn() && (resource.data.organizerId == request.auth.uid || isAdmin());
+    // Checks if the current user is an admin.
+    function isAdmin() {
+      // Use isVerified() here to ensure only verified users can be admins.
+      return isVerified() && getUserData(request.auth.uid).isAdmin == true;
     }
 
-    match /creators/{creatorId} {
-      allow read: if true;
-      // Only admins can create/delete creators directly.
-      // Users are added via applications.
-      allow create, delete: if isAdmin();
-      // Allow updates only for voting
-      allow update: if isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy']);
-    }
-    
-    match /creatorApplications/{appId} {
-        allow read: if isAdmin() || isOwner(resource.data.userId);
-        allow create: if isOwner(request.resource.data.userId);
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
+    // Checks if the current user is the organizer of a specific tournament.
+    function isTournamentOrganizer(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
     }
 
-    match /communities/{communityId} {
-        allow read: if true;
-        allow create: if isSignedIn(); // Any signed-in user can create
-        allow update: if isOwner(resource.data.ownerId) || isAdmin();
-        allow delete: if isOwner(resource.data.ownerId) || isAdmin();
-        
-        match /members/{memberId} {
-            allow read: if true;
-            // Only the user themselves can join (create their member doc)
-            // or the community owner/admin can manage members.
-            allow create, delete: if isOwner(memberId) || isOwner(get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId) || isAdmin();
-            allow update: if isOwner(memberId) || isOwner(get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId) || isAdmin();
-        }
-
-        match /announcements/{announcementId} {
-            allow read: if true;
-            allow create, update, delete: if isOwner(get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId) || isAdmin();
-        }
+    // Checks if the current user is the owner of a specific community.
+    function isCommunityOwner(communityId) {
+      return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
     }
 
+    // --- Default Security: Deny all access unless explicitly allowed ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- User Profiles (`users`) ---
     match /users/{userId} {
-      // Allow users to read their own document
-      allow read: if isOwner(userId);
-      
-      // Allow creation only if the user is creating their own document
-      allow create: if isOwner(userId);
+      // Anyone can read public profile data (e.g., for leaderboards or participant lists).
+      // `read` covers both `get` (single document) and `list` (collection query).
+      allow read: if true;
 
-      // Allow updates only by the user themselves or an admin.
-      // Users cannot change their own admin status or points directly.
-      allow update: if (isOwner(userId) && !('isAdmin' in request.resource.data.diff(resource.data).affectedKeys())) || isAdmin();
+      // A user can create their own profile document.
+      // This is the only place we use `isSignedIn()` instead of `isVerified()`.
+      allow create: if isSelf(userId)
+                    && request.resource.data.isAdmin == false
+                    && request.resource.data.points == 10
+                    && !('communityId' in request.resource.data)
+                    && request.resource.data.uid == userId;
       
-      // Allow admins to delete users
+      // A user can update their own profile, but with restrictions.
+      allow update: if isVerified() && (
+        // Admins can update any profile.
+        isAdmin() ||
+        // A user can update their own profile...
+        (isSelf(userId) &&
+          // but they cannot change these protected fields.
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'createdAt', 'uid'])
+        ) ||
+        // Allow updating only lastLogin and points for the daily bonus.
+        (isSelf(userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin', 'points', 'updatedAt']) &&
+          request.resource.data.points == resource.data.points + 5 // Enforce daily bonus increment
+        )
+      );
+      
+      // Only an admin can delete a user account.
       allow delete: if isAdmin();
 
-      // Allow users to read their OWN transaction history
+      // --- Rewards Transaction History (Subcollection) ---
       match /transactions/{transactionId} {
-        allow read: if isOwner(userId);
-        // Transactions are created via backend logic (transactions), so no direct client write access.
-        allow write: if false; 
+        // A user can read their OWN transaction history.
+        allow read: if isSelf(userId);
+        // Nobody can manually create, update, or delete transactions.
+        // They are only created via secure server-side logic (transactions/batches).
+        allow write: if false;
+      }
+    }
+
+    // --- Games (`games`) ---
+    match /games/{gameId} {
+      // Game data is public and readable by anyone.
+      allow read: if true;
+      // Only admins can create, update, or delete games.
+      allow write: if isAdmin();
+    }
+    
+    // --- Tournaments (`tournaments`) ---
+    match /tournaments/{tournamentId} {
+        // Tournament data is public and readable by anyone.
+        allow read: if true;
+        
+        // Verified users can create tournaments if they have enough points.
+        allow create: if isVerified() && getUserData(request.auth.uid).points >= 40;
+        
+        // Complex update logic for tournaments.
+        allow update: if isVerified() && (
+            // Admins can update anything.
+            isAdmin() ||
+            
+            // Tournament organizers can update specific non-critical fields.
+            (isTournamentOrganizer(tournamentId) && 
+              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'createdAt', 'status'])) ||
+
+            // Any user can join a tournament by adding themselves to the participants list.
+            (
+                request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
+                request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
+            )
+        );
+        
+        // Organizer or admin can delete a tournament.
+        allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
+    }
+    
+    // --- Notifications (`notifications`) ---
+    match /notifications/{notificationId} {
+        // Any verified user can read notifications.
+        allow read: if true;
+        // Only admins can create/write notifications.
+        allow write: if isAdmin();
+    }
+    
+    // --- Site Settings (`settings`) ---
+    match /settings/global {
+        // Site settings are public and readable by anyone.
+        allow read: if true;
+        // Only admins can change site settings.
+        allow write: if isAdmin();
+    }
+    
+    // --- Sponsorships (`sponsorships`) ---
+    match /sponsorships/{sponsorshipId} {
+      // Any verified user can create a request.
+      allow create: if isVerified();
+      // Only admins can read, update status, or delete requests.
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // --- Communities (`communities`) ---
+    match /communities/{communityId} {
+      // Anyone can view a community's public page.
+      allow read: if true;
+
+      // A verified user can create a community, setting themself as the owner.
+      allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
+      
+      // Community owner or a platform admin can update details.
+      // Other users can join, which only increments member count.
+      allow update: if isVerified() && (
+        (isAdmin() || isCommunityOwner(communityId)) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && 
+          request.resource.data.memberCount == resource.data.memberCount + 1
+        )
+      );
+      
+      // Only the community owner or a platform admin can delete the community.
+      allow delete: if isVerified() && (isAdmin() || isCommunityOwner(communityId));
+      
+      // --- Community Members (`members`) ---
+      match /members/{userId} {
+        // Anyone can see who is in the community.
+        allow read: if true;
+        // A user can join a community (create their own member doc).
+        allow create: if isSelf(userId);
+        // A user can leave a community (delete their own member doc).
+        // The community owner can also remove (kick) members.
+        allow delete: if isSelf(userId) || isCommunityOwner(communityId);
+        // Roles and other details can only be updated by the community owner or an admin.
+        allow update: if isAdmin() || isCommunityOwner(communityId);
+      }
+
+      // --- Community Announcements (`announcements`) ---
+      match /announcements/{announcementId} {
+        // Announcements are public.
+        allow read: if true;
+        // Only the owner can create, update, or delete announcements.
+        allow write: if isCommunityOwner(communityId);
       }
     }
     
-    match /notifications/{notificationId} {
-      allow read: if true;
-      allow write: if isAdmin();
+    // --- Creator Hub (`creatorApplications` and `creators`) ---
+    match /creatorApplications/{applicationId} {
+      // A user can create their own application.
+      allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
+      // An admin can read any application. A user can read their own.
+      allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      // Only admins can update status or delete applications.
+      allow update, delete: if isAdmin();
     }
-
-    match /sponsorships/{sponsorshipId} {
-        allow read: if isAdmin();
-        allow create: if isSignedIn();
-        allow update, delete: if isAdmin();
-    }
-
-    match /settings/{settingId} {
+    
+    match /creators/{creatorId} {
+      // Anyone can view the list of approved creators.
       allow read: if true;
-      allow write: if isAdmin();
+      // Only admins can create (approve) or delete creator profiles.
+      allow create, delete: if isAdmin();
+      // An admin can update any field.
+      // A signed-in user can vote securely.
+      allow update: if isVerified() && (
+        isAdmin() ||
+        (
+          request.resource.data.votes == resource.data.votes + 1 &&
+          // Ensure the user is not already in the votedBy array.
+          !resource.data.votedBy.hasAny([request.auth.uid]) && 
+          // Ensure only votes and votedBy are being changed.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy', 'updatedAt'])
+        )
+      );
     }
   }
 }
