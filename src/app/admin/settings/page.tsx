@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -36,6 +36,7 @@ const settingsSchema = z.object({
   defaultCommunityBannerUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   adsEnabled: z.boolean().optional(),
   adsterraNativeAdKey: z.string().optional(),
+  aeCoinLogoUrl: z.string().url("Must be a valid URL for the coin logo.").or(z.literal('')).optional(),
 });
 
 
@@ -52,6 +53,7 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   defaultCommunityBannerUrl: "",
   adsEnabled: false,
   adsterraNativeAdKey: "",
+  aeCoinLogoUrl: "",
 };
 
 function AdminSettingsPageContent() {
@@ -214,6 +216,11 @@ function AdminSettingsPageContent() {
             <Label htmlFor="faviconUrl">Favicon URL</Label>
             <Input id="faviconUrl" {...form.register("faviconUrl")} placeholder="https://example.com/favicon.ico" disabled={isSaving}/>
             {form.formState.errors.faviconUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.faviconUrl.message as string}</p>}
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="aeCoinLogoUrl" className="flex items-center gap-2"><Coins className="h-4 w-4"/>AE Coin Logo URL</Label>
+            <Input id="aeCoinLogoUrl" {...form.register("aeCoinLogoUrl")} placeholder="https://example.com/coin.png" disabled={isSaving}/>
+            {form.formState.errors.aeCoinLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.aeCoinLogoUrl.message as string}</p>}
           </div>
           <Separator />
            <div className="space-y-2">

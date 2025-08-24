@@ -1,3 +1,4 @@
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -19,7 +20,8 @@ const serializeTournament = (tournament: Tournament): any => {
 
 
 export default async function AllTournamentsPage() {
-    const allTournaments = await getTournamentsFromFirestore();
+    // Only fetch non-quick tournaments for the main list
+    const allTournaments = await getTournamentsFromFirestore({ excludeQuick: true });
     const serializableTournaments = allTournaments.map(serializeTournament);
 
     return (

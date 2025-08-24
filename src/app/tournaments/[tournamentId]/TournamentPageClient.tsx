@@ -55,7 +55,6 @@ import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 const registrationSchema = z.object({
   gameUsername: z.string().min(2, "In-game username is required."),
   inGameId: z.string().min(2, "In-game ID is required."),
-  contactEmail: z.string().email("Please enter a valid email.").optional().or(z.literal('')),
 });
 
 type RegistrationFormData = z.infer<typeof registrationSchema>;
@@ -128,7 +127,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   
   const registrationForm = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
-    defaultValues: { gameUsername: "", inGameId: "", contactEmail: user?.email || "" }
+    defaultValues: { gameUsername: "", inGameId: "" }
   });
 
   const winnerForm = useForm<WinnerFormData>({
@@ -153,7 +152,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   useEffect(() => {
     if(user && tournament) {
         setIsRegistered(tournament.participants.some(p => p.id === user.uid));
-        registrationForm.reset({ gameUsername: "", inGameId: "", contactEmail: user.email || "" });
+        registrationForm.reset({ gameUsername: "", inGameId: "" });
     } else {
         setIsRegistered(false);
     }
@@ -195,7 +194,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`,
         gameUsername: data.gameUsername,
         inGameId: data.inGameId,
-        contactEmail: data.contactEmail || undefined,
       };
       
       await addParticipantToTournamentFirestore(tournament.id, newParticipant, entryFee);
@@ -561,7 +559,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                             <TableHead>Player</TableHead>
                             <TableHead>In-Game Name</TableHead>
                             <TableHead>In-Game ID</TableHead>
-                            <TableHead>Contact Email</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -578,7 +575,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                                 </TableCell>
                                 <TableCell>{p.gameUsername}</TableCell>
                                 <TableCell>{p.inGameId}</TableCell>
-                                <TableCell>{p.contactEmail || 'Not provided'}</TableCell>
                             </TableRow>
                             ))}
                         </TableBody>
@@ -802,6 +798,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 <DialogDescription>Enter your in-game details to complete your registration. An entry fee of {tournament.entryFee} AE points will be deducted.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
+                <Input defaultValue={user?.displayName || ''} disabled className="hidden" />
                 <div>
                     <Label htmlFor="gameUsername">In-Game Username *</Label>
                     <Input id="gameUsername" {...registrationForm.register("gameUsername")} disabled={isJoining}/>
@@ -811,14 +808,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                     <Label htmlFor="inGameId">In-Game ID *</Label>
                     <Input id="inGameId" {...registrationForm.register("inGameId")} disabled={isJoining}/>
                     {registrationForm.formState.errors.inGameId && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.inGameId.message}</p>}
-                </div>
-                <div>
-                    <Label htmlFor="contactEmail">Contact Email (Optional)</Label>
-                    <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input id="contactEmail" type="email" {...registrationForm.register("contactEmail")} className="pl-10" disabled={isJoining}/>
-                    </div>
-                    {registrationForm.formState.errors.contactEmail && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.contactEmail.message}</p>}
                 </div>
                 <DialogFooter>
                     <DialogClose asChild>

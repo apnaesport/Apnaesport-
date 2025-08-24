@@ -24,12 +24,13 @@ import {
   runTransaction
 } from "firebase/firestore";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
 const NOTIFICATIONS_COLLECTION = "notifications";
 const USERS_COLLECTION = "users";
+const TRANSACTIONS_COLLECTION = "transactions";
 const SETTINGS_COLLECTION = "settings";
 const GLOBAL_SETTINGS_ID = "global";
 const SPONSORSHIPS_COLLECTION = "sponsorships";
@@ -45,15 +46,18 @@ const DAILY_LOGIN_BONUS = 5;
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
     const startTime = tournament.startDate.getTime();
-    const endTime = tournament.endDate ? tournament.endDate.getTime() : null;
+    
+    // Auto-complete tournaments 2 hours after start time if they are still 'Live'
+    const twoHoursAfterStart = startTime + (2 * 60 * 60 * 1000);
 
     if (tournament.status === 'Completed' || tournament.status === 'Cancelled') {
         return tournament.status;
     }
-
-    if (endTime && now.getTime() > endTime) {
+    
+    if (now.getTime() > twoHoursAfterStart) {
         return "Completed";
     }
+
     if (now.getTime() >= startTime) {
         return "Live";
     }
@@ -157,13 +161,22 @@ export const addTournamentToFirestore = async (
 
     transaction.set(newTournamentDocRef, newTournamentData);
     transaction.update(userRef, { points: increment(-TOURNAMENT_CREATION_FEE) });
+    
+    const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+    transaction.set(transactionRef, { 
+        amount: TOURNAMENT_CREATION_FEE, 
+        type: 'debit', 
+        reason: `Fee for creating tournament: ${tournamentData.name}`,
+        tournamentId: newTournamentDocRef.id,
+        createdAt: serverTimestamp() 
+    });
 
     return newTournamentDocRef.id;
   });
 };
 
 
-export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean }): Promise<Tournament[]> => {
+export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean, excludeQuick?: boolean }): Promise<Tournament[]> => {
   let qConstraints: QueryConstraint[] = [];
   
   if (!queryParams || Object.keys(queryParams).length === 0) {
@@ -183,9 +196,15 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   if (queryParams?.featured !== undefined) {
     qConstraints.push(where("featured", "==", queryParams.featured));
   }
+
+  if (queryParams?.excludeQuick) {
+    qConstraints.push(where("isQuickTournament", "==", false));
+  }
+  
   if (queryParams?.participantId) {
     qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId }));
   }
+
   if (queryParams?.count) {
     qConstraints.push(limit(queryParams.count));
   }
@@ -210,6 +229,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       prizePool: data.prizePool || 0,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
+      isQuickTournament: data.isQuickTournament || false,
     } as Tournament;
 
     const currentStatus = tournament.status;
@@ -263,6 +283,7 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
       prizePool: data.prizePool || 0,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
+      isQuickTournament: data.isQuickTournament || false,
     } as Tournament;
     
     const currentStatus = tournament.status;
@@ -327,12 +348,29 @@ export const deleteTournamentFromFirestore = async (tournament: Tournament, orga
 
         // 1. Penalize the organizer
         transaction.update(organizerRef, { points: increment(-TOURNAMENT_DELETION_PENALTY) });
-        
+        const penaltyTransactionRef = doc(collection(db, USERS_COLLECTION, organizerId, TRANSACTIONS_COLLECTION));
+        transaction.set(penaltyTransactionRef, { 
+            amount: TOURNAMENT_DELETION_PENALTY, 
+            type: 'debit', 
+            reason: `Penalty for deleting tournament: ${tournament.name}`,
+            tournamentId: tournament.id,
+            createdAt: serverTimestamp() 
+        });
+
         // 2. Refund all participants
         if (tournament.participants && tournament.participants.length > 0 && tournament.entryFee > 0) {
             for (const participant of tournament.participants) {
                 const participantRef = doc(db, USERS_COLLECTION, participant.id);
                 transaction.update(participantRef, { points: increment(tournament.entryFee) });
+                
+                const refundTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+                transaction.set(refundTransactionRef, { 
+                    amount: tournament.entryFee, 
+                    type: 'credit', 
+                    reason: `Refund for cancelled tournament: ${tournament.name}`,
+                    tournamentId: tournament.id,
+                    createdAt: serverTimestamp() 
+                });
             }
         }
         
@@ -345,6 +383,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   return runTransaction(db, async (transaction) => {
     const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
     const userRef = doc(db, USERS_COLLECTION, participant.id);
+    const transactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
 
     const tournamentSnap = await transaction.get(tournamentRef);
     const userSnap = await transaction.get(userRef);
@@ -361,12 +400,23 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
     if (tournamentData.participants.length >= tournamentData.maxParticipants) {
       throw new Error("Tournament is full");
     }
-    if (userData.points < fee) {
+    if ((userData.points || 0) < fee) {
       throw new Error("Insufficient AE Points to join.");
     }
     
-    // Deduct points from user
-    transaction.update(userRef, { points: increment(-fee) });
+    if (fee > 0) {
+        // Deduct points from user
+        transaction.update(userRef, { points: increment(-fee) });
+         // Create a transaction record
+        transaction.set(transactionRef, { 
+            amount: fee, 
+            type: 'debit', 
+            reason: `Entry fee for: ${tournamentData.name}`,
+            tournamentId: tournamentId,
+            createdAt: serverTimestamp() 
+        });
+    }
+
     // Add participant to tournament and increase prize pool
     transaction.update(tournamentRef, {
       participants: arrayUnion(participant),
@@ -384,10 +434,11 @@ export const awardTournamentWinners = async (
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
         const tournamentDoc = await transaction.get(tournamentRef);
 
-        if (!tournamentDoc.exists()) {
-            throw new Error("Tournament not found.");
-        }
+        if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
         const tournamentData = tournamentDoc.data() as Tournament;
+        if (tournamentData.winners && tournamentData.winners.length > 0) {
+            throw new Error("Winners have already been declared for this tournament.");
+        }
 
         const prizePool = tournamentData.prizePool || 0;
         const prizeDistribution = {
@@ -395,37 +446,29 @@ export const awardTournamentWinners = async (
             second: Math.floor(prizePool * 0.3),
             third: Math.floor(prizePool * 0.2)
         };
-        const totalWinnerPrize = prizeDistribution.first + prizeDistribution.second + prizeDistribution.third;
-        
         const finalWinners: Winner[] = [];
 
-        // Award winners
-        const firstRef = doc(db, USERS_COLLECTION, winners.first.id);
-        transaction.update(firstRef, { points: increment(prizeDistribution.first) });
-        finalWinners.push({ rank: 1, participant: winners.first, prize: prizeDistribution.first });
-        
-        const secondRef = doc(db, USERS_COLLECTION, winners.second.id);
-        transaction.update(secondRef, { points: increment(prizeDistribution.second) });
-        finalWinners.push({ rank: 2, participant: winners.second, prize: prizeDistribution.second });
-
-        const thirdRef = doc(db, USERS_COLLECTION, winners.third.id);
-        transaction.update(thirdRef, { points: increment(prizeDistribution.third) });
-        finalWinners.push({ rank: 3, participant: winners.third, prize: prizeDistribution.third });
-
-        // Calculate and award organizer's cut
-        const totalEntryFees = (tournamentData.entryFee || 0) * tournamentData.participants.length;
-        const remainingAfterPrizes = totalEntryFees - totalWinnerPrize;
-        
-        if (remainingAfterPrizes > 0 && tournamentData.organizerId) {
-            const platformCut = Math.floor(remainingAfterPrizes * PLATFORM_FEE_PERCENTAGE);
-            const organizerCut = remainingAfterPrizes - platformCut;
-
-            if (organizerCut > 0) {
-                const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
-                transaction.update(organizerRef, { points: increment(organizerCut) });
+        // Award winners and create transaction logs
+        const processWinner = (participant: Participant, rank: 1 | 2 | 3, prize: number) => {
+            if (prize > 0) {
+                const winnerRef = doc(db, USERS_COLLECTION, participant.id);
+                transaction.update(winnerRef, { points: increment(prize) });
+                const prizeTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+                transaction.set(prizeTransactionRef, {
+                    amount: prize,
+                    type: 'credit',
+                    reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} place in ${tournamentData.name}`,
+                    tournamentId: tournamentId,
+                    createdAt: serverTimestamp()
+                });
             }
-        }
-
+            finalWinners.push({ rank, participant, prize });
+        };
+        
+        processWinner(winners.first, 1, prizeDistribution.first);
+        processWinner(winners.second, 2, prizeDistribution.second);
+        processWinner(winners.third, 3, prizeDistribution.third);
+        
         // Update tournament doc
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
@@ -514,10 +557,12 @@ const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => 
     let lastLoginDate: Date;
     if (lastLogin instanceof Date) {
         lastLoginDate = lastLogin;
-    } else if (typeof (lastLogin as Timestamp).toDate === 'function') {
+    } else if (typeof (lastLogin as Timestamp)?.toDate === 'function') {
         lastLoginDate = (lastLogin as Timestamp).toDate();
+    } else if (typeof lastLogin === 'string') {
+        lastLoginDate = new Date(lastLogin);
     } else {
-        lastLoginDate = new Date(lastLogin as string);
+        return true; // Invalid format, assume it's a new day to be safe
     }
     
     if (isNaN(lastLoginDate.getTime())) {
@@ -529,16 +574,40 @@ const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => 
     return lastLoginDate.getTime() < startOfToday.getTime();
 };
 
+
 export const checkForDailyLoginBonus = async (user: UserProfile): Promise<boolean> => {
     if (isNewDay(user.lastLogin)) {
+        const batch = writeBatch(db);
         const userRef = doc(db, USERS_COLLECTION, user.uid);
-        await updateDoc(userRef, {
+        const transactionRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
+
+        batch.update(userRef, {
             points: increment(DAILY_LOGIN_BONUS),
             lastLogin: serverTimestamp()
         });
+
+        batch.set(transactionRef, {
+            amount: DAILY_LOGIN_BONUS,
+            type: 'credit',
+            reason: 'Daily Login Bonus',
+            createdAt: serverTimestamp()
+        });
+
+        await batch.commit();
         return true; // Bonus was awarded
     }
     return false; // Not a new day, no bonus awarded
+};
+
+export const getPointTransactions = async (userId: string): Promise<PointTransaction[]> => {
+    const transactionsRef = collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION);
+    const q = query(transactionsRef, orderBy("createdAt", "desc"), limit(50));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        userId: userId,
+        ...doc.data()
+    } as PointTransaction));
 };
 
 
@@ -728,10 +797,19 @@ export const leaveCommunity = async (communityId: string, user: UserProfile) => 
 };
 
 
-export const getCommunitiesFromFirestore = async (): Promise<Community[]> => {
-    const communitiesSnapshot = await getDocs(query(collection(db, COMMUNITIES_COLLECTION), orderBy("createdAt", "desc")));
-    return communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
+export const getCommunitiesFromFirestore = async (excludeId?: string): Promise<Community[]> => {
+    const q = query(collection(db, COMMUNITIES_COLLECTION), orderBy("createdAt", "desc"));
+    const communitiesSnapshot = await getDocs(q);
+    
+    let communities = communitiesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Community));
+    
+    if (excludeId) {
+        communities = communities.filter(community => community.id !== excludeId);
+    }
+    
+    return communities;
 };
+
 
 export const getCommunityByIdFromFirestore = async (communityId: string): Promise<Community | null> => {
     if (!communityId) return null;
@@ -889,6 +967,8 @@ export const addQuickTournamentToFirestore = async (
         matches: [],
         featured: false,
         rules: "Standard community tournament rules apply. Be respectful.",
+        isQuickTournament: true,
+        communityId: community.id,
     };
 
     const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {

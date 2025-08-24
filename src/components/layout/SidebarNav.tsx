@@ -15,7 +15,8 @@ import {
   TrendingUp,
   Download,
   Star,
-  Home, // Added Home icon
+  Home,
+  Coins, // Added
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -36,6 +37,7 @@ const mainNavItems = [
   { href: "/community", label: "Communities", icon: Users },
   { href: "/creators", label: "Creators", icon: Star },
   { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/rewards", label: "Rewards", icon: Coins }, // Added
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 

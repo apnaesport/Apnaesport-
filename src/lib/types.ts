@@ -26,6 +26,16 @@ export interface UserProfile extends Partial<FirebaseUser> {
   lastLogin?: Timestamp;
 }
 
+export type PointTransaction = {
+  id: string;
+  userId: string;
+  amount: number;
+  reason: string;
+  type: 'credit' | 'debit';
+  tournamentId?: string;
+  createdAt: Timestamp;
+}
+
 export type Game = {
   id: string;
   name: string;
@@ -47,7 +57,6 @@ export type Participant = {
   avatarUrl?: string;
   gameUsername: string;
   inGameId: string;
-  contactEmail?: string;
 };
 
 export type Match = {
@@ -99,6 +108,8 @@ export type Tournament = {
   roomCode?: string;
   roomPassword?: string;
   winners?: Winner[];
+  isQuickTournament?: boolean;
+  communityId?: string;
 };
 
 export type TournamentFormDataUI = {
@@ -146,6 +157,7 @@ export interface SiteSettings {
   updatedAt?: Timestamp;
   adsEnabled?: boolean;
   adsterraNativeAdKey?: string;
+  aeCoinLogoUrl?: string;
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
