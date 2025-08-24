@@ -508,12 +508,23 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
 };
 
 // Helper function to check if a day has passed
-const isNewDay = (lastLogin: Timestamp | Date | undefined): boolean => {
+const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => {
     if (!lastLogin) return true;
-    const lastLoginDate = lastLogin instanceof Date ? lastLogin : lastLogin.toDate();
-    const today = new Date();
+
+    let lastLoginDate: Date;
+    if (lastLogin instanceof Date) {
+        lastLoginDate = lastLogin;
+    } else if (typeof (lastLogin as Timestamp).toDate === 'function') {
+        lastLoginDate = (lastLogin as Timestamp).toDate();
+    } else {
+        lastLoginDate = new Date(lastLogin as string);
+    }
     
-    // Check if the last login was before the start of today
+    if (isNaN(lastLoginDate.getTime())) {
+        return true; // Invalid date, treat as new day
+    }
+
+    const today = new Date();
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     return lastLoginDate.getTime() < startOfToday.getTime();
 };
