@@ -104,8 +104,19 @@ service cloud.firestore {
         // Tournament data is public and readable by anyone.
         allow read: if true;
         
-        // Verified users can create tournaments if they have enough points.
-        allow create: if isVerified() && getUserData(request.auth.uid).points >= 40;
+        // --- Tournament Creation Rules ---
+        allow create: if isVerified() && (
+            // Rule for regular tournaments: User must have enough points.
+            (
+                request.resource.data.isQuickTournament == false &&
+                getUserData(request.auth.uid).points >= 40
+            ) ||
+            // Rule for Quick Tournaments: Creator must be the owner of the specified community.
+            (
+                request.resource.data.isQuickTournament == true &&
+                isCommunityOwner(request.resource.data.communityId)
+            )
+        );
         
         // Complex update logic for tournaments.
         allow update: if isVerified() && (
