@@ -28,7 +28,7 @@ export function CreatorCard({ creator }: CreatorCardProps) {
     const hasVoted = user && creator.votedBy?.includes(user.uid);
 
     const handleVote = async (e: React.MouseEvent) => {
-        e.stopPropagation(); // prevent dialog from opening
+        e.stopPropagation(); 
         if (!user) {
             toast({ title: "Login Required", description: "You must be logged in to vote.", variant: "destructive"});
             return;
@@ -54,34 +54,34 @@ export function CreatorCard({ creator }: CreatorCardProps) {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogTrigger asChild>
             <Card className="hover:bg-accent/50 transition-colors duration-200 group hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10 cursor-pointer">
-                <CardContent className="p-3 flex items-center gap-4">
-                    <Avatar className="h-14 w-14 border-2 border-primary/50 group-hover:border-primary transition-all">
+                <CardContent className="p-4 flex items-center gap-4">
+                    <Avatar className="h-16 w-16 border-2 border-primary/50 group-hover:border-primary transition-all">
                         <AvatarImage src={creator.avatarUrl} alt={creator.name} data-ai-hint={creator.dataAiHint} />
                         <AvatarFallback>{creator.name.substring(0, 2)}</AvatarFallback>
                     </Avatar>
                     <div className="flex-grow overflow-hidden">
-                        <h4 className="font-semibold text-foreground truncate">{creator.name}</h4>
-                        <p className="text-xs text-muted-foreground truncate">{creator.tags}</p>
+                        <h4 className="font-semibold text-lg text-foreground truncate">{creator.name}</h4>
+                        <p className="text-sm text-muted-foreground truncate">{creator.tags}</p>
                         {creator.communityName && (
-                            <Link href={`/community/${creator.communityId}`} onClick={(e) => e.stopPropagation()} className="flex items-center text-xs text-primary hover:underline mt-1">
+                            <Link href={`/community/${creator.communityId}`} onClick={(e) => e.stopPropagation()} className="flex items-center text-xs text-primary hover:underline mt-1 transition-colors">
                                 <Users className="h-3 w-3 mr-1" />
                                 <span className="truncate">{creator.communityName}</span>
                             </Link>
                         )}
                     </div>
-                    <Button 
+                     <Button 
                         size="sm"
                         variant={hasVoted ? "default" : "outline"}
                         className={cn(
-                            "flex items-center gap-1 text-sm font-bold bg-primary/10 px-2 py-1 rounded-md",
-                            hasVoted ? "border-primary text-primary" : "text-primary hover:bg-primary/20"
+                            "flex flex-col items-center justify-center h-16 w-16 shrink-0",
+                            hasVoted ? "bg-primary/20 border-primary text-primary" : ""
                         )}
                         onClick={handleVote}
                         disabled={isVoting || loading}
                         title={hasVoted ? "You have voted" : "Upvote this creator"}
                     >
-                        {isVoting ? <Loader2 className="h-4 w-4 animate-spin"/> : <ArrowUp className="h-4 w-4"/>}
-                        <span>{creator.votes}</span>
+                        {isVoting ? <Loader2 className="h-5 w-5 animate-spin"/> : <ArrowUp className="h-5 w-5"/>}
+                        <span className="text-sm font-bold">{creator.votes}</span>
                     </Button>
                 </CardContent>
             </Card>
@@ -105,5 +105,3 @@ export function CreatorCard({ creator }: CreatorCardProps) {
         </Dialog>
     );
 }
-
-    

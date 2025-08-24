@@ -199,20 +199,22 @@ export default function CreatorHubPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
       {/* Main Content */}
-      <div className="lg:col-span-2 space-y-6">
-        <Card className="bg-card/50 border border-primary/20 shadow-lg">
-           <CardContent className="p-6">
-              <div className="h-1 w-24 bg-gradient-to-r from-primary to-accent rounded-full mb-4 shadow-[0_0_15px_hsl(var(--primary))]"/>
-              <PageTitle
-                title="Where Rising Creators Get Noticed"
-                subtitle="Apna Esport Creator helps small and mid-level gaming creators grow with community voting, featured showcases, and verified creator badges."
-                className="mb-0"
-              />
-              <div className="mt-6 flex gap-4 items-center">
-                  <Button><Star className="mr-2 h-4 w-4"/> Get Featured</Button>
-                  <Button variant="outline">Create Campaign</Button>
+      <div className="lg:col-span-3 space-y-6">
+        <Card className="bg-card/50 border border-primary/20 shadow-lg overflow-hidden">
+           <CardContent className="p-8 relative">
+              <div className="absolute top-0 right-0 h-48 w-48 bg-gradient-to-l from-primary/20 to-transparent rounded-bl-full opacity-50"/>
+              <div className="relative z-10">
+                <div className="h-1 w-24 bg-gradient-to-r from-primary to-accent rounded-full mb-4 shadow-[0_0_15px_hsl(var(--primary))]"/>
+                <PageTitle
+                  title="Where Rising Creators Get Noticed"
+                  subtitle="Apna Esport Creator helps small and mid-level gaming creators grow with community voting, featured showcases, and verified creator badges."
+                  className="mb-0"
+                />
+                <div className="mt-6">
+                  {renderJoinButton()}
+                </div>
               </div>
            </CardContent>
         </Card>
@@ -222,39 +224,40 @@ export default function CreatorHubPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"/>
                 <Input placeholder="Search creators by name, game, or tag..." className="pl-9"/>
             </div>
-            <Button variant="ghost"><Filter className="mr-2 h-4 w-4"/> Filter</Button>
+            <Button variant="outline"><Filter className="mr-2 h-4 w-4"/> Filter</Button>
         </div>
-
-        {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {Array.from({length: 5}).map((_, i) => <Skeleton key={i} className="h-[80px] w-full" />)}
-            </div>
-        ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {creators.map(creator => <CreatorCard key={creator.id} creator={creator} />)}
-            </div>
-        )}
+        
+         <div>
+            <h2 className="text-2xl font-bold text-foreground mb-4">All Creators</h2>
+             {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {Array.from({length: 6}).map((_, i) => <Skeleton key={i} className="h-[88px] w-full" />)}
+                </div>
+            ) : creators.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {creators.map(creator => <CreatorCard key={creator.id} creator={creator} />)}
+                </div>
+            ) : (
+                <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                    <Users className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-4 text-lg font-semibold">No Creators Yet</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Be the first to join the Creator Hub!</p>
+                </div>
+            )}
+        </div>
       </div>
 
       {/* Sidebar */}
-      <div className="lg:col-span-1 space-y-6">
-        <Card>
-            <CardHeader>
-                <CardTitle>Join the Hub</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-                 {renderJoinButton()}
-                 <Button variant="outline" className="w-full">Explore Creators</Button>
-            </CardContent>
-        </Card>
+      <div className="lg:col-span-1 space-y-6 lg:sticky lg:top-20">
         <Card>
           <CardHeader>
             <CardTitle>Top Creators</CardTitle>
+            <CardDescription>Most voted creators this week.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
              {isLoading ? (
                 Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-[68px] w-full" />)
-             ) : (
+             ) : topCreators.length > 0 ? (
                 topCreators.map((creator, index) => (
                     <TopCreatorItem 
                         key={creator.id} 
@@ -263,6 +266,8 @@ export default function CreatorHubPage() {
                         tier={index === 0 ? 'gold' : index === 1 ? 'silver' : 'bronze'}
                     />
                 ))
+             ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">No votes have been cast yet.</p>
              )}
           </CardContent>
         </Card>
