@@ -34,6 +34,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import React from 'react';
 
 const communitySchema = z.object({
     name: z.string().min(3, "Community name must be at least 3 characters.").max(50, "Name cannot exceed 50 characters."),
@@ -113,6 +115,7 @@ export default function CommunityHubPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const adFrequency = settings?.adFrequencyInLists || 0;
 
     const form = useForm<CommunityFormData>({
         resolver: zodResolver(communitySchema),
@@ -176,6 +179,20 @@ export default function CommunityHubPage() {
             setIsCreating(false);
         }
     };
+    
+    const itemsWithAds = useMemo(() => {
+        if (!adFrequency || adFrequency <= 0) return communities;
+
+        const newItems: (Community | { isAd: true })[] = [];
+        communities.forEach((item, index) => {
+        newItems.push(item);
+        if ((index + 1) % adFrequency === 0) {
+            newItems.push({ isAd: true });
+        }
+        });
+        return newItems;
+    }, [communities, adFrequency]);
+
 
     if (authLoading) {
       return (
@@ -281,6 +298,10 @@ export default function CommunityHubPage() {
                 }
             />
 
+            <div className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </div>
+
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="relative flex-grow">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -310,11 +331,14 @@ export default function CommunityHubPage() {
                        </Card>
                     ))}
                 </div>
-            ) : communities.length > 0 ? (
+            ) : itemsWithAds.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {communities.map(community => (
-                        <CommunityCard key={community.id} community={community} settings={settings} isMember={user?.communityId === community.id} />
-                    ))}
+                     {itemsWithAds.map((item, index) => {
+                        if ('isAd' in item) {
+                            return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+                        }
+                        return <CommunityCard key={item.id} community={item} settings={settings} isMember={user?.communityId === item.id} />;
+                    })}
                 </div>
             ) : (
                 <Card className="text-center py-10">
@@ -327,6 +351,10 @@ export default function CommunityHubPage() {
                     </CardContent>
                 </Card>
             )}
+
+            <div className="flex justify-center mt-8">
+                <AdsterraBlock format="leaderboard" />
+            </div>
         </div>
     );
 }

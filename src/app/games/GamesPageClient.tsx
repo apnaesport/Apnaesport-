@@ -7,6 +7,8 @@ import { GameCard } from '@/components/games/GameCard';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import React from 'react';
 
 interface GamesPageClientProps {
   allGames: Game[];
@@ -16,6 +18,8 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const { settings } = useSiteSettings();
 
+  const adFrequency = settings?.adFrequencyInLists || 0;
+
   const filteredGames = useMemo(() => {
     if (!searchTerm) {
       return allGames;
@@ -24,6 +28,20 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
       game.name.toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [searchTerm, allGames]);
+
+  const itemsWithAds = useMemo(() => {
+    if (!adFrequency || adFrequency <= 0) return filteredGames;
+
+    const newItems: (Game | { isAd: true })[] = [];
+    filteredGames.forEach((item, index) => {
+      newItems.push(item);
+      if ((index + 1) % adFrequency === 0) {
+        newItems.push({ isAd: true });
+      }
+    });
+    return newItems;
+  }, [filteredGames, adFrequency]);
+
 
   return (
     <>
@@ -37,9 +55,12 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
         />
       </div>
 
-      {filteredGames.length > 0 ? (
+      {itemsWithAds.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredGames.map((item, index) => {
+          {itemsWithAds.map((item, index) => {
+            if ('isAd' in item) {
+                return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+             }
             return <GameCard key={item.id} game={item} />;
           })}
         </div>

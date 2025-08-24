@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { useState, useMemo } from "react";
@@ -17,6 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import React from "react";
 
 interface TournamentsPageClientProps {
     allTournaments: Tournament[];
@@ -33,6 +34,9 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     "Completed": false,
     "Cancelled": false,
   });
+
+  const adFrequency = settings?.adFrequencyInLists || 0;
+
 
    const filteredTournaments = useMemo(() => {
     let newFilteredTournaments = allTournaments;
@@ -92,6 +96,20 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     });
   };
 
+  const itemsWithAds = useMemo(() => {
+    if (!adFrequency || adFrequency <= 0) return filteredTournaments;
+
+    const newItems: (Tournament | { isAd: true })[] = [];
+    filteredTournaments.forEach((item, index) => {
+      newItems.push(item);
+      if ((index + 1) % adFrequency === 0) {
+        newItems.push({ isAd: true });
+      }
+    });
+    return newItems;
+  }, [filteredTournaments, adFrequency]);
+
+
   return (
     <>
       <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -126,11 +144,14 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
         </DropdownMenu>
       </div>
 
-      {filteredTournaments.length > 0 ? (
+      {itemsWithAds.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredTournaments.map((item, index) => {
-            return <TournamentCard key={item.id} tournament={item} />;
-          })}
+           {itemsWithAds.map((item, index) => {
+             if ('isAd' in item) {
+                return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+             }
+             return <TournamentCard key={item.id} tournament={item} />;
+           })}
         </div>
       ) : (
         <p className="text-muted-foreground text-center py-10">

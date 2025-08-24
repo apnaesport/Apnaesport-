@@ -16,11 +16,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Creator, CreatorApplication } from '@/lib/types';
 import { submitCreatorApplicationInFirestore, listenToCreators, listenToTopCreators, getMyApplicationsFromFirestore } from '@/lib/tournamentStore';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import React from 'react';
 
 const applicationSchema = z.object({
     creatorName: z.string().min(3, "Creator name must be at least 3 characters.").max(30, "Creator name is too long."),
@@ -34,6 +37,7 @@ type ApplicationFormData = z.infer<typeof applicationSchema>;
 export default function CreatorHubPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { settings } = useSiteSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [creators, setCreators] = useState<Creator[]>([]);
@@ -41,6 +45,8 @@ export default function CreatorHubPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [isCreator, setIsCreator] = useState(false);
+  const adFrequency = settings?.adFrequencyInLists || 0;
+
 
   useEffect(() => {
     const unsubscribeCreators = listenToCreators((data) => {
@@ -117,6 +123,19 @@ export default function CreatorHubPage() {
         setIsSubmitting(false);
     }
   }
+
+  const itemsWithAds = useMemo(() => {
+    if (!adFrequency || adFrequency <= 0) return creators;
+
+    const newItems: (Creator | { isAd: true })[] = [];
+    creators.forEach((item, index) => {
+      newItems.push(item);
+      if ((index + 1) % adFrequency === 0) {
+        newItems.push({ isAd: true });
+      }
+    });
+    return newItems;
+  }, [creators, adFrequency]);
 
   const renderJoinButton = () => {
     if (authLoading) {
@@ -233,9 +252,14 @@ export default function CreatorHubPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     {Array.from({length: 6}).map((_, i) => <Skeleton key={i} className="h-[88px] w-full" />)}
                 </div>
-            ) : creators.length > 0 ? (
+            ) : itemsWithAds.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {creators.map(creator => <CreatorCard key={creator.id} creator={creator} />)}
+                  {itemsWithAds.map((creator, index) => {
+                     if ('isAd' in creator) {
+                        return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[88px]" />;
+                     }
+                     return <CreatorCard key={creator.id} creator={creator} />;
+                  })}
                 </div>
             ) : (
                 <div className="text-center py-10 border-2 border-dashed rounded-lg">
@@ -271,6 +295,7 @@ export default function CreatorHubPage() {
              )}
           </CardContent>
         </Card>
+        <AdsterraBlock format="square" />
       </div>
     </div>
   );

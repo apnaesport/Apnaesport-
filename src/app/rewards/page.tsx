@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 export default function RewardsPage() {
     const { user, loading: authLoading } = useAuth();
@@ -71,6 +72,10 @@ export default function RewardsPage() {
     return (
         <div className="space-y-8">
             <PageTitle title="My Rewards" subtitle="Track your AE Points and see your transaction history." />
+
+            <div className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </div>
 
             <Card className="bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600 text-white shadow-lg overflow-hidden">
                 <CardContent className="p-6 flex items-center gap-6 relative">
@@ -148,6 +153,10 @@ export default function RewardsPage() {
                     )}
                 </CardContent>
             </Card>
+            
+            <div className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </div>
 
         </div>
     );

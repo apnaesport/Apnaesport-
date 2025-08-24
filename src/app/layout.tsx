@@ -1,4 +1,5 @@
 
+
 import type { Metadata } from "next";
 import { Inter } from "next/font/google"; // Using Inter font for a modern look
 import "./globals.css";
@@ -8,6 +9,8 @@ import { getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import Script from "next/script";
+import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -100,8 +103,10 @@ export default function RootLayout({
             ></iframe>
         </noscript>
         {/* End Google Tag Manager (noscript) */}
-
-        <AppProviders>{children}</AppProviders>
+        <SiteSettingsProvider>
+            <AppProviders>{children}</AppProviders>
+            <AdsterraBlock format="social_bar" />
+        </SiteSettingsProvider>
         <Analytics />
         <SpeedInsights />
       </body>

@@ -97,6 +97,10 @@ export default function UserNotificationsPage() {
     <>
       <PageTitle title="Notifications" subtitle="Stay updated with the latest announcements and alerts." />
       
+      <div className="flex justify-center mb-8">
+        <AdsterraBlock format="leaderboard" />
+      </div>
+
       {notifications.length > 0 ? (
         <div className="space-y-4">
           {notifications.map(notif => (
@@ -129,7 +133,7 @@ export default function UserNotificationsPage() {
 
       {/* Adsterra Block at the bottom */}
       <section className="flex justify-center mt-8">
-        <AdsterraBlock className="w-full max-w-4xl" />
+        <AdsterraBlock format="leaderboard" />
       </section>
     </>
   );

@@ -46,6 +46,8 @@ import { PageTitle } from '@/components/shared/PageTitle';
 import Link from 'next/link';
 import { Textarea } from '@/components/ui/textarea';
 import { QuickTournamentForm } from './QuickTournamentForm';
+import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import React from 'react';
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -110,23 +112,44 @@ const AnnouncementForm = ({ communityId, ownerId }: { communityId: string, owner
 
 
 const MemberList = ({ members }: { members: CommunityMember[] }) => {
+    const { settings } = useSiteSettings();
+    const adFrequency = settings?.adFrequencyInLists || 0;
+
+    const itemsWithAds = useMemo(() => {
+        if (!adFrequency || adFrequency <= 0) return members;
+        const newItems: (CommunityMember | { isAd: true })[] = [];
+        members.forEach((item, index) => {
+            newItems.push(item);
+            if ((index + 1) % adFrequency === 0) {
+                newItems.push({ isAd: true });
+            }
+        });
+        return newItems;
+    }, [members, adFrequency]);
+
+
     if (!members || members.length === 0) {
         return <p className="text-muted-foreground text-center py-4">No members found.</p>;
     }
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {members.map(member => (
-                <Card key={member.uid} className="flex items-center p-4 gap-4">
-                    <Avatar>
-                        <AvatarImage src={member.avatarUrl} alt={member.displayName} />
-                        <AvatarFallback>{getInitials(member.displayName)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="font-semibold">{member.displayName}</p>
-                        <p className="text-sm text-muted-foreground">{member.role}</p>
-                    </div>
-                </Card>
-            ))}
+            {itemsWithAds.map((item, index) => {
+                if ('isAd' in item) {
+                    return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[100px]" />;
+                }
+                return (
+                    <Card key={item.uid} className="flex items-center p-4 gap-4">
+                        <Avatar>
+                            <AvatarImage src={item.avatarUrl} alt={item.displayName} />
+                            <AvatarFallback>{getInitials(item.displayName)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <p className="font-semibold">{item.displayName}</p>
+                            <p className="text-sm text-muted-foreground">{item.role}</p>
+                        </div>
+                    </Card>
+                )
+            })}
         </div>
     );
 };
@@ -533,6 +556,10 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 </div>
             </header>
             
+             <div className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </div>
+            
             <Tabs defaultValue="home" className="w-full">
                 <TabsList>
                     <TabsTrigger value="home"><Home className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
@@ -543,13 +570,21 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 <TabsContent value="home" className="mt-4 space-y-4">
                     {isOwner && <AnnouncementForm communityId={communityId} ownerId={community.ownerId} />}
                      {announcements.length > 0 ? (
-                        announcements.map(ann => <AnnouncementCard key={ann.id} announcement={ann} isOwner={isOwner} />)
+                        announcements.map((ann, index) => (
+                            <React.Fragment key={ann.id}>
+                                <AnnouncementCard announcement={ann} isOwner={isOwner} />
+                                {(index + 1) % 3 === 0 && <AdsterraBlock format="square" />}
+                            </React.Fragment>
+                        ))
                     ) : (
                         <p className="text-muted-foreground text-center py-6">No announcements yet.</p>
                     )}
                 </TabsContent>
                 <TabsContent value="tournaments" className="mt-4">
-                    <QuickTournamentForm community={community} />
+                    <div className="space-y-4">
+                        <QuickTournamentForm community={community} />
+                        <AdsterraBlock format="square" />
+                    </div>
                 </TabsContent>
                  <TabsContent value="members" className="mt-4">
                     <Card>

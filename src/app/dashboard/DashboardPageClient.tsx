@@ -39,13 +39,17 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
         const checkBonus = async () => {
             if (user && !hasCheckedBonus.current) {
                 hasCheckedBonus.current = true; // Prevent re-checking on re-renders
-                const bonusAwarded = await checkForDailyLoginBonus(user);
-                if (bonusAwarded) {
-                    toast({
-                        title: ( <div className="flex items-center gap-2"><Coins className="h-5 w-5 text-yellow-500" /><span>+5 AE Points!</span></div>),
-                        description: "Your daily login bonus has been added.",
-                    });
-                    await refreshUser(); // Refresh user data to show new points total
+                try {
+                    const bonusAwarded = await checkForDailyLoginBonus(user);
+                    if (bonusAwarded) {
+                        toast({
+                            title: ( <div className="flex items-center gap-2"><Coins className="h-5 w-5 text-yellow-500" /><span>+5 AE Points!</span></div>),
+                            description: "Your daily login bonus has been added.",
+                        });
+                        await refreshUser(); // Refresh user data to show new points total
+                    }
+                } catch (error) {
+                    console.error("Failed to check for daily login bonus", error);
                 }
             }
         };
@@ -69,6 +73,10 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     return (
         <div className="space-y-8">
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
+            
+            <section className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </section>
             
             {featuredTournament ? (
                 <section>
@@ -101,11 +109,6 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                     <StatsCard key={stat.title} item={stat} />
                 ))}
                 </div>
-            </section>
-            
-            {/* Adsterra Block */}
-            <section className="flex justify-center">
-                <AdsterraBlock className="w-full max-w-4xl" />
             </section>
 
             <section>

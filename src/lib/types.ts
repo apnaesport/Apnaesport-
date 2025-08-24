@@ -156,7 +156,10 @@ export interface SiteSettings {
   landingPageVideoUrl?: string;
   updatedAt?: Timestamp;
   adsEnabled?: boolean;
-  adsterraNativeAdKey?: string;
+  adKeyLeaderboard?: string;
+  adKeySquare?: string;
+  adKeySocialBar?: string;
+  adFrequencyInLists?: number;
   aeCoinLogoUrl?: string;
 }
 

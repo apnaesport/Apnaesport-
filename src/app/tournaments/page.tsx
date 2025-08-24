@@ -6,6 +6,7 @@ import { PlusCircle } from "lucide-react";
 import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import TournamentsPageClient from './TournamentsPageClient';
 import type { Tournament } from "@/lib/types";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeTournament = (tournament: Tournament): any => {
@@ -37,6 +38,9 @@ export default async function AllTournamentsPage() {
                     </Button>
                 }
             />
+            <div className="flex justify-center">
+                <AdsterraBlock format="leaderboard" />
+            </div>
             <TournamentsPageClient allTournaments={serializableTournaments} />
         </div>
     );
