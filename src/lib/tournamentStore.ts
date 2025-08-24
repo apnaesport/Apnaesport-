@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   doc,
@@ -197,8 +198,11 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("featured", "==", queryParams.featured));
   }
 
+  // This query causes a missing index error if combined with orderBy. 
+  // It's better to filter this on the client if needed, or create the index in Firebase.
+  // For now, we will use a different indexed field to prevent crashes.
   if (queryParams?.excludeQuick) {
-    qConstraints.push(where("isQuickTournament", "==", false));
+    qConstraints.push(where("featured", "in", [true, false])); // This is a workaround to use an existing index
   }
   
   if (queryParams?.participantId) {
@@ -214,7 +218,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
   const now = new Date();
   const batch = writeBatch(db);
-  const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
+  let tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data();
     const tournament = {
       id: docSnapshot.id,
@@ -243,6 +247,11 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     
     return tournament;
   });
+
+  // Since the query can't filter `isQuickTournament`, we do it here.
+  if (queryParams?.excludeQuick) {
+    tournaments = tournaments.filter(t => !t.isQuickTournament);
+  }
 
   await batch.commit();
   return tournaments;
