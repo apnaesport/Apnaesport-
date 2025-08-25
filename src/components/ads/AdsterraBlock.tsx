@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Skeleton } from '../ui/skeleton';
+import { useIsMobile } from '@/hooks/use-mobile'; // Import the hook to detect mobile screens
 
 export type AdFormat = 'leaderboard' | 'square' | 'social_bar';
 
@@ -19,30 +20,37 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   const adContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { settings, loadingSettings } = useSiteSettings();
+  const isMobile = useIsMobile(); // Check if the device is mobile
 
+  // Use a different, more mobile-friendly ad key for leaderboards on small screens if available
   const adKey = useMemo(() => {
     switch (format) {
-      case 'leaderboard': return settings?.adKeyLeaderboard;
-      case 'square': return settings?.adKeySquare;
-      case 'social_bar': return settings?.adKeySocialBar;
-      default: return '';
+      case 'leaderboard':
+        // On mobile, use the square ad key for a better fit if leaderboard is requested.
+        // This assumes the square ad unit is more responsive.
+        return isMobile ? (settings?.adKeySquare || settings?.adKeyLeaderboard) : settings?.adKeyLeaderboard;
+      case 'square': 
+        return settings?.adKeySquare;
+      default: 
+        return '';
     }
-  }, [format, settings]);
+  }, [format, settings, isMobile]);
 
   const adsEnabled = settings?.adsEnabled ?? false;
-  const componentKey = `${pathname}-${format}-${adKey}`;
+  const componentKey = `${pathname}-${format}-${adKey}-${isMobile}`;
 
+  // Ad dimensions are now for placeholder/skeleton purposes. The script will handle responsiveness.
   const adDimensions = {
     leaderboard: { width: 728, height: 90 },
     square: { width: 300, height: 250 },
     social_bar: { width: 0, height: 0 },
   };
   
+  // Choose dimensions based on the original format, not the potentially swapped one for mobile
   const { width, height } = adDimensions[format];
 
-
   useEffect(() => {
-    if (loadingSettings || !adsEnabled || !adKey || format === 'social_bar') {
+    if (loadingSettings || !adsEnabled || !adKey) {
       if (adContainerRef.current) adContainerRef.current.innerHTML = '';
       return;
     }
@@ -52,12 +60,13 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
       const script = document.createElement('script');
       script.type = 'text/javascript';
       
+      // Using a responsive format. Adsterra will fill the container.
       const adOptions = `
         atOptions = {
           'key' : '${adKey}',
           'format' : 'iframe',
-          'height' : ${height},
-          'width' : ${width},
+          'height' : ${isMobile && format === 'leaderboard' ? 250 : height},
+          'width' : ${isMobile && format === 'leaderboard' ? 300 : width},
           'params' : {}
         };
       `;
@@ -72,48 +81,28 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
       container.appendChild(script);
       container.appendChild(invokeScript);
     }
-  }, [componentKey, adsEnabled, adKey, loadingSettings, format, width, height]);
-
-
-  useEffect(() => {
-    if (format === 'social_bar' && adsEnabled && adKey) {
-        const existingScript = document.getElementById(`adsterra-social-bar-${adKey}`);
-        if(existingScript) return;
-
-        const script = document.createElement('script');
-        script.id = `adsterra-social-bar-${adKey}`;
-        script.type = 'text/javascript';
-        script.src = `//www.profitabledisplaynetwork.com/e5/1e/21/e51e21b9c452796479159d3a54b383de.js`;
-        script.async = true;
-        document.body.appendChild(script);
-
-        return () => {
-            const scriptToRemove = document.getElementById(`adsterra-social-bar-${adKey}`);
-            if (scriptToRemove) {
-                document.body.removeChild(scriptToRemove);
-            }
-        };
-    }
-  }, [format, adsEnabled, adKey]);
-
+  }, [componentKey, adsEnabled, adKey, loadingSettings, format, width, height, isMobile]);
 
   if (loadingSettings) {
-    return <Skeleton className={cn(`w-full max-w-[${width}px] h-[${height}px]`, className)} />;
+    // Show a skeleton that best represents the ad space on the current device
+    const skelHeight = isMobile && format === 'leaderboard' ? 'h-[250px]' : `h-[${height}px]`;
+    const skelWidth = isMobile && format === 'leaderboard' ? 'w-[300px]' : `w-full max-w-[${width}px]`;
+    return <Skeleton className={cn(skelWidth, skelHeight, className)} />;
   }
 
-  if (!adsEnabled || !adKey || format === 'social_bar') {
+  if (!adsEnabled || !adKey) {
     return null; 
   }
 
+  // The outer container is now fully responsive.
   return (
     <div
       key={componentKey}
       className={cn(
-        "ad-container w-full mx-auto flex items-center justify-center bg-muted/20 min-h-[50px] rounded-lg",
-        `max-w-[${width}px]`,
+        "ad-container w-full mx-auto flex items-center justify-center bg-muted/20 min-h-[50px] rounded-lg overflow-hidden",
         className
       )}
-      style={{...style, minHeight: `${height}px`}}
+      style={style}
     >
         <div ref={adContainerRef} className="w-full h-full flex items-center justify-center">
             <span className="text-xs text-muted-foreground">Advertisement</span>

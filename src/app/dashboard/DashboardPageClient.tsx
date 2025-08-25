@@ -84,7 +84,9 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
             
             <section className="flex justify-center">
-                <AdsterraBlock format="leaderboard" />
+                <div className="w-full max-w-5xl">
+                    <AdsterraBlock format="leaderboard" />
+                </div>
             </section>
             
             {featuredTournament ? (
