@@ -148,7 +148,7 @@ service cloud.firestore {
     }
     
     // --- Site Settings (`settings`) ---
-    match /settings/global {
+    match /settings/{setting} {
         // Site settings are public and readable by anyone.
         allow read: if true;
         // Only admins can change site settings.
