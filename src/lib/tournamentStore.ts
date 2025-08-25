@@ -1,5 +1,4 @@
 
-
 import {
   collection,
   doc,
@@ -198,11 +197,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     qConstraints.push(where("featured", "==", queryParams.featured));
   }
 
-  // This query causes a missing index error if combined with orderBy. 
-  // It's better to filter this on the client if needed, or create the index in Firebase.
-  // For now, we will use a different indexed field to prevent crashes.
   if (queryParams?.excludeQuick) {
-    qConstraints.push(where("featured", "in", [true, false])); // This is a workaround to use an existing index
+      qConstraints.push(where("featured", "in", [true, false])); 
   }
   
   if (queryParams?.participantId) {
@@ -248,7 +244,6 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     return tournament;
   });
 
-  // Since the query can't filter `isQuickTournament`, we do it here.
   if (queryParams?.excludeQuick) {
     tournaments = tournaments.filter(t => !t.isQuickTournament);
   }
@@ -564,6 +559,7 @@ const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => 
     if (!lastLogin) return true;
 
     let lastLoginDate: Date;
+    // Handle different timestamp formats from Firestore
     if (lastLogin instanceof Date) {
         lastLoginDate = lastLogin;
     } else if (typeof (lastLogin as Timestamp)?.toDate === 'function') {
@@ -574,13 +570,18 @@ const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => 
         return true; // Invalid format, assume it's a new day to be safe
     }
     
+    // Check for invalid date object
     if (isNaN(lastLoginDate.getTime())) {
-        return true; // Invalid date, treat as new day
+        return true; 
     }
 
     const today = new Date();
-    const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    return lastLoginDate.getTime() < startOfToday.getTime();
+    // Compare date parts only (YYYY-MM-DD) to ignore time
+    return (
+        lastLoginDate.getFullYear() < today.getFullYear() ||
+        lastLoginDate.getMonth() < today.getMonth() ||
+        lastLoginDate.getDate() < today.getDate()
+    );
 };
 
 

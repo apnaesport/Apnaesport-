@@ -34,28 +34,8 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     const adContainerRef = useRef<HTMLDivElement>(null);
     const hasCheckedBonus = useRef(false);
 
-    // This effect handles the daily login bonus check when the user visits the dashboard.
-    useEffect(() => {
-        const checkBonus = async () => {
-            if (user && !hasCheckedBonus.current) {
-                hasCheckedBonus.current = true; // Prevent re-checking on re-renders
-                try {
-                    const bonusAwarded = await checkForDailyLoginBonus(user);
-                    if (bonusAwarded) {
-                        toast({
-                            title: ( <div className="flex items-center gap-2"><Coins className="h-5 w-5 text-yellow-500" /><span>+5 AE Points!</span></div>),
-                            description: "Your daily login bonus has been added.",
-                        });
-                        await refreshUser(); // Refresh user data to show new points total
-                    }
-                } catch (error) {
-                    console.error("Failed to check for daily login bonus", error);
-                }
-            }
-        };
-        checkBonus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user]); 
+    // The daily login bonus check logic has been moved to AuthContext for reliability.
+    // This component will now just reflect the user's points as updated by the context.
 
     const stats = useMemo(() => {
         const userRankStat: StatItem = { 

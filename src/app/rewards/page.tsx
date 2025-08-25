@@ -102,7 +102,7 @@ export default function RewardsPage() {
                     <div className="relative">
                         <CardDescription className="text-yellow-200 text-sm">Your Balance</CardDescription>
                         <CardTitle className="text-4xl sm:text-5xl font-bold tracking-tight">{user.points || 0}</CardTitle>
-                        <p className="font-semibold opacity-90">Apna Coins</p>
+                        <p className="font-semibold opacity-90">AE Points</p>
                     </div>
                 </CardContent>
             </Card>
