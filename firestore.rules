@@ -71,9 +71,9 @@ service cloud.firestore {
           // but they cannot change these protected fields.
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'createdAt', 'uid'])
         ) ||
-        // Allow updating only lastLogin and points for the daily bonus.
+        // Allow updating only lastBonusClaimedAt and points for the daily bonus.
         (isSelf(userId) &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastLogin', 'points', 'updatedAt']) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastBonusClaimedAt', 'points', 'updatedAt']) &&
           request.resource.data.points == resource.data.points + 5 // Enforce daily bonus increment
         )
       );
