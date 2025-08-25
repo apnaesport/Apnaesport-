@@ -39,7 +39,7 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
 
 
    const filteredTournaments = useMemo(() => {
-    let newFilteredTournaments = allTournaments;
+    let newFilteredTournaments = allTournaments.filter(t => !t.isQuickTournament);
 
     const isFilteringForCompleted = statusFilter.Completed && !statusFilter.all;
     if (!isFilteringForCompleted) {
@@ -49,7 +49,7 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
           if (!completedDate?.toDate) return true; // Keep if date is invalid for some reason
           const sevenDaysAgo = new Date();
           sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          return completedDate.toDate() > sevenDaysAgo;
+          return new Date(completedDate) > sevenDaysAgo;
         }
         return true;
       });
