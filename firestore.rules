@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -85,9 +86,10 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         // A user can read their OWN transaction history.
         allow read: if isSelf(userId);
-        // Nobody can manually create, update, or delete transactions.
-        // They are only created via secure server-side logic (transactions/batches).
-        allow write: if false;
+        // A user can create their own transaction record (for daily bonus, etc.).
+        allow create: if isSelf(userId);
+        // Nobody can manually update or delete transactions.
+        allow update, delete: if false;
       }
     }
 
