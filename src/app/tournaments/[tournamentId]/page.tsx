@@ -12,6 +12,7 @@ import TournamentPageClient from "./TournamentPageClient";
 import type { Tournament } from "@/lib/types";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 interface TournamentPageProps {
   params: { tournamentId: string };
@@ -58,5 +59,9 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
 export default function TournamentPage({ params }: TournamentPageProps) {
   const { tournamentId } = params;
   
-  return <TournamentPageClient tournamentId={tournamentId} />;
+  return (
+    <div className="space-y-8">
+      <TournamentPageClient tournamentId={tournamentId} />
+    </div>
+  );
 }

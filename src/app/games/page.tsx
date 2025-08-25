@@ -17,6 +17,9 @@ export default async function GamesPage() {
           <AdsterraBlock format="leaderboard" />
       </div>
       <GamesPageClient allGames={allGames} />
+       <div className="flex justify-center mt-8">
+          <AdsterraBlock format="leaderboard" />
+      </div>
     </div>
   );
 }

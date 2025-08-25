@@ -127,7 +127,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   
   const registrationForm = useForm<RegistrationFormData>({
     resolver: zodResolver(registrationSchema),
-    defaultValues: { gameUsername: "", inGameId: "" }
+    defaultValues: { gameUsername: user?.displayName || "", inGameId: "" }
   });
 
   const winnerForm = useForm<WinnerFormData>({
@@ -152,7 +152,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   useEffect(() => {
     if(user && tournament) {
         setIsRegistered(tournament.participants.some(p => p.id === user.uid));
-        registrationForm.reset({ gameUsername: "", inGameId: "" });
+        registrationForm.reset({ gameUsername: user.displayName || "", inGameId: "" });
     } else {
         setIsRegistered(false);
     }
@@ -339,7 +339,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const TeamIcon = tournament.teamSize ? teamSizeIcons[tournament.teamSize] : Users;
 
   return (
-    <div className="space-y-8">
+    <>
       <div className="relative h-48 sm:h-64 md:h-80 rounded-lg overflow-hidden group shadow-xl">
         <ImageWithFallback 
           src={tournament.bannerImageUrl} 
@@ -379,7 +379,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
       </div>
        {/* Adsterra Block */}
         <section className="flex justify-center">
-            <AdsterraBlock className="w-full max-w-5xl" />
+            <AdsterraBlock format="leaderboard" className="w-full max-w-5xl" />
         </section>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
@@ -798,7 +798,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 <DialogDescription>Enter your in-game details to complete your registration. An entry fee of {tournament.entryFee} AE points will be deducted.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
-                <Input defaultValue={user?.displayName || ''} disabled className="hidden" />
+                
                 <div>
                     <Label htmlFor="gameUsername">In-Game Username *</Label>
                     <Input id="gameUsername" {...registrationForm.register("gameUsername")} disabled={isJoining}/>
@@ -868,6 +868,6 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
         </div>
         </div>
-    </div>
+    </>
   );
 }

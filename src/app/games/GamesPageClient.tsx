@@ -33,9 +33,10 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
     if (!adFrequency || adFrequency <= 0) return filteredGames;
 
     const newItems: (Game | { isAd: true })[] = [];
+    if(filteredGames.length > 0) newItems.push({ isAd: true });
     filteredGames.forEach((item, index) => {
       newItems.push(item);
-      if ((index + 1) % adFrequency === 0) {
+      if ((index + 1) % adFrequency === 0 && index < filteredGames.length -1) {
         newItems.push({ isAd: true });
       }
     });
@@ -59,7 +60,11 @@ export default function GamesPageClient({ allGames }: GamesPageClientProps) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {itemsWithAds.map((item, index) => {
             if ('isAd' in item) {
-                return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+                return (
+                    <div key={`ad-${index}`} className="flex items-center justify-center">
+                        <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
+                    </div>
+                );
              }
             return <GameCard key={item.id} game={item} />;
           })}

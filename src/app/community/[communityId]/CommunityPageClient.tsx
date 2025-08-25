@@ -111,12 +111,15 @@ const AnnouncementForm = ({ communityId, ownerId }: { communityId: string, owner
 };
 
 
-const MemberList = ({ members }: { members: CommunityMember[] }) => {
+const MemberList = ({ members, isCommunityMember }: { members: CommunityMember[]; isCommunityMember: boolean }) => {
     const { settings } = useSiteSettings();
     const adFrequency = settings?.adFrequencyInLists || 0;
 
+    // Conditionally show ads in member list only if the current user is NOT a member
+    const shouldShowAds = !isCommunityMember && adFrequency > 0;
+
     const itemsWithAds = useMemo(() => {
-        if (!adFrequency || adFrequency <= 0) return members;
+        if (!shouldShowAds) return members;
         const newItems: (CommunityMember | { isAd: true })[] = [];
         members.forEach((item, index) => {
             newItems.push(item);
@@ -125,7 +128,7 @@ const MemberList = ({ members }: { members: CommunityMember[] }) => {
             }
         });
         return newItems;
-    }, [members, adFrequency]);
+    }, [members, shouldShowAds, adFrequency]);
 
 
     if (!members || members.length === 0) {
@@ -590,12 +593,14 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     <Card>
                         <CardHeader><CardTitle>Community Members</CardTitle></CardHeader>
                         <CardContent>
-                            <MemberList members={members} />
+                            <MemberList members={members} isCommunityMember={isMember} />
                         </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>
-
+             <div className="flex justify-center mt-8">
+                <AdsterraBlock format="leaderboard" />
+            </div>
         </div>
     );
 }

@@ -100,9 +100,12 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     if (!adFrequency || adFrequency <= 0) return filteredTournaments;
 
     const newItems: (Tournament | { isAd: true })[] = [];
+    // Add ad at the start
+    if (filteredTournaments.length > 0) newItems.push({ isAd: true });
     filteredTournaments.forEach((item, index) => {
       newItems.push(item);
-      if ((index + 1) % adFrequency === 0) {
+       // Inject ad after every X items, but not after the very last item.
+      if ((index + 1) % adFrequency === 0 && index < filteredTournaments.length -1) {
         newItems.push({ isAd: true });
       }
     });
@@ -148,7 +151,11 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {itemsWithAds.map((item, index) => {
              if ('isAd' in item) {
-                return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+                return (
+                  <div key={`ad-${index}`} className="flex items-center justify-center">
+                     <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
+                  </div>
+                );
              }
              return <TournamentCard key={item.id} tournament={item} />;
            })}

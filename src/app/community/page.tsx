@@ -184,11 +184,14 @@ export default function CommunityHubPage() {
         if (!adFrequency || adFrequency <= 0) return communities;
 
         const newItems: (Community | { isAd: true })[] = [];
+        // Add ad at the start
+        if(communities.length > 0) newItems.push({ isAd: true });
         communities.forEach((item, index) => {
-        newItems.push(item);
-        if ((index + 1) % adFrequency === 0) {
-            newItems.push({ isAd: true });
-        }
+            newItems.push(item);
+            // Inject ad after every X items, but not after the very last item.
+            if ((index + 1) % adFrequency === 0 && index < communities.length -1) {
+                newItems.push({ isAd: true });
+            }
         });
         return newItems;
     }, [communities, adFrequency]);
@@ -335,7 +338,11 @@ export default function CommunityHubPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                      {itemsWithAds.map((item, index) => {
                         if ('isAd' in item) {
-                            return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+                            return (
+                                <div key={`ad-${index}`} className="flex items-center justify-center">
+                                    <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
+                                </div>
+                            );
                         }
                         return <CommunityCard key={item.id} community={item} settings={settings} isMember={user?.communityId === item.id} />;
                     })}

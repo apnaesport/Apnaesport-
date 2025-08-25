@@ -132,9 +132,9 @@ export default function UserNotificationsPage() {
       )}
 
       {/* Adsterra Block at the bottom */}
-      <section className="flex justify-center mt-8">
+      <div className="flex justify-center mt-8">
         <AdsterraBlock format="leaderboard" />
-      </section>
+      </div>
     </>
   );
 }
