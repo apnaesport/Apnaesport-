@@ -4,12 +4,12 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { Coins, LogIn, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+import { Coins, LogIn, Loader2, ArrowUp, ArrowDown, Gift, CheckCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import type { PointTransaction } from "@/lib/types";
-import { getPointTransactions } from "@/lib/tournamentStore";
+import { getPointTransactions, isDailyBonusAvailable, claimDailyBonus } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDistanceToNow } from "date-fns";
@@ -19,21 +19,61 @@ import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
+const DailyBonusCard = ({ isAvailable, onClaim, isClaiming }: { isAvailable: boolean, onClaim: () => void, isClaiming: boolean }) => {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+                <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2">
+                        <Gift className="h-6 w-6 text-primary" /> Daily Login Bonus
+                    </CardTitle>
+                    <CardDescription>
+                        Claim your daily bonus once every 24 hours.
+                    </CardDescription>
+                </div>
+                <Button onClick={onClaim} disabled={!isAvailable || isClaiming} size="lg">
+                    {isClaiming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isAvailable ? "Claim Now" : "Claimed"}
+                </Button>
+            </CardHeader>
+            <CardContent>
+                {isAvailable ? (
+                     <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                        <CheckCircle className="h-4 w-4"/>
+                        <p>Your daily 5 AE Points bonus is ready to be claimed!</p>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                        <Clock className="h-4 w-4"/>
+                        <p>You have already claimed your bonus for today. Check back tomorrow!</p>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 export default function RewardsPage() {
-    const { user, loading: authLoading } = useAuth();
+    const { user, loading: authLoading, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const { toast } = useToast();
     const [transactions, setTransactions] = useState<PointTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [bonusAvailable, setBonusAvailable] = useState(false);
+    const [isClaiming, setIsClaiming] = useState(false);
 
-    const fetchTransactions = useCallback(async (userId: string) => {
+    const fetchPageData = useCallback(async (userId: string) => {
         setIsLoading(true);
         try {
-            const userTransactions = await getPointTransactions(userId);
+            const [userTransactions, isAvailable] = await Promise.all([
+                getPointTransactions(userId),
+                isDailyBonusAvailable(userId)
+            ]);
             setTransactions(userTransactions);
+            setBonusAvailable(isAvailable);
         } catch (error) {
-            console.error("Error loading transaction history:", error);
-            toast({ title: "Error", description: "Could not load transaction history.", variant: "destructive"});
+            console.error("Error loading rewards data:", error);
+            toast({ title: "Error", description: "Could not load your rewards information.", variant: "destructive"});
         } finally {
             setIsLoading(false);
         }
@@ -41,13 +81,34 @@ export default function RewardsPage() {
 
     useEffect(() => {
         if (!authLoading && user) {
-            fetchTransactions(user.uid);
+            fetchPageData(user.uid);
         } else if (!authLoading && !user) {
             setIsLoading(false);
         }
-    }, [user, authLoading, fetchTransactions]);
+    }, [user, authLoading, fetchPageData]);
 
-    if (authLoading || loadingSettings) {
+    const handleClaimBonus = async () => {
+        if (!user || !bonusAvailable) return;
+        setIsClaiming(true);
+        try {
+            const result = await claimDailyBonus(user.uid);
+            if (result.success) {
+                toast({ title: "Success!", description: `+${result.amount} AE Points have been added to your account.` });
+                await refreshUser(); // Refresh user context to show new balance
+                await fetchPageData(user.uid); // Refresh page data to update transactions and button state
+            } else {
+                toast({ title: "Already Claimed", description: "You have already claimed your bonus for today.", variant: "destructive" });
+                setBonusAvailable(false); // Sync state just in case
+            }
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Failed to claim bonus.", variant: "destructive" });
+        } finally {
+            setIsClaiming(false);
+        }
+    };
+
+
+    if (authLoading || loadingSettings || isLoading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-15rem)]">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -106,6 +167,8 @@ export default function RewardsPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <DailyBonusCard isAvailable={bonusAvailable} onClaim={handleClaimBonus} isClaiming={isClaiming} />
 
             <Card>
                 <CardHeader>

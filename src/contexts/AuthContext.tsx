@@ -8,7 +8,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback 
 import { auth, db } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
-import { generateApnaId, checkForDailyLoginBonus } from "@/lib/tournamentStore";
+import { generateApnaId } from "@/lib/tournamentStore";
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -39,23 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (userDocSnap.exists()) {
         const userProfile = userDocSnap.data() as UserProfile;
-        
-        // Check for daily bonus and update user state if awarded
-        const bonusAwarded = await checkForDailyLoginBonus(userProfile);
-        if (bonusAwarded) {
-            // Re-fetch the user profile to get the latest points
-            const updatedUserDocSnap = await getDoc(userDocRef);
-            if (updatedUserDocSnap.exists()) {
-                 setUser(updatedUserDocSnap.data() as UserProfile);
-            } else {
-                 setUser(userProfile);
-            }
-        } else {
-            // Update last login time if no bonus was awarded
-             await setDoc(userDocRef, { lastLogin: serverTimestamp() }, { merge: true });
-             setUser(userProfile);
-        }
-
+        setUser(userProfile);
       } else {
         // This is a new, verified user. Create their profile.
         const newApnaId = await generateApnaId();
@@ -69,7 +53,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             points: 10,
             createdAt: serverTimestamp() as Timestamp,
             updatedAt: serverTimestamp() as Timestamp,
-            lastLogin: serverTimestamp() as Timestamp,
             apnaId: newApnaId,
             bio: "",
             favoriteGameIds: [],

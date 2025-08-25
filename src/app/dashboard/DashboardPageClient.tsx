@@ -7,18 +7,19 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, UserProfile } from "@/lib/types";
-import { Heart, Megaphone } from "lucide-react";
+import { Heart, Megaphone, Coins, Gift } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
-import { checkForDailyLoginBonus } from "@/lib/tournamentStore";
+import { isDailyBonusAvailable } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
-import { Coins } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -27,22 +28,50 @@ interface DashboardPageClientProps {
     allGames: Game[];
 }
 
+const DailyBonusCard = ({ bonusAvailable }: { bonusAvailable: boolean }) => {
+    if (!bonusAvailable) {
+        return null;
+    }
+
+    return (
+        <Card className="bg-gradient-to-tr from-green-500 to-emerald-600 text-white shadow-lg overflow-hidden">
+             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <Gift className="h-6 w-6"/>
+                    Daily Bonus Ready!
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <p className="text-sm opacity-90 mb-4">You have a daily bonus waiting for you.</p>
+                <Button asChild className="w-full bg-white text-emerald-700 hover:bg-white/90">
+                    <Link href="/rewards">Claim Now</Link>
+                </Button>
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames }: DashboardPageClientProps) {
     const { user, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
-    const { toast } = useToast();
-    const adContainerRef = useRef<HTMLDivElement>(null);
-    const hasCheckedBonus = useRef(false);
+    const [bonusAvailable, setBonusAvailable] = useState(false);
 
-    // The daily login bonus check logic has been moved to AuthContext for reliability.
-    // This component will now just reflect the user's points as updated by the context.
+    useEffect(() => {
+        const checkBonus = async () => {
+            if (user) {
+                const available = await isDailyBonusAvailable(user.uid);
+                setBonusAvailable(available);
+            }
+        };
+        checkBonus();
+    }, [user]);
 
     const stats = useMemo(() => {
         const userRankStat: StatItem = { 
             title: "Your AE Points", 
             value: user?.points ?? 0,
-            icon: "BarChart3", 
-            change: `Your Rank: N/A` // Rank calculation removed for performance
+            icon: "Coins", 
+            change: `Your Rank: N/A`
         };
         return [...initialStats, userRankStat];
     }, [initialStats, user]);
@@ -85,6 +114,7 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
             <section>
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">Stats Overview</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                 <DailyBonusCard bonusAvailable={bonusAvailable} />
                 {stats.map((stat) => (
                     <StatsCard key={stat.title} item={stat} />
                 ))}

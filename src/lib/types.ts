@@ -14,6 +14,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   isAdmin?: boolean;
   emailVerified: boolean;
   createdAt?: Timestamp;
+  lastBonusClaimedAt?: Timestamp;
   bio?: string;
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
@@ -23,7 +24,6 @@ export interface UserProfile extends Partial<FirebaseUser> {
   kills?: number;
   deaths?: number;
   apnaId?: string;
-  lastLogin?: Timestamp;
 }
 
 export type PointTransaction = {

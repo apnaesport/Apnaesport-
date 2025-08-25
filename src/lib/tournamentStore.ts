@@ -198,7 +198,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   }
 
   if (queryParams?.excludeQuick) {
-      qConstraints.push(where("featured", "in", [true, false])); 
+      qConstraints.push(where("isQuickTournament", "in", [true, false])); 
   }
   
   if (queryParams?.participantId) {
@@ -539,6 +539,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp,
+      lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -548,65 +549,67 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       kills: data.kills || 0,
       deaths: data.deaths || 0,
       apnaId: data.apnaId,
-      lastLogin: data.lastLogin as Timestamp,
     } as UserProfile;
   }
   return null;
 };
 
-// Helper function to check if a day has passed
-const isNewDay = (lastLogin: Timestamp | Date | string | undefined): boolean => {
-    if (!lastLogin) return true;
+const isNewDayForBonus = (lastClaimed: Timestamp | undefined): boolean => {
+    if (!lastClaimed) return true; // Never claimed before
 
-    let lastLoginDate: Date;
-    // Handle different timestamp formats from Firestore
-    if (lastLogin instanceof Date) {
-        lastLoginDate = lastLogin;
-    } else if (typeof (lastLogin as Timestamp)?.toDate === 'function') {
-        lastLoginDate = (lastLogin as Timestamp).toDate();
-    } else if (typeof lastLogin === 'string') {
-        lastLoginDate = new Date(lastLogin);
-    } else {
-        return true; // Invalid format, assume it's a new day to be safe
-    }
+    const lastClaimDate = lastClaimed.toDate();
+    const now = new Date();
     
-    // Check for invalid date object
-    if (isNaN(lastLoginDate.getTime())) {
-        return true; 
-    }
+    // Reset hours, minutes, seconds for accurate date comparison
+    lastClaimDate.setHours(0, 0, 0, 0);
+    now.setHours(0, 0, 0, 0);
 
-    const today = new Date();
-    // Compare date parts only (YYYY-MM-DD) to ignore time
-    return (
-        lastLoginDate.getFullYear() < today.getFullYear() ||
-        lastLoginDate.getMonth() < today.getMonth() ||
-        lastLoginDate.getDate() < today.getDate()
-    );
+    return now.getTime() > lastClaimDate.getTime();
 };
 
+export const isDailyBonusAvailable = async (userId: string): Promise<boolean> => {
+    const user = await getUserProfileFromFirestore(userId);
+    if (!user) return false;
+    return isNewDayForBonus(user.lastBonusClaimedAt);
+};
 
-export const checkForDailyLoginBonus = async (user: UserProfile): Promise<boolean> => {
-    if (isNewDay(user.lastLogin)) {
-        const batch = writeBatch(db);
-        const userRef = doc(db, USERS_COLLECTION, user.uid);
-        const transactionRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
+export const claimDailyBonus = async (userId: string): Promise<{ success: boolean, message: string, amount?: number }> => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
 
-        batch.update(userRef, {
-            points: increment(DAILY_LOGIN_BONUS),
-            lastLogin: serverTimestamp()
+    try {
+        const result = await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) {
+                throw new Error("User not found.");
+            }
+            const userData = userDoc.data() as UserProfile;
+
+            if (!isNewDayForBonus(userData.lastBonusClaimedAt)) {
+                return { success: false, message: "Bonus already claimed today." };
+            }
+
+            // Award the bonus
+            transaction.update(userRef, {
+                points: increment(DAILY_LOGIN_BONUS),
+                lastBonusClaimedAt: serverTimestamp()
+            });
+
+            // Log the transaction
+            const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+            transaction.set(transactionRef, {
+                amount: DAILY_LOGIN_BONUS,
+                type: 'credit',
+                reason: 'Daily Bonus Claimed',
+                createdAt: serverTimestamp()
+            });
+
+            return { success: true, message: "Bonus claimed successfully!", amount: DAILY_LOGIN_BONUS };
         });
-
-        batch.set(transactionRef, {
-            amount: DAILY_LOGIN_BONUS,
-            type: 'credit',
-            reason: 'Daily Login Bonus',
-            createdAt: serverTimestamp()
-        });
-
-        await batch.commit();
-        return true; // Bonus was awarded
+        return result;
+    } catch (error: any) {
+        console.error("Error claiming daily bonus:", error);
+        return { success: false, message: error.message || "An unknown error occurred." };
     }
-    return false; // Not a new day, no bonus awarded
 };
 
 export const getPointTransactions = async (userId: string): Promise<PointTransaction[]> => {
@@ -632,6 +635,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
       createdAt: data.createdAt as Timestamp,
+      lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -641,7 +645,6 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       kills: data.kills || 0,
       deaths: data.deaths || 0,
       apnaId: data.apnaId,
-      lastLogin: data.lastLogin as Timestamp,
     };
   });
 };
