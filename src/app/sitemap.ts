@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next'
 import { getTournamentsFromFirestore, getGamesFromFirestore, getCommunitiesFromFirestore } from '@/lib/tournamentStore';
 import type { Timestamp } from 'firebase/firestore';
 
-const BASE_URL = 'https://apnaesport.vercel.app';
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.app';
 
 // Helper function to safely convert Firestore Timestamps
 const toDate = (timestamp: Timestamp | Date | undefined): Date => {
@@ -18,37 +18,37 @@ const toDate = (timestamp: Timestamp | Date | undefined): Date => {
 
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  // Static Routes
+  // Static Routes - these are the main, public-facing pages of your site.
   const staticRoutes: MetadataRoute.Sitemap = [
     {
-      url: `${BASE_URL}/dashboard`,
+      url: `${BASE_URL}/landing`,
       lastModified: new Date(),
-      changeFrequency: 'daily',
+      changeFrequency: 'monthly',
       priority: 1.0,
     },
-    {
+     {
       url: `${BASE_URL}/tournaments`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.9,
     },
     {
-      url: `${BASE_URL}/games`,
+      url: `${BASE_URL}/community`,
       lastModified: new Date(),
-      changeFrequency: 'weekly',
+      changeFrequency: 'daily',
       priority: 0.8,
     },
-     {
+    {
       url: `${BASE_URL}/creators`,
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 0.8,
     },
     {
-      url: `${BASE_URL}/community`,
+      url: `${BASE_URL}/games`,
       lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 0.8,
+      changeFrequency: 'weekly',
+      priority: 0.7,
     },
     {
       url: `${BASE_URL}/about`,
@@ -78,13 +78,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${BASE_URL}/auth/login`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
-      priority: 0.6,
+      priority: 0.4,
     },
     {
       url: `${BASE_URL}/auth/register`,
       lastModified: new Date(),
       changeFrequency: 'yearly',
-      priority: 0.6,
+      priority: 0.4,
     },
   ];
 

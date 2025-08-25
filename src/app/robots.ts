@@ -7,27 +7,33 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
-      // Allow all crawlers to access the site
+      // Allow all crawlers to access the public parts of the site
       {
         userAgent: '*',
-        allow: '/',
-        // Disallow crawling of private/admin pages and auth routes
+        allow: [
+          '/',
+          '/landing',
+          '/tournaments',
+          '/games',
+          '/community',
+          '/creators',
+          '/about',
+          '/contact',
+          '/privacy',
+          '/terms',
+          '/auth/login',
+          '/auth/register',
+        ],
+        // Disallow crawling of private user-specific pages and the admin area
         disallow: [
           '/admin/',
           '/profile/',
           '/settings/',
-          '/auth/',
           '/notifications/',
-          '/stats/', // Disallowing stats as it's a locked/user-specific page
+          '/stats/', 
+          '/rewards/',
         ],
       },
-      // You can add more specific rules for other bots if needed
-      // Example for Googlebot
-      // {
-      //   userAgent: 'Googlebot',
-      //   allow: ['/'],
-      //   disallow: ['/admin/'],
-      // },
     ],
     // Point to the sitemap location
     sitemap: `${BASE_URL}/sitemap.xml`,
