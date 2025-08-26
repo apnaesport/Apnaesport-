@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -56,6 +55,7 @@ service cloud.firestore {
       allow read: if true;
 
       // A user can create their own profile document.
+      // This is the only place we use `isSignedIn()` instead of `isVerified()`.
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
                     && request.resource.data.points == 10
@@ -64,8 +64,10 @@ service cloud.firestore {
       
       // A user can update their own profile, but with restrictions.
       allow update: if isVerified() && (
-        // Admins can update any profile including protected fields like points and premium status.
-        (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['apnaId', 'createdAt', 'uid'])) ||
+        // Admins can update specific fields on any profile (e.g. points, premium status).
+        (isAdmin() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['apnaId', 'createdAt', 'uid'])
+        ) ||
         // A user can update their own profile...
         (isSelf(userId) &&
           // but they cannot change these protected fields.
@@ -85,7 +87,7 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         // A user can read their OWN transaction history.
         allow read: if isSelf(userId);
-        // Only a server-side process can create a transaction record, which requires isSelf to be true.
+        // A user can create their own transaction record (for daily bonus, etc.).
         allow create: if isSelf(userId);
         // Nobody can manually update or delete transactions.
         allow update, delete: if false;
