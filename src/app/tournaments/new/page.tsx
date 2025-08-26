@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
@@ -43,19 +43,21 @@ const tournamentSchema = z.object({
   registrationInstructions: z.string().optional(),
   featured: z.boolean().optional(),
   bannerImageUrl: z.string().url("Must be a valid URL.").or(z.literal("")).optional(),
+  bannerImageFile: z.custom<FileList>().optional(),
   sponsorName: z.string().optional(),
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
 });
 
 
 export default function CreateTournamentPage() {
-  const { user, isAdmin, loading: authLoading, refreshUser } = useAuth();
+  const { user, isAdmin, isPremium, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [isLoadingGames, setIsLoadingGames] = useState(true);
   const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
   const TOURNAMENT_CREATION_FEE = 40;
 
@@ -135,13 +137,19 @@ export default function CreateTournamentPage() {
             finalStartDate.setHours(23, 59); 
         }
     }
+    
+    let finalBannerUrl = data.bannerImageUrl || selectedGame.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`;
+    if (isPremium && bannerPreview && bannerPreview.startsWith('data:')) {
+        finalBannerUrl = bannerPreview;
+    }
+
 
     const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bracketType'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
       gameIconUrl: selectedGame.iconUrl,
-      bannerImageUrl: selectedGame.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
+      bannerImageUrl: finalBannerUrl,
       description: data.description,
       startDate: finalStartDate, 
       maxParticipants: data.maxParticipants,
@@ -176,6 +184,20 @@ export default function CreateTournamentPage() {
       setIsSubmittingForm(false);
     }
   };
+  
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setBannerPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            setBannerPreview(null);
+        }
+    };
+
 
   if (authLoading || (user && isLoadingGames)) { 
     return (
@@ -281,6 +303,27 @@ export default function CreateTournamentPage() {
               {form.formState.errors.description && <p className="text-destructive text-xs mt-1">{form.formState.errors.description.message}</p>}
             </div>
             
+            <div className="space-y-2">
+                <Label>Tournament Banner</Label>
+                <div className="relative p-4 border-2 border-dashed rounded-lg">
+                    {!isPremium && (
+                        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
+                            <Lock className="h-8 w-8 text-primary mb-2"/>
+                            <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
+                            <p className="text-sm text-muted-foreground">Unlock custom banner uploads with Premium status.</p>
+                             <Button variant="link" asChild><Link href="/premium">Learn More</Link></Button>
+                        </div>
+                    )}
+                    <div className={!isPremium ? 'blur-sm select-none pointer-events-none' : ''}>
+                        <p className="text-sm text-muted-foreground mb-2">Upload a custom banner (1200x400 recommended). If none is provided, the game's default banner will be used.</p>
+                        <Input id="bannerImageFile" type="file" {...form.register("bannerImageFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={handleFileChange} disabled={!isPremium}/>
+                        {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={400} height={200} className="rounded-md border object-cover aspect-video mt-2" data-ai-hint='custom banner preview' unoptimized />}
+                        <Input {...form.register("bannerImageUrl")} placeholder="Or enter Banner URL" className="mt-2" disabled={!isPremium}/>
+                        {form.formState.errors.bannerImageUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.bannerImageUrl.message}</p>}
+                    </div>
+                </div>
+            </div>
+
             <div>
               <Label htmlFor="startDate">Start Date & Time</Label>
               <Controller
@@ -409,8 +452,8 @@ export default function CreateTournamentPage() {
             <Card className="mt-6 border-dashed border-primary/50 relative bg-muted/30">
               <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
                   <Lock className="h-8 w-8 text-primary mb-2"/>
-                  <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
-                  <p className="text-sm text-muted-foreground">This feature is available for premium users only.</p>
+                  <h3 className="font-bold text-lg text-foreground">Admin-Only Feature</h3>
+                  <p className="text-sm text-muted-foreground">This feature is available for platform administrators only.</p>
               </div>
               <div className="blur-sm select-none pointer-events-none">
                 <CardHeader>
@@ -443,5 +486,3 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
-
-    

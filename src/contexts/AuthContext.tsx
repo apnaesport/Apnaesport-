@@ -14,6 +14,7 @@ interface AuthContextType {
   user: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  isPremium: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -49,6 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             email: firebaseUser.email,
             photoURL: firebaseUser.photoURL,
             isAdmin: false,
+            isPremium: false,
             emailVerified: firebaseUser.emailVerified,
             points: 10,
             createdAt: serverTimestamp() as Timestamp,
@@ -90,9 +92,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [fetchAndSetUser]);
   
   const isAdmin = user?.isAdmin || false;
+  const isPremium = user?.isPremium || false;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isPremium, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

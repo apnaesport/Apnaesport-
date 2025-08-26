@@ -12,6 +12,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
+  isPremium?: boolean; // Added for premium feature
+  premiumSince?: Timestamp; // Added for premium feature
   emailVerified: boolean;
   createdAt?: Timestamp;
   lastBonusClaimedAt?: Timestamp;
@@ -127,6 +129,7 @@ export type TournamentFormDataUI = {
   registrationInstructions?: string;
   featured?: boolean;
   bannerImageUrl?: string;
+  bannerImageFile?: FileList; // Added for custom upload
   sponsorName?: string;
   sponsorLogoUrl?: string;
 };

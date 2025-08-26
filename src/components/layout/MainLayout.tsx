@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { SponsorshipCTA } from "./SponsorshipCTA";
 import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle, Home } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle, Home, Star } from "lucide-react"; 
 import { Button } from "../ui/button";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
@@ -191,6 +191,7 @@ export function MainLayout({ children }: MainLayoutProps) {
                             <li><Link href="/privacy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
                             <li><Link href="/terms" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
                             <li><Link href="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact</Link></li>
+                            <li><Link href="/premium" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400"/>Premium</Link></li>
                         </ul>
                     </div>
                     <div className="space-y-6 col-span-2 sm:col-span-1">

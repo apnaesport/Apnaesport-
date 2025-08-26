@@ -538,6 +538,8 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
+      isPremium: data.isPremium || false,
+      premiumSince: data.premiumSince as Timestamp,
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       bio: data.bio || "",
@@ -634,6 +636,8 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
       isAdmin: data.isAdmin || false,
+      isPremium: data.isPremium || false,
+      premiumSince: data.premiumSince as Timestamp,
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       bio: data.bio || "",
@@ -689,6 +693,39 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
         });
     });
 };
+
+// --- Premium User Functions ---
+export const updateUserPremiumStatus = async (identifier: string, isPremium: boolean): Promise<void> => {
+  let userQuery;
+  // Check if identifier is an email or Apna ID
+  if (identifier.includes('@')) {
+    userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier));
+  } else {
+    userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier));
+  }
+
+  const querySnapshot = await getDocs(userQuery);
+  if (querySnapshot.empty) {
+    throw new Error("User not found with that identifier.");
+  }
+  const userDoc = querySnapshot.docs[0];
+  const userRef = doc(db, USERS_COLLECTION, userDoc.id);
+
+  const updateData: any = {
+    isPremium: isPremium,
+    updatedAt: serverTimestamp(),
+  };
+
+  if (isPremium) {
+    updateData.premiumSince = serverTimestamp();
+  } else {
+    // Optionally remove premiumSince when revoking, or keep it for historical data
+    // updateData.premiumSince = null; // Or deleteField()
+  }
+
+  await updateDoc(userRef, updateData);
+};
+
 
 // --- Site Settings Functions ---
 export const getSiteSettingsFromFirestore = async (): Promise<SiteSettings | null> => {
