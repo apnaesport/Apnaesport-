@@ -65,13 +65,13 @@ service cloud.firestore {
       
       // A user can update their own profile, but with restrictions.
       allow update: if isVerified() && (
-        // Admins can update any profile.
-        isAdmin() ||
+        // Admins can update any profile, including points.
+        (isAdmin() &&
+         !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'apnaId', 'createdAt', 'uid'])) ||
         // A user can update their own profile...
         (isSelf(userId) &&
           // but they cannot change these protected fields.
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'createdAt', 'uid'])
-        ) ||
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'points', 'apnaId', 'createdAt', 'uid'])) ||
         // Allow updating only lastBonusClaimedAt and points for the daily bonus.
         (isSelf(userId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastBonusClaimedAt', 'points', 'updatedAt']) &&
@@ -86,8 +86,9 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         // A user can read their OWN transaction history.
         allow read: if isSelf(userId);
-        // A user can create their own transaction record (for daily bonus, etc.).
-        allow create: if isSelf(userId);
+        // Only the system (via a transaction) or an admin can create a transaction record.
+        // We check if the write is coming from a self-write (user action) or admin action.
+        allow create: if isVerified() && isSelf(userId);
         // Nobody can manually update or delete transactions.
         allow update, delete: if false;
       }

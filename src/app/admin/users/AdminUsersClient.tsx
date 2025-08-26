@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ADMIN_EMAIL } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateUserAdminStatusInFirestore, getAllUsersFromFirestore } from "@/lib/tournamentStore";
+import { updateUserAdminStatusInFirestore, getAllUsersFromFirestore, adjustUserPoints } from "@/lib/tournamentStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,9 +30,16 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "@/components/ui/dialog";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import type { Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useForm, type SubmitHandler } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Helper function to convert Timestamp to a readable string or return a fallback
 const formatDateFromTimestamp = (timestamp: any) => {
@@ -48,11 +55,18 @@ const formatDateFromTimestamp = (timestamp: any) => {
     }
 };
 
-
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "??";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
 };
+
+const pointsSchema = z.object({
+  amount: z.coerce.number().min(1, "Amount must be at least 1.").max(10000, "Amount cannot exceed 10,000."),
+  type: z.enum(["credit", "debit"]),
+  reason: z.string().min(3, "Reason must be at least 3 characters.").max(100, "Reason is too long."),
+});
+
+type PointsFormData = z.infer<typeof pointsSchema>;
 
 
 export default function AdminUsersClient() {
@@ -61,6 +75,18 @@ export default function AdminUsersClient() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth(); 
   const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
+  const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [isPointsDialogOpen, setIsPointsDialogOpen] = useState(false);
+
+  const pointsForm = useForm<PointsFormData>({
+    resolver: zodResolver(pointsSchema),
+    defaultValues: {
+        amount: 10,
+        type: "credit",
+        reason: "",
+    },
+  });
 
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
@@ -108,7 +134,76 @@ export default function AdminUsersClient() {
     toast({ title: "Ban Action (Simulated)", description: `Banning ${displayName || userId} would typically involve backend actions.`});
   };
 
+  const openPointsDialog = (user: UserProfile) => {
+    setSelectedUser(user);
+    pointsForm.reset();
+    setIsPointsDialogOpen(true);
+  };
+  
+  const handleAdjustPoints: SubmitHandler<PointsFormData> = async (data) => {
+    if (!selectedUser) return;
+    setIsAdjustingPoints(true);
+    try {
+        await adjustUserPoints(selectedUser.uid, data.amount, data.type, data.reason);
+        toast({
+            title: "Points Adjusted",
+            description: `${data.amount} points have been ${data.type === 'credit' ? 'added to' : 'removed from'} ${selectedUser.displayName}.`
+        });
+        await fetchUsers();
+        setIsPointsDialogOpen(false);
+    } catch(error: any) {
+        toast({ title: "Error Adjusting Points", description: error.message || "An unknown error occurred.", variant: "destructive" });
+    } finally {
+        setIsAdjustingPoints(false);
+    }
+  }
+
+
   return (
+    <>
+    <Dialog open={isPointsDialogOpen} onOpenChange={setIsPointsDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Adjust Points for {selectedUser?.displayName}</DialogTitle>
+                <DialogDescription>
+                    Manually add or remove AE points from this user's account. This action will be recorded in their transaction history.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={pointsForm.handleSubmit(handleAdjustPoints)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="type">Action</Label>
+                        <Select onValueChange={(value) => pointsForm.setValue('type', value as "credit" | "debit")} defaultValue="credit">
+                            <SelectTrigger id="type">
+                                <SelectValue placeholder="Select action..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="credit">Add Points</SelectItem>
+                                <SelectItem value="debit">Remove Points</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label htmlFor="amount">Amount</Label>
+                        <Input id="amount" type="number" {...pointsForm.register("amount")} disabled={isAdjustingPoints}/>
+                    </div>
+                </div>
+                 {pointsForm.formState.errors.amount && <p className="text-destructive text-xs mt-1">{pointsForm.formState.errors.amount.message}</p>}
+                <div>
+                    <Label htmlFor="reason">Reason</Label>
+                    <Input id="reason" {...pointsForm.register("reason")} placeholder="e.g., Giveaway prize, refund" disabled={isAdjustingPoints}/>
+                    {pointsForm.formState.errors.reason && <p className="text-destructive text-xs mt-1">{pointsForm.formState.errors.reason.message}</p>}
+                </div>
+                 <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost" disabled={isAdjustingPoints}>Cancel</Button></DialogClose>
+                    <Button type="submit" disabled={isAdjustingPoints}>
+                        {isAdjustingPoints && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Confirm
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
@@ -173,8 +268,8 @@ export default function AdminUsersClient() {
                   {formatDateFromTimestamp(user.createdAt)}
               </TableCell>
               <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap">
-                <Button variant="outline" size="icon" title="Edit User Details (Coming Soon)" disabled className="h-8 w-8 sm:h-9 sm:w-9">
-                  <Edit className="h-4 w-4" />
+                <Button variant="outline" size="icon" title="Adjust Points" onClick={() => openPointsDialog(user)} className="h-8 w-8 sm:h-9 sm:w-9">
+                  <Coins className="h-4 w-4" />
                 </Button>
                  {user.email !== ADMIN_EMAIL && user.uid !== currentUser?.uid && ( 
                   <>
@@ -224,5 +319,6 @@ export default function AdminUsersClient() {
         </TableBody>
       </Table>
     </div>
+    </>
   );
 }

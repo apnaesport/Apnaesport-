@@ -198,7 +198,7 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   }
 
   if (queryParams?.excludeQuick) {
-      qConstraints.push(where("isQuickTournament", "in", [true, false])); 
+      qConstraints.push(where("isQuickTournament", "in", [false, null])); 
   }
   
   if (queryParams?.participantId) {
@@ -666,6 +666,28 @@ export const updateUserProfileInFirestore = async (userId: string, profileData: 
   }
 
   await updateDoc(userRef, dataToUpdate);
+};
+
+export const adjustUserPoints = async (userId: string, amount: number, type: 'credit' | 'debit', reason: string): Promise<void> => {
+    if (amount <= 0) throw new Error("Amount must be positive.");
+
+    return runTransaction(db, async (transaction) => {
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+        
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User not found.");
+
+        const change = type === 'credit' ? amount : -amount;
+        
+        transaction.update(userRef, { points: increment(change) });
+        transaction.set(transactionRef, {
+            amount: amount,
+            type: type,
+            reason: `Admin: ${reason}`, // Prefix with Admin for clarity
+            createdAt: serverTimestamp()
+        });
+    });
 };
 
 // --- Site Settings Functions ---
