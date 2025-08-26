@@ -41,6 +41,18 @@ export async function generateMetadata({ params }: GameTournamentsPageProps, par
   };
 }
 
+// Helper to convert Firestore Timestamps to a serializable format for Client Components
+const serializeTournament = (tournament: Tournament): any => {
+  return JSON.parse(JSON.stringify(tournament, (key, value) => {
+    // Firestore Timestamps have a toDate method
+    if (value && typeof value === 'object' && typeof value.toDate === 'function') {
+      return value.toDate().toISOString();
+    }
+    return value;
+  }));
+}
+
+
 export default async function GameTournamentsPage({ params }: GameTournamentsPageProps) {
   const { gameId } = params;
   const game = await getGameDetails(gameId);
@@ -59,6 +71,7 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
   }
 
   const allTournaments = await getTournamentsForGame(gameId);
+  const serializableTournaments = allTournaments.map(serializeTournament);
 
   // Serialize the game object to make it a plain object
   const serializableGame = {
@@ -102,7 +115,7 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
           <AdsterraBlock format="leaderboard" />
       </div>
 
-      <GameTournamentsClient game={serializableGame as Game} initialTournaments={allTournaments} />
+      <GameTournamentsClient game={serializableGame as Game} initialTournaments={serializableTournaments} />
       
       <div className="flex justify-center mt-8">
           <AdsterraBlock format="leaderboard" />
