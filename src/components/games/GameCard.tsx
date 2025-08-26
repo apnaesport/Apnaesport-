@@ -19,9 +19,8 @@ export function GameCard({ game }: GameCardProps) {
         <Image
           src={game.bannerUrl || game.iconUrl || `https://placehold.co/400x300.png`}
           alt={game.name}
-          layout="fill"
-          objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="game wallpaper"
           onError={(e) => e.currentTarget.src = `https://placehold.co/400x300.png`}
         />

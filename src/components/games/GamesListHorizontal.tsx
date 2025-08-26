@@ -36,9 +36,8 @@ export function GamesListHorizontal({ games, title = "Browse Games" }: GamesList
                       src={game.iconUrl || `https://placehold.co/200x300.png`}
                       fallbackSrc={`https://placehold.co/200x300.png?text=${game.name.substring(0,2)}`}
                       alt={game.name}
-                      layout="fill"
-                      objectFit="cover"
-                      className="rounded-lg"
+                      fill
+                      className="object-cover rounded-lg"
                       data-ai-hint="game poster"
                       unoptimized={game.iconUrl?.startsWith('data:image')}
                     />

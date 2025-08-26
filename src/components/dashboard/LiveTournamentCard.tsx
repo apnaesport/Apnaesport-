@@ -25,9 +25,8 @@ export function LiveTournamentCard({ tournament }: LiveTournamentCardProps) {
           src={tournament.bannerImageUrl || ""}
           fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
-          layout="fill"
-          objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="gaming match"
           unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />

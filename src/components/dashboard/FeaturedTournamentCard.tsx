@@ -23,9 +23,8 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
           src={tournament.bannerImageUrl || ""}
           fallbackSrc={`https://placehold.co/800x400.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
-          layout="fill"
-          objectFit="cover"
-          className="transition-transform duration-500 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
           data-ai-hint="esports tournament banner"
           unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
