@@ -34,7 +34,9 @@ export const ImageWithFallback = forwardRef<HTMLImageElement, ImageWithFallbackP
     }
     
     const finalAlt = alt || 'Apna Esport placeholder image';
-    const unoptimized = unoptimizedProp || isDataUri;
+    
+    // Correctly handle the 'unoptimized' prop. It should be true or undefined, not false.
+    const unoptimized = (unoptimizedProp || isDataUri) ? true : undefined;
 
     return <Comp ref={ref} src={finalSrc} alt={finalAlt} onError={handleError} unoptimized={unoptimized} {...props} />;
   }
