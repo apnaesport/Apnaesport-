@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Edit3, LogIn, Save, Loader2, Gamepad2, FileText, BadgeInfo, Coins } from "lucide-react";
+import { Shield, Edit3, LogIn, Save, Loader2, Gamepad2, FileText, BadgeInfo, Coins, Crown, ImagePlus, Handshake } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
@@ -47,8 +47,33 @@ const statusColors: Record<CreatorApplication['status'], string> = {
     Archived: "bg-gray-500/20 text-muted-foreground border-gray-500/30",
 };
 
+const PremiumBenefitsCard = () => (
+    <Card className="bg-gradient-to-tr from-amber-400/20 via-yellow-400/20 to-orange-500/20 border-amber-500/50">
+        <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-500">
+                <Crown className="h-6 w-6"/> Premium Member
+            </CardTitle>
+            <CardDescription>You have access to exclusive features across the platform.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+            <div className="flex items-center gap-3 text-sm">
+                <ImagePlus className="h-5 w-5 text-primary"/>
+                <span>Custom tournament banners</span>
+            </div>
+             <div className="flex items-center gap-3 text-sm">
+                <Handshake className="h-5 w-5 text-primary"/>
+                <span>Add sponsors to your tournaments</span>
+            </div>
+             <div className="flex items-center gap-3 text-sm">
+                <Coins className="h-5 w-5 text-yellow-500"/>
+                <span>One-time bonus of 200 AE Points</span>
+            </div>
+        </CardContent>
+    </Card>
+)
+
 export default function ProfilePage() {
-  const { user, loading: authLoading, refreshUser } = useAuth();
+  const { user, loading: authLoading, refreshUser, isPremium } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
@@ -180,12 +205,12 @@ export default function ProfilePage() {
     <MainLayout>
       <PageTitle title="My Profile" subtitle="View and manage your account details." />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="md:col-span-1">
+        <div className="md:col-span-1 space-y-6">
           <Card className="text-center">
             <CardHeader>
-              <Avatar className="h-32 w-32 mx-auto mb-4 border-4 border-primary shadow-lg">
+              <Avatar className={cn("h-32 w-32 mx-auto mb-4 border-4 shadow-lg", isPremium ? "border-amber-500" : "border-primary")}>
                 <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} data-ai-hint="user avatar" />
-                <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
+                <AvatarFallback className={cn("text-4xl", isPremium ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground")}>
                   {getInitials(user.displayName)}
                 </AvatarFallback>
               </Avatar>
@@ -210,12 +235,8 @@ export default function ProfilePage() {
                 </div>
               )}
             </CardHeader>
-            <CardContent>
-              {/* <Button variant="outline" disabled> 
-                <Edit3 className="mr-2 h-4 w-4" /> Change Profile Picture
-              </Button> */}
-            </CardContent>
           </Card>
+          {isPremium && <PremiumBenefitsCard />}
         </div>
 
         <div className="md:col-span-2">

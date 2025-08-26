@@ -691,7 +691,7 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
         transaction.set(transactionRef, {
             amount: amount,
             type: type,
-            reason: `Admin: ${reason}`, // Prefix with Admin for clarity
+            reason: `From Apna Esport: ${reason}`, // Prefix with Admin for clarity
             createdAt: serverTimestamp()
         });
     });
@@ -699,45 +699,65 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
 
 // --- Premium User Functions ---
 export const updateUserPremiumStatus = async (identifier: string, isPremium: boolean): Promise<void> => {
-  return runTransaction(db, async (transaction) => {
-    let userQuery;
-    if (identifier.includes('@')) {
-      userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier));
-    } else {
-      userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier));
-    }
-    const querySnapshot = await getDocs(userQuery);
-    if (querySnapshot.empty) {
-      throw new Error("User not found with that identifier.");
-    }
-    const userDoc = querySnapshot.docs[0];
-    const userRef = doc(db, USERS_COLLECTION, userDoc.id);
+    return runTransaction(db, async (transaction) => {
+        let userDoc;
+        let userId;
 
-    const updateData: any = {
-      isPremium: isPremium,
-      updatedAt: serverTimestamp(),
-    };
+        if (identifier.includes('@')) {
+            const userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier), limit(1));
+            const querySnapshot = await getDocs(userQuery); // This is fine outside transaction for lookup
+            if (querySnapshot.empty) {
+                throw new Error("User not found with that email.");
+            }
+            userDoc = querySnapshot.docs[0];
+            userId = userDoc.id;
+        } else if (identifier.startsWith('AE')) {
+            const userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier), limit(1));
+            const querySnapshot = await getDocs(userQuery);
+            if (querySnapshot.empty) {
+                throw new Error("User not found with that Apna ID.");
+            }
+            userDoc = querySnapshot.docs[0];
+            userId = userDoc.id;
+        } else {
+             const userRef = doc(db, USERS_COLLECTION, identifier);
+             const docSnap = await transaction.get(userRef);
+             if (!docSnap.exists()) {
+                 throw new Error("User not found with that ID.");
+             }
+             userDoc = docSnap;
+             userId = docSnap.id;
+        }
 
-    if (isPremium) {
-      updateData.premiumSince = serverTimestamp();
-      // Check if the one-time bonus should be awarded
-      const userData = userDoc.data() as UserProfile;
-      if (!userData.hasReceivedPremiumBonus) {
-        updateData.points = increment(PREMIUM_POINT_BONUS);
-        updateData.hasReceivedPremiumBonus = true;
+        if (!userDoc) {
+             throw new Error("User not found with that identifier.");
+        }
 
-        // Log the bonus transaction
-        const transactionRef = doc(collection(db, USERS_COLLECTION, userDoc.id, TRANSACTIONS_COLLECTION));
-        transaction.set(transactionRef, {
-            amount: PREMIUM_POINT_BONUS,
-            type: 'credit',
-            reason: 'One-Time Premium Bonus',
-            createdAt: serverTimestamp()
-        });
-      }
-    }
-    transaction.update(userRef, updateData);
-  });
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const userData = userDoc.data() as UserProfile;
+        
+        const updateData: any = {
+            isPremium: isPremium,
+            updatedAt: serverTimestamp(),
+        };
+
+        if (isPremium) {
+            updateData.premiumSince = serverTimestamp();
+            if (!userData.hasReceivedPremiumBonus) {
+                updateData.points = increment(PREMIUM_POINT_BONUS);
+                updateData.hasReceivedPremiumBonus = true;
+
+                const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+                transaction.set(transactionRef, {
+                    amount: PREMIUM_POINT_BONUS,
+                    type: 'credit',
+                    reason: 'One-Time Premium Bonus',
+                    createdAt: serverTimestamp()
+                });
+            }
+        }
+        transaction.update(userRef, updateData);
+    });
 };
 
 

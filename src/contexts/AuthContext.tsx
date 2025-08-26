@@ -5,7 +5,7 @@ import type { User as FirebaseUser } from "firebase/auth";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, setAuthPersistence } from "@/lib/firebase";
 import type { UserProfile } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { generateApnaId } from "@/lib/tournamentStore";
@@ -25,6 +25,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    // Set persistence once when the app loads
+    setAuthPersistence();
+  }, []);
 
   const fetchAndSetUser = useCallback(async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {

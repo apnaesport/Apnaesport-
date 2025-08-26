@@ -17,6 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 
 const grantPremiumSchema = z.object({
   identifier: z.string().min(1, 'Please enter an email or Apna ID.'),
@@ -141,7 +142,12 @@ export default function AdminPremiumClient() {
                               <AvatarFallback>{user.displayName?.substring(0, 2) || 'U'}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <p className="font-medium">{user.displayName}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{user.displayName}</p>
+                                <Badge variant="outline" className="text-amber-500 border-amber-500/50 bg-amber-500/10 whitespace-nowrap">
+                                    <Crown className="h-3 w-3 mr-1" /> Premium
+                                </Badge>
+                              </div>
                               <p className="text-xs text-muted-foreground">{user.email}</p>
                             </div>
                           </div>
