@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { Skeleton } from '../ui/skeleton';
-import { useIsMobile } from '@/hooks/use-mobile'; // Import the hook to detect mobile screens
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export type AdFormat = 'leaderboard' | 'square' | 'social_bar';
 
@@ -20,15 +20,13 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   const adContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { settings, loadingSettings } = useSiteSettings();
-  const isMobile = useIsMobile(); // Check if the device is mobile
-  const uniqueId = useMemo(() => Math.random().toString(36).substring(7), []); // Generate a unique ID for each instance
+  const isMobile = useIsMobile();
+  // A unique ID for each instance of the component is crucial for multiple ads on one page
+  const uniqueId = useMemo(() => `adsterra-${Math.random().toString(36).substring(7)}`, []);
 
-  // Use a different, more mobile-friendly ad key for leaderboards on small screens if available
   const adKey = useMemo(() => {
     switch (format) {
       case 'leaderboard':
-        // On mobile, use the square ad key for a better fit if leaderboard is requested.
-        // This assumes the square ad unit is more responsive.
         return isMobile ? (settings?.adKeySquare || settings?.adKeyLeaderboard) : settings?.adKeyLeaderboard;
       case 'square': 
         return settings?.adKeySquare;
@@ -38,17 +36,18 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   }, [format, settings, isMobile]);
 
   const adsEnabled = settings?.adsEnabled ?? false;
-  const componentKey = `${pathname}-${format}-${adKey}-${isMobile}-${uniqueId}`; // Add uniqueId to the key
+  // The key for the useEffect hook must be absolutely unique for each instance
+  const componentKey = `${pathname}-${format}-${adKey}-${isMobile}-${uniqueId}`;
 
-  // Ad dimensions are now for placeholder/skeleton purposes. The script will handle responsiveness.
   const adDimensions = {
     leaderboard: { width: 728, height: 90 },
     square: { width: 300, height: 250 },
     social_bar: { width: 0, height: 0 },
   };
   
-  // Choose dimensions based on the original format, not the potentially swapped one for mobile
   const { width, height } = adDimensions[format];
+  const effectiveHeight = isMobile && format === 'leaderboard' ? 250 : height;
+  const effectiveWidth = isMobile && format === 'leaderboard' ? 300 : width;
 
   useEffect(() => {
     if (loadingSettings || !adsEnabled || !adKey) {
@@ -58,19 +57,19 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
 
     const container = adContainerRef.current;
     if (container) {
-      // Clear previous ad scripts to prevent conflicts
+      // Clear previous ad scripts to prevent conflicts during navigation
       container.innerHTML = '';
       
       const script = document.createElement('script');
       script.type = 'text/javascript';
       
-      // Using a responsive format. Adsterra will fill the container.
+      // The ad script itself is what's placed in the container.
       const adOptions = `
         atOptions = {
           'key' : '${adKey}',
           'format' : 'iframe',
-          'height' : ${isMobile && format === 'leaderboard' ? 250 : height},
-          'width' : ${isMobile && format === 'leaderboard' ? 300 : width},
+          'height' : ${effectiveHeight},
+          'width' : ${effectiveWidth},
           'params' : {}
         };
       `;
@@ -84,14 +83,12 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
       container.appendChild(script);
       container.appendChild(invokeScript);
     }
-  // We use componentKey which now includes uniqueId to ensure this effect re-runs for each ad block instance.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [componentKey, adsEnabled, adKey, loadingSettings, format, width, height, isMobile]);
+  }, [componentKey, adsEnabled, adKey, loadingSettings, effectiveWidth, effectiveHeight]);
 
   if (loadingSettings) {
-    // Show a skeleton that best represents the ad space on the current device
-    const skelHeight = isMobile && format === 'leaderboard' ? 'h-[250px]' : `h-[${height}px]`;
-    const skelWidth = isMobile && format === 'leaderboard' ? 'w-[300px]' : `w-full max-w-[${width}px]`;
+    const skelHeight = `h-[${effectiveHeight}px]`;
+    const skelWidth = `w-full max-w-[${effectiveWidth}px]`;
     return <Skeleton className={cn(skelWidth, skelHeight, className)} />;
   }
 
@@ -99,15 +96,20 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
     return null; 
   }
 
-  // The outer container is now fully responsive.
+  // Assign the unique ID to the main container div
   return (
     <div
+      id={uniqueId}
       key={componentKey}
       className={cn(
         "ad-container w-full mx-auto flex items-center justify-center bg-muted/20 min-h-[50px] rounded-lg overflow-hidden",
         className
       )}
-      style={style}
+      style={{
+          maxWidth: `${effectiveWidth}px`,
+          maxHeight: `${effectiveHeight}px`,
+          ...style
+      }}
     >
         <div ref={adContainerRef} className="w-full h-full flex items-center justify-center">
             <span className="text-xs text-muted-foreground">Advertisement</span>
