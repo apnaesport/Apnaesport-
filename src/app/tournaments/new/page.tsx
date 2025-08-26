@@ -18,7 +18,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
@@ -165,8 +165,8 @@ export default function CreateTournamentPage() {
       matches: [], 
       featured: data.featured || false,
       entryFee: data.entryFee || 0,
-      sponsorName: data.sponsorName || undefined,
-      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
+      sponsorName: isPremium ? data.sponsorName || undefined : undefined,
+      sponsorLogoUrl: isPremium ? data.sponsorLogoUrl || undefined : undefined,
     };
     
     try {
@@ -316,9 +316,9 @@ export default function CreateTournamentPage() {
                     )}
                     <div className={!isPremium ? 'blur-sm select-none pointer-events-none' : ''}>
                         <p className="text-sm text-muted-foreground mb-2">Upload a custom banner (1200x400 recommended). If none is provided, the game's default banner will be used.</p>
-                        <Input id="bannerImageFile" type="file" {...form.register("bannerImageFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={handleFileChange} disabled={!isPremium}/>
+                        <Input id="bannerImageFile" type="file" {...form.register("bannerImageFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={handleFileChange} disabled={!isPremium || isSubmittingForm}/>
                         {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={400} height={200} className="rounded-md border object-cover aspect-video mt-2" data-ai-hint='custom banner preview' unoptimized />}
-                        <Input {...form.register("bannerImageUrl")} placeholder="Or enter Banner URL" className="mt-2" disabled={!isPremium}/>
+                        <Input {...form.register("bannerImageUrl")} placeholder="Or enter Banner URL" className="mt-2" disabled={!isPremium || isSubmittingForm}/>
                         {form.formState.errors.bannerImageUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.bannerImageUrl.message}</p>}
                     </div>
                 </div>
@@ -450,26 +450,29 @@ export default function CreateTournamentPage() {
             </div>
             
             <Card className="mt-6 border-dashed border-primary/50 relative bg-muted/30">
-              <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
-                  <Lock className="h-8 w-8 text-primary mb-2"/>
-                  <h3 className="font-bold text-lg text-foreground">Admin-Only Feature</h3>
-                  <p className="text-sm text-muted-foreground">This feature is available for platform administrators only.</p>
-              </div>
-              <div className="blur-sm select-none pointer-events-none">
+              {!isPremium && (
+                  <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
+                      <Lock className="h-8 w-8 text-primary mb-2"/>
+                      <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
+                      <p className="text-sm text-muted-foreground">Add a sponsor to your tournament with Premium status.</p>
+                      <Button variant="link" asChild><Link href="/premium">Learn More</Link></Button>
+                  </div>
+              )}
+              <div className={!isPremium ? 'blur-sm select-none pointer-events-none' : ''}>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
-                    <ShieldCheck className="h-5 w-5 text-primary" /> Sponsorship (Optional)
+                    <Handshake className="h-5 w-5 text-primary" /> Sponsorship (Optional)
                     </CardTitle>
                     <CardDescription>Add sponsor details if this tournament is sponsored.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="sponsorName">Sponsor Name</Label>
-                        <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={true} />
+                        <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={!isPremium || isSubmittingForm} />
                     </div>
                     <div>
                         <Label htmlFor="sponsorLogoUrl">Sponsor Logo URL</Label>
-                        <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={true} />
+                        <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={!isPremium || isSubmittingForm} />
                     </div>
                 </CardContent>
               </div>

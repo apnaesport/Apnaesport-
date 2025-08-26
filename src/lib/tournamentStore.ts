@@ -42,6 +42,7 @@ const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
 const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 const DAILY_LOGIN_BONUS = 5;
+const PREMIUM_POINT_BONUS = 200;
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
@@ -461,7 +462,7 @@ export const awardTournamentWinners = async (
                 transaction.set(prizeTransactionRef, {
                     amount: prize,
                     type: 'credit',
-                    reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} place in ${tournamentData.name}`,
+                    reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? 'nd' : '3rd'} place in ${tournamentData.name}`,
                     tournamentId: tournamentId,
                     createdAt: serverTimestamp()
                 });
@@ -542,6 +543,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       premiumSince: data.premiumSince as Timestamp,
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
+      hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -640,6 +642,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       premiumSince: data.premiumSince as Timestamp,
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
+      hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -696,34 +699,45 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
 
 // --- Premium User Functions ---
 export const updateUserPremiumStatus = async (identifier: string, isPremium: boolean): Promise<void> => {
-  let userQuery;
-  // Check if identifier is an email or Apna ID
-  if (identifier.includes('@')) {
-    userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier));
-  } else {
-    userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier));
-  }
+  return runTransaction(db, async (transaction) => {
+    let userQuery;
+    if (identifier.includes('@')) {
+      userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier));
+    } else {
+      userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier));
+    }
+    const querySnapshot = await getDocs(userQuery);
+    if (querySnapshot.empty) {
+      throw new Error("User not found with that identifier.");
+    }
+    const userDoc = querySnapshot.docs[0];
+    const userRef = doc(db, USERS_COLLECTION, userDoc.id);
 
-  const querySnapshot = await getDocs(userQuery);
-  if (querySnapshot.empty) {
-    throw new Error("User not found with that identifier.");
-  }
-  const userDoc = querySnapshot.docs[0];
-  const userRef = doc(db, USERS_COLLECTION, userDoc.id);
+    const updateData: any = {
+      isPremium: isPremium,
+      updatedAt: serverTimestamp(),
+    };
 
-  const updateData: any = {
-    isPremium: isPremium,
-    updatedAt: serverTimestamp(),
-  };
+    if (isPremium) {
+      updateData.premiumSince = serverTimestamp();
+      // Check if the one-time bonus should be awarded
+      const userData = userDoc.data() as UserProfile;
+      if (!userData.hasReceivedPremiumBonus) {
+        updateData.points = increment(PREMIUM_POINT_BONUS);
+        updateData.hasReceivedPremiumBonus = true;
 
-  if (isPremium) {
-    updateData.premiumSince = serverTimestamp();
-  } else {
-    // Optionally remove premiumSince when revoking, or keep it for historical data
-    // updateData.premiumSince = null; // Or deleteField()
-  }
-
-  await updateDoc(userRef, updateData);
+        // Log the bonus transaction
+        const transactionRef = doc(collection(db, USERS_COLLECTION, userDoc.id, TRANSACTIONS_COLLECTION));
+        transaction.set(transactionRef, {
+            amount: PREMIUM_POINT_BONUS,
+            type: 'credit',
+            reason: 'One-Time Premium Bonus',
+            createdAt: serverTimestamp()
+        });
+      }
+    }
+    transaction.update(userRef, updateData);
+  });
 };
 
 

@@ -1,14 +1,14 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus } from "lucide-react";
+import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins } from "lucide-react";
 import type { Metadata } from 'next';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Premium Features - Apna Esport",
-  description: "Unlock exclusive features with Apna Esport Premium. Get a verified badge, upload custom tournament banners, and more. Learn how to get premium access.",
+  description: "Unlock exclusive features with Apna Esport Premium. Get a verified badge, upload custom tournament banners, add sponsors, get free AE points, and more.",
 };
 
 const premiumFeatures = [
@@ -21,6 +21,16 @@ const premiumFeatures = [
         icon: ImagePlus,
         title: "Custom Tournament Banners",
         description: "As a tournament creator, upload your own custom banner images to make your event stand out."
+    },
+    {
+        icon: Handshake,
+        title: "Add Tournament Sponsors",
+        description: "Feature your own sponsors in the tournaments you create, including their name and logo."
+    },
+    {
+        icon: Coins,
+        title: "200 AE Points Bonus",
+        description: "Receive a one-time bonus of 200 AE Points instantly when you're granted Premium status."
     },
     {
         icon: ShieldCheck,

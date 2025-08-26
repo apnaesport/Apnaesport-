@@ -12,8 +12,9 @@ export interface UserProfile extends Partial<FirebaseUser> {
   photoURL: string | null;
   uid: string;
   isAdmin?: boolean;
-  isPremium?: boolean; // Added for premium feature
-  premiumSince?: Timestamp; // Added for premium feature
+  isPremium?: boolean;
+  premiumSince?: Timestamp;
+  hasReceivedPremiumBonus?: boolean; // New field for one-time bonus
   emailVerified: boolean;
   createdAt?: Timestamp;
   lastBonusClaimedAt?: Timestamp;
