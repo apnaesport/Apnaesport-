@@ -8,6 +8,7 @@ import { AlertTriangle } from "lucide-react";
 import { getGameDetails, getTournamentsForGame } from "@/lib/tournamentStore";
 import GameTournamentsClient from "./GameTournamentsClient";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 
 interface GameTournamentsPageProps {
   params: { gameId: string };
@@ -97,8 +98,15 @@ export default async function GameTournamentsPage({ params }: GameTournamentsPag
         </div>
       </div>
       
+      <div className="flex justify-center">
+          <AdsterraBlock format="leaderboard" />
+      </div>
+
       <GameTournamentsClient game={serializableGame as Game} initialTournaments={allTournaments} />
       
+      <div className="flex justify-center mt-8">
+          <AdsterraBlock format="leaderboard" />
+      </div>
     </div>
   );
 }
