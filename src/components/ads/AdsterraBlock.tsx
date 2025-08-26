@@ -36,7 +36,7 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   }, [format, settings, isMobile]);
 
   const adsEnabled = settings?.adsEnabled ?? false;
-  // The key for the useEffect hook must be absolutely unique for each instance
+  // The key for the useEffect hook must be absolutely unique for each instance to force re-render
   const componentKey = `${pathname}-${format}-${adKey}-${isMobile}-${uniqueId}`;
 
   const adDimensions = {
