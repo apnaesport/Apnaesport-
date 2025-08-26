@@ -64,14 +64,12 @@ service cloud.firestore {
       
       // A user can update their own profile, but with restrictions.
       allow update: if isVerified() && (
-        // Admins can update specific fields on any profile (e.g. points, premium status).
-        (isAdmin() &&
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['apnaId', 'createdAt', 'uid'])
-        ) ||
+        // Admins can update specific fields on any profile.
+        (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'apnaId', 'createdAt', 'uid'])) ||
         // A user can update their own profile...
         (isSelf(userId) &&
           // but they cannot change these protected fields.
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isPremium', 'premiumSince', 'points', 'apnaId', 'createdAt', 'uid'])
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isPremium', 'premiumSince', 'hasReceivedPremiumBonus', 'points', 'apnaId', 'createdAt', 'uid'])
         ) ||
         // Allow updating only lastBonusClaimedAt and points for the daily bonus.
         (isSelf(userId) &&
@@ -86,9 +84,10 @@ service cloud.firestore {
       // --- Rewards Transaction History (Subcollection) ---
       match /transactions/{transactionId} {
         // A user can read their OWN transaction history.
-        allow read: if isSelf(userId);
+        allow read: if isSelf(userId) || isAdmin();
         // A user can create their own transaction record (for daily bonus, etc.).
-        allow create: if isSelf(userId);
+        // An admin can also create a transaction for a user (adjusting points).
+        allow create: if isSelf(userId) || isAdmin();
         // Nobody can manually update or delete transactions.
         allow update, delete: if false;
       }
@@ -111,7 +110,7 @@ service cloud.firestore {
         allow create: if isVerified() && (
             // Rule for regular tournaments: User must have enough points.
             (
-                request.resource.data.isQuickTournament == false &&
+                (request.resource.data.isQuickTournament == false || !('isQuickTournament' in request.resource.data)) &&
                 getUserData(request.auth.uid).points >= 40
             ) ||
             // Rule for Quick Tournaments: Creator must be the owner of the specified community.
