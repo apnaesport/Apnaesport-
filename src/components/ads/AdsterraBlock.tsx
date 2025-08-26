@@ -21,6 +21,7 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   const pathname = usePathname();
   const { settings, loadingSettings } = useSiteSettings();
   const isMobile = useIsMobile(); // Check if the device is mobile
+  const uniqueId = useMemo(() => Math.random().toString(36).substring(7), []); // Generate a unique ID for each instance
 
   // Use a different, more mobile-friendly ad key for leaderboards on small screens if available
   const adKey = useMemo(() => {
@@ -37,7 +38,7 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   }, [format, settings, isMobile]);
 
   const adsEnabled = settings?.adsEnabled ?? false;
-  const componentKey = `${pathname}-${format}-${adKey}-${isMobile}`;
+  const componentKey = `${pathname}-${format}-${adKey}-${isMobile}-${uniqueId}`; // Add uniqueId to the key
 
   // Ad dimensions are now for placeholder/skeleton purposes. The script will handle responsiveness.
   const adDimensions = {
@@ -57,6 +58,9 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
 
     const container = adContainerRef.current;
     if (container) {
+      // Clear previous ad scripts to prevent conflicts
+      container.innerHTML = '';
+      
       const script = document.createElement('script');
       script.type = 'text/javascript';
       
@@ -77,10 +81,11 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
       invokeScript.type = 'text/javascript';
       invokeScript.src = `//www.profitabledisplaynetwork.com/${adKey}/invoke.js`;
       
-      container.innerHTML = '';
       container.appendChild(script);
       container.appendChild(invokeScript);
     }
+  // We use componentKey which now includes uniqueId to ensure this effect re-runs for each ad block instance.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [componentKey, adsEnabled, adKey, loadingSettings, format, width, height, isMobile]);
 
   if (loadingSettings) {
