@@ -58,18 +58,19 @@ export const uploadImageAndGetURL = async (file: File, path: string): Promise<st
   return downloadURL;
 };
 
-const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
+const getTournamentStatus = (tournament: Omit<Tournament, 'id'>): TournamentStatus => {
     const now = new Date();
-    const startTime = tournament.startDate.getTime();
+    const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as Timestamp).toDate();
+    const startTime = startDate.getTime();
     
-    // Auto-complete tournaments 2 hours after start time if they are still 'Live'
+    // Auto-complete tournaments 2 hours after start time if they are still 'Live' or 'Ongoing'
     const twoHoursAfterStart = startTime + (2 * 60 * 60 * 1000);
 
     if (tournament.status === 'Completed' || tournament.status === 'Cancelled') {
         return tournament.status;
     }
     
-    if (now.getTime() > twoHoursAfterStart) {
+    if (now.getTime() > twoHoursAfterStart && (tournament.status === 'Live' || tournament.status === 'Ongoing')) {
         return "Completed";
     }
 
@@ -192,22 +193,13 @@ export const addTournamentToFirestore = async (
 
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean, excludeQuick?: boolean }): Promise<Tournament[]> => {
-  const constraints: QueryConstraint[] = [orderBy("startDate", "desc")];
+  let constraints: QueryConstraint[] = [orderBy("startDate", "desc")];
   
-  if (queryParams?.status) {
-    constraints.push(where("status", "==", queryParams.status));
-  }
   if (queryParams?.gameId) {
     constraints.push(where("gameId", "==", queryParams.gameId));
   }
-  if (queryParams?.featured !== undefined) {
-    constraints.push(where("featured", "==", queryParams.featured));
-  }
   if (queryParams?.excludeQuick) {
-    constraints.push(where("isQuickTournament", "in", [false, null])); 
-  }
-  if (queryParams?.participantId) {
-    constraints.push(where("participants", "array-contains", { id: queryParams.participantId }));
+    constraints.push(where("isQuickTournament", "in", [false, null]));
   }
   if (queryParams?.count) {
     constraints.push(limit(queryParams.count));
@@ -215,26 +207,15 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...constraints);
   const tournamentsSnapshot = await getDocs(q);
-  const now = new Date();
   
   const tournamentsToUpdate: { ref: any, data: any }[] = [];
   
-  let tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
-    const data = docSnapshot.data();
+  const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
+    const data = docSnapshot.data() as Omit<Tournament, 'id'>;
     const tournament = {
       id: docSnapshot.id,
       ...data,
-      bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
-      gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
       startDate: (data.startDate as Timestamp).toDate(),
-      endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
-      createdAt: data.createdAt as Timestamp,
-      updatedAt: data.updatedAt as Timestamp,
-      entryFee: data.entryFee || 0,
-      prizePool: data.prizePool || 0,
-      sponsorName: data.sponsorName || undefined,
-      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
-      isQuickTournament: data.isQuickTournament || false,
     } as Tournament;
 
     const currentStatus = tournament.status;
@@ -243,22 +224,16 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     if (currentStatus !== newStatus && currentStatus !== "Cancelled") {
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
         tournamentsToUpdate.push({ ref: tournamentRef, data: { status: newStatus, updatedAt: serverTimestamp() } });
-        // Return the tournament with the *new* status for immediate UI update
         return { ...tournament, status: newStatus };
     }
     
     return tournament;
   });
 
-  // Perform updates in a batch if there are any
   if (tournamentsToUpdate.length > 0) {
     const batch = writeBatch(db);
     tournamentsToUpdate.forEach(t => batch.update(t.ref, t.data));
-    await batch.commit();
-  }
-
-  if (queryParams?.excludeQuick) {
-    tournaments = tournaments.filter(t => !t.isQuickTournament);
+    await batch.commit().catch(err => console.error("Batch update for tournament statuses failed:", err));
   }
 
   return tournaments;
@@ -720,8 +695,7 @@ export const updateUserPremiumStatus = async (identifier: string, isPremium: boo
              userQuery = query(collection(db, USERS_COLLECTION), where("uid", "==", identifier), limit(1));
         }
         
-        // Firestore transactions require all reads to be done first.
-        const querySnapshot = await getDocs(userQuery);
+        const querySnapshot = await transaction.get(userQuery);
         if (querySnapshot.empty) {
             throw new Error("User not found with that identifier.");
         }

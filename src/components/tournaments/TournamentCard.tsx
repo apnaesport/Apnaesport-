@@ -18,17 +18,14 @@ interface TournamentCardProps {
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
-  // Directly format the date string passed from the server component.
-  // useMemo ensures this only recalculates if the tournament start date changes.
   const formattedStartDate = useMemo(() => {
     if (!tournament.startDate) {
       return "No date specified";
     }
     try {
-      // The date is passed as an ISO string, so we create a new Date object from it.
       return format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p");
     } catch (error) {
-      console.error("Error formatting date in TournamentCard:", error);
+      console.error("Error formatting date:", error);
       return "Invalid date";
     }
   }, [tournament.startDate]);
