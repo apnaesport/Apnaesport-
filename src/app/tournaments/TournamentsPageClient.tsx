@@ -1,110 +1,74 @@
 
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import type { Tournament } from "@/lib/types";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { Input } from "@/components/ui/input";
-import { Search, Filter } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Search } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 import React from "react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSearchParams, useRouter } from "next/navigation";
+
 
 interface TournamentsPageClientProps {
     allTournaments: Tournament[];
 }
 
-export default function TournamentsPageClient({ allTournaments }: TournamentsPageClientProps) {
+function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const { settings } = useSiteSettings();
-  const [statusFilter, setStatusFilter] = useState<Record<Tournament["status"] | "all", boolean>>({
-    "all": true,
-    "Upcoming": false,
-    "Live": false,
-    "Ongoing": false,
-    "Completed": false,
-    "Cancelled": false,
-  });
-
   const adFrequency = settings?.adFrequencyInLists || 0;
+  
+  // Default to 'all', but allow URL to override the active tab
+  const activeTab = searchParams.get('status') || 'all';
+
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('status', value);
+    router.push(`?${params.toString()}`, { scroll: false });
+  };
 
 
-   const filteredTournaments = useMemo(() => {
-    let newFilteredTournaments = allTournaments.filter(t => !t.isQuickTournament);
-
-    const isFilteringForCompleted = statusFilter.Completed && !statusFilter.all;
-    if (!isFilteringForCompleted) {
-       newFilteredTournaments = newFilteredTournaments.filter(tournament => {
-        if (tournament.status === 'Completed') {
-          const completedDate = (tournament.endDate || tournament.updatedAt) as any;
-          if (!completedDate?.toDate) return true; // Keep if date is invalid for some reason
-          const sevenDaysAgo = new Date();
-          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-          return new Date(completedDate) > sevenDaysAgo;
-        }
-        return true;
-      });
-    }
-
+  const filteredTournaments = useMemo(() => {
+    let tournaments = allTournaments;
+    
+    // 1. Filter by search term
     if (searchTerm) {
-      newFilteredTournaments = newFilteredTournaments.filter(tournament =>
+      tournaments = tournaments.filter(tournament =>
         tournament.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         tournament.gameName.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-
-    const activeStatusFilters = Object.entries(statusFilter)
-      .filter(([_, isActive]) => isActive)
-      .map(([status]) => status as Tournament["status"] | "all");
     
-    if (!activeStatusFilters.includes("all") && activeStatusFilters.length > 0) {
-      newFilteredTournaments = newFilteredTournaments.filter(tournament =>
-        activeStatusFilters.includes(tournament.status)
-      );
-    }
-    
-    return newFilteredTournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
-  }, [searchTerm, statusFilter, allTournaments]);
-
-
-  const handleStatusFilterChange = (status: Tournament["status"] | "all") => {
-    setStatusFilter(prev => {
-      const newState = { ...prev };
-      if (status === "all") {
-        Object.keys(newState).forEach(key => newState[key as keyof typeof newState] = false);
-        newState.all = !prev.all; 
-        if (!newState.all && !Object.values(newState).some(val => val)) { 
-           newState.all = true;
-        }
+    // 2. Filter by status tab
+    if (activeTab !== 'all') {
+      const liveStatuses: Tournament['status'][] = ["Live", "Ongoing"];
+      if (activeTab === 'live') {
+        tournaments = tournaments.filter(tournament => liveStatuses.includes(tournament.status));
       } else {
-        newState.all = false;
-        newState[status] = !prev[status];
-        if (!newState[status] && !Object.values(newState).filter((v, k) => Object.keys(newState)[k] !== 'all').some(val => val) ) {
-          newState.all = true;
-        }
+        tournaments = tournaments.filter(tournament => tournament.status.toLowerCase() === activeTab);
       }
-      return newState;
-    });
-  };
+    }
 
+    // Sort by start date, most recent first
+    return tournaments.sort((a,b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+    
+  }, [searchTerm, activeTab, allTournaments]);
+  
   const itemsWithAds = useMemo(() => {
     if (!adFrequency || adFrequency <= 0) return filteredTournaments;
 
     const newItems: (Tournament | { isAd: true })[] = [];
-    // Add ad at the start
     if (filteredTournaments.length > 0) newItems.push({ isAd: true });
+    
     filteredTournaments.forEach((item, index) => {
       newItems.push(item);
-       // Inject ad after every X items, but not after the very last item.
       if ((index + 1) % adFrequency === 0 && index < filteredTournaments.length -1) {
         newItems.push({ isAd: true });
       }
@@ -112,59 +76,64 @@ export default function TournamentsPageClient({ allTournaments }: TournamentsPag
     return newItems;
   }, [filteredTournaments, adFrequency]);
 
+  const upcomingCount = allTournaments.filter(t => t.status === "Upcoming").length;
+  const liveCount = allTournaments.filter(t => t.status === "Live" || t.status === "Ongoing").length;
+  const completedCount = allTournaments.filter(t => t.status === "Completed").length;
+
 
   return (
     <>
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-grow">
+      <div className="relative mb-6">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
             placeholder="Search tournaments by name or game..."
-            className="pl-10"
+            className="pl-10 max-w-lg"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline">
-              <Filter className="mr-2 h-4 w-4" /> Filter by Status
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Status</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {Object.keys(statusFilter).map((statusKey) => (
-              <DropdownMenuCheckboxItem
-                key={statusKey}
-                checked={statusFilter[statusKey as keyof typeof statusFilter]}
-                onCheckedChange={() => handleStatusFilterChange(statusKey as Tournament["status"] | "all")}
-              >
-                {statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replace('_', ' ')}
-              </DropdownMenuCheckboxItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
-      {itemsWithAds.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-           {itemsWithAds.map((item, index) => {
-             if ('isAd' in item) {
-                return (
-                  <div key={`ad-${index}`} className="flex items-center justify-center">
-                     <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
-                  </div>
-                );
-             }
-             return <TournamentCard key={item.id} tournament={item} />;
-           })}
-        </div>
-      ) : (
-        <p className="text-muted-foreground text-center py-10">
-          No tournaments match your criteria. Try adjusting filters or check back later.
-        </p>
-      )}
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="upcoming">Upcoming ({upcomingCount})</TabsTrigger>
+          <TabsTrigger value="live">Live ({liveCount})</TabsTrigger>
+          <TabsTrigger value="completed">Completed ({completedCount})</TabsTrigger>
+        </TabsList>
+        <TabsContent value={activeTab} className="mt-6">
+           {itemsWithAds.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {itemsWithAds.map((item, index) => {
+                if ('isAd' in item) {
+                    return (
+                      <div key={`ad-${index}`} className="flex items-center justify-center">
+                        <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
+                      </div>
+                    );
+                }
+                return <TournamentCard key={item.id} tournament={item} />;
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                <h3 className="text-xl font-semibold">No Tournaments Found</h3>
+                <p className="text-muted-foreground mt-2">
+                    No tournaments match your current filter. Please select another category.
+                </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
     </>
   )
 }
+
+// Wrap the client component in Suspense to handle searchParams usage
+export default function TournamentsPageClient(props: TournamentsPageClientProps) {
+    return (
+        <Suspense fallback={<div><Skeleton className="h-10 w-full max-w-lg mb-6" /><Skeleton className="h-10 w-96 mb-6" /><Skeleton className="h-80 w-full" /></div>}>
+            <TournamentsPageContent {...props} />
+        </Suspense>
+    );
+}
+
