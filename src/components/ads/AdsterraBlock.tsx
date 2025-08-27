@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useId } from 'react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
@@ -21,8 +21,8 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
   const pathname = usePathname();
   const { settings, loadingSettings } = useSiteSettings();
   const isMobile = useIsMobile();
-  // A unique ID for each instance of the component is crucial for multiple ads on one page
-  const uniqueId = useMemo(() => `adsterra-${Math.random().toString(36).substring(7)}`, []);
+  // useId() generates a unique ID that is stable across server and client, preventing hydration mismatches.
+  const uniqueId = useId();
 
   const adKey = useMemo(() => {
     switch (format) {
@@ -30,6 +30,8 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
         return isMobile ? (settings?.adKeySquare || settings?.adKeyLeaderboard) : settings?.adKeyLeaderboard;
       case 'square': 
         return settings?.adKeySquare;
+      case 'social_bar':
+        return settings?.adKeySocialBar;
       default: 
         return '';
     }
@@ -85,6 +87,13 @@ export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) 
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [componentKey, adsEnabled, adKey, loadingSettings, effectiveWidth, effectiveHeight]);
+
+
+  if (format === 'social_bar') {
+     if (!adsEnabled || !settings?.adKeySocialBar) return null;
+     // Special handling for social bar which injects its own div
+     return <div key={componentKey} ref={adContainerRef} />;
+  }
 
   if (loadingSettings) {
     const skelHeight = `h-[${effectiveHeight}px]`;
