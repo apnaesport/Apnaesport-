@@ -15,10 +15,9 @@ import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
   tournament: Tournament;
-  formattedStartDate: string;
 }
 
-export function TournamentCard({ tournament, formattedStartDate }: TournamentCardProps) {
+export function TournamentCard({ tournament }: TournamentCardProps) {
   
   const getStatusBadgeVariant = (status: Tournament["status"]) => {
     switch (status) {
@@ -35,6 +34,13 @@ export function TournamentCard({ tournament, formattedStartDate }: TournamentCar
   };
   
   const isFreeEntry = !tournament.entryFee || tournament.entryFee <= 0;
+
+  // Format the date here on the client side to avoid hydration errors
+  const formattedStartDate = useMemo(() => {
+    if (!tournament.startDate) return "Date TBD";
+    // The date comes in as an ISO string, convert it to a Date object first
+    return format(new Date(tournament.startDate), "PPPp");
+  }, [tournament.startDate]);
 
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
