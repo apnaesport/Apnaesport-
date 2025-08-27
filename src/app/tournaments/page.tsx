@@ -7,15 +7,18 @@ import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import TournamentsPageClient from './TournamentsPageClient';
 import type { Tournament } from "@/lib/types";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import type { Timestamp } from "firebase/firestore";
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeTournament = (tournament: Tournament): any => {
-  const serialized = { ...tournament };
+  const serialized: { [key: string]: any } = { ...tournament };
   for (const key in serialized) {
-    if (serialized[key as keyof Tournament] instanceof Timestamp) {
-      serialized[key as keyof Tournament] = (serialized[key as keyof Tournament] as Timestamp).toDate().toISOString();
-    } else if(serialized[key as keyof Tournament] instanceof Date) {
-      serialized[key as keyof Tournament] = (serialized[key as keyof Tournament] as Date).toISOString();
+    const value = serialized[key as keyof Tournament];
+    // Safely check for Timestamp by looking for the .toDate() method
+    if (value && typeof value === 'object' && typeof (value as Timestamp).toDate === 'function') {
+      serialized[key] = (value as Timestamp).toDate().toISOString();
+    } else if (value instanceof Date) {
+      serialized[key] = (value as Date).toISOString();
     }
   }
   return JSON.parse(JSON.stringify(serialized));
