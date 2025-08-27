@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Gamepad2, Eye, Coins } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
@@ -18,22 +18,18 @@ interface TournamentCardProps {
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
-  const [formattedStartDate, setFormattedStartDate] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (tournament.startDate) {
-      try {
-        // Ensure tournament.startDate is a Date object or can be converted
-        const dateToFormat = tournament.startDate instanceof Date 
-          ? tournament.startDate 
-          : (tournament.startDate as any)?.toDate 
-            ? (tournament.startDate as any).toDate() 
-            : new Date(tournament.startDate as any);
-        setFormattedStartDate(format(dateToFormat, "MMM dd, yyyy 'at' p"));
-      } catch (error) {
-        console.error("Error formatting date in TournamentCard:", error);
-        setFormattedStartDate("Invalid date");
-      }
+  // Directly format the date string passed from the server component.
+  // useMemo ensures this only recalculates if the tournament start date changes.
+  const formattedStartDate = useMemo(() => {
+    if (!tournament.startDate) {
+      return "No date specified";
+    }
+    try {
+      // The date is passed as an ISO string, so we create a new Date object from it.
+      return format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p");
+    } catch (error) {
+      console.error("Error formatting date in TournamentCard:", error);
+      return "Invalid date";
     }
   }, [tournament.startDate]);
 
@@ -60,9 +56,8 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           src={tournament.bannerImageUrl || ''}
           fallbackSrc={`https://placehold.co/400x200.png?text=${encodeURIComponent(tournament.name)}`}
           alt={tournament.name}
-          layout="fill"
-          objectFit="cover"
-          className="transition-transform duration-300 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           data-ai-hint="tournament banner small"
           unoptimized={tournament.bannerImageUrl?.startsWith('data:image')}
         />
@@ -97,7 +92,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
           <div className="flex items-center text-muted-foreground">
             <CalendarDays className="h-4 w-4 mr-2 text-primary" />
-            <span>{formattedStartDate || "Loading date..."}</span>
+            <span>{formattedStartDate}</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2 text-primary" />
