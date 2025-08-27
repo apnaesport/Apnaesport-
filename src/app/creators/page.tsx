@@ -234,7 +234,7 @@ export default function CreatorHubPage() {
         </Card>
 
         <div className="flex justify-center">
-            <AdsterraBlock format="leaderboard" />
+            <AdsterraBlock format="leaderboard" key="creators-leaderboard-top" />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
@@ -310,11 +310,11 @@ export default function CreatorHubPage() {
                     )}
                 </CardContent>
                 </Card>
-                <AdsterraBlock format="square" />
+                <AdsterraBlock format="square" key="creators-square-sidebar"/>
             </div>
         </div>
          <div className="flex justify-center mt-8">
-            <AdsterraBlock format="leaderboard" />
+            <AdsterraBlock format="leaderboard" key="creators-leaderboard-bottom"/>
         </div>
     </div>
   );

@@ -367,6 +367,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIsCreator, setOwnerIsCreator] = useState(false);
+    const adFrequency = settings?.adFrequencyInLists || 0;
 
     const communityId = community.id;
 
@@ -406,6 +407,19 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
 
     const isMember = useMemo(() => user?.communityId === community.id, [user, community]);
     const isOwner = useMemo(() => user?.uid === community.ownerId, [user, community]);
+
+    const announcementsWithAds = useMemo(() => {
+        if (!adFrequency || adFrequency <= 0) return announcements;
+
+        const newItems: (Announcement | { isAd: true })[] = [];
+        announcements.forEach((item, index) => {
+            newItems.push(item);
+            if ((index + 1) % adFrequency === 0 && index < announcements.length - 1) {
+                newItems.push({ isAd: true });
+            }
+        });
+        return newItems;
+    }, [announcements, adFrequency]);
 
     const handleJoinCommunity = async () => {
         if (!user) {
@@ -560,7 +574,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
             </header>
             
              <div className="flex justify-center">
-                <AdsterraBlock format="leaderboard" />
+                <AdsterraBlock format="leaderboard" key="community-detail-top"/>
             </div>
             
             <Tabs defaultValue="home" className="w-full">
@@ -572,13 +586,13 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 </TabsList>
                 <TabsContent value="home" className="mt-4 space-y-4">
                     {isOwner && <AnnouncementForm communityId={communityId} ownerId={community.ownerId} />}
-                     {announcements.length > 0 ? (
-                        announcements.map((ann, index) => (
-                            <React.Fragment key={ann.id}>
-                                <AnnouncementCard announcement={ann} isOwner={isOwner} />
-                                {(index + 1) % 3 === 0 && <AdsterraBlock format="square" />}
-                            </React.Fragment>
-                        ))
+                     {announcementsWithAds.length > 0 ? (
+                        announcementsWithAds.map((item, index) => {
+                            if ('isAd' in item) {
+                                return <AdsterraBlock key={`announcement-ad-${index}`} format="square" />;
+                            }
+                            return <AnnouncementCard key={item.id} announcement={item} isOwner={isOwner} />;
+                        })
                     ) : (
                         <p className="text-muted-foreground text-center py-6">No announcements yet.</p>
                     )}
@@ -586,7 +600,6 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 <TabsContent value="tournaments" className="mt-4">
                     <div className="space-y-4">
                         <QuickTournamentForm community={community} />
-                        <AdsterraBlock format="square" />
                     </div>
                 </TabsContent>
                  <TabsContent value="members" className="mt-4">
@@ -599,7 +612,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 </TabsContent>
             </Tabs>
              <div className="flex justify-center mt-8">
-                <AdsterraBlock format="leaderboard" />
+                <AdsterraBlock format="leaderboard" key="community-detail-bottom"/>
             </div>
         </div>
     );

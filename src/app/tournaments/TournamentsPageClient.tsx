@@ -67,7 +67,6 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
         if (!adFrequency || adFrequency <= 0) return tournaments;
 
         const newItems: (Tournament | { isAd: true })[] = [];
-        if (tournaments.length > 0) newItems.push({ isAd: true });
         
         tournaments.forEach((item, index) => {
           newItems.push(item);
@@ -78,7 +77,7 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
         return newItems;
       }, [tournaments, adFrequency]);
 
-      if (itemsWithAds.length === 0 || (itemsWithAds.length === 1 && 'isAd' in itemsWithAds[0])) {
+      if (itemsWithAds.length === 0) {
           return (
              <div className="text-center py-10 border-2 border-dashed rounded-lg">
                 <h3 className="text-xl font-semibold">No Tournaments Found</h3>

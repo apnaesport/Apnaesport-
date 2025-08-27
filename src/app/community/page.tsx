@@ -184,11 +184,9 @@ export default function CommunityHubPage() {
         if (!adFrequency || adFrequency <= 0) return communities;
 
         const newItems: (Community | { isAd: true })[] = [];
-        // Add ad at the start
-        if(communities.length > 0) newItems.push({ isAd: true });
+        
         communities.forEach((item, index) => {
             newItems.push(item);
-            // Inject ad after every X items, but not after the very last item.
             if ((index + 1) % adFrequency === 0 && index < communities.length -1) {
                 newItems.push({ isAd: true });
             }
@@ -302,7 +300,7 @@ export default function CommunityHubPage() {
             />
 
             <div className="flex justify-center">
-                <AdsterraBlock format="leaderboard" />
+                <AdsterraBlock format="leaderboard" key="community-hub-top"/>
             </div>
 
             <div className="flex flex-col md:flex-row gap-4">
@@ -360,7 +358,7 @@ export default function CommunityHubPage() {
             )}
 
             <div className="flex justify-center mt-8">
-                <AdsterraBlock format="leaderboard" />
+                <AdsterraBlock format="leaderboard" key="community-hub-bottom"/>
             </div>
         </div>
     );

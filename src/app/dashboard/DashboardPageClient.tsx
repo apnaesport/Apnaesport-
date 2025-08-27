@@ -20,6 +20,7 @@ import { isDailyBonusAvailable } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import React from 'react';
 
 interface DashboardPageClientProps {
     stats: StatItem[];
@@ -55,6 +56,7 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     const { user, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const [bonusAvailable, setBonusAvailable] = useState(false);
+    const adFrequency = settings?.adFrequencyInLists || 0;
 
     useEffect(() => {
         const checkBonus = async () => {
@@ -79,13 +81,26 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     
     const recommendedTournaments: Tournament[] = [];
 
+    const liveTournamentsWithAds = useMemo(() => {
+        if (!adFrequency || adFrequency <= 0) return liveTournaments;
+
+        const newItems: (Tournament | { isAd: true })[] = [];
+        liveTournaments.forEach((item, index) => {
+            newItems.push(item);
+            if ((index + 1) % adFrequency === 0) {
+                newItems.push({ isAd: true });
+            }
+        });
+        return newItems;
+    }, [liveTournaments, adFrequency]);
+
     return (
         <div className="space-y-8">
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
             
             <section className="flex justify-center">
                 <div className="w-full max-w-5xl">
-                    <AdsterraBlock format="leaderboard" />
+                    <AdsterraBlock format="leaderboard" key="dashboard-leaderboard-top" />
                 </div>
             </section>
             
@@ -127,9 +142,12 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                 <h2 className="text-2xl font-semibold mb-4 text-foreground">Live Now</h2>
                 {liveTournaments.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {liveTournaments.map((tournament) => (
-                    <LiveTournamentCard key={tournament.id} tournament={tournament} />
-                    ))}
+                    {liveTournamentsWithAds.map((item, index) => {
+                        if ('isAd' in item) {
+                             return <AdsterraBlock key={`live-ad-${index}`} format="square" className="h-full min-h-[300px]" />;
+                        }
+                        return <LiveTournamentCard key={item.id} tournament={item} />;
+                    })}
                 </div>
                 ) : (
                 <p className="text-muted-foreground">No tournaments are live right now. Check back soon!</p>
