@@ -26,17 +26,17 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
   const { settings } = useSiteSettings();
   const adFrequency = settings?.adFrequencyInLists || 0;
   
-  // Default to 'upcoming', but allow URL to override the active tab
-  const activeTab = searchParams.get('status') || 'upcoming';
+  // Default to 'all', but allow URL to override the active tab
+  const activeTab = searchParams.get('status') || 'all';
 
   const handleTabChange = (value: string) => {
-    const params = new URLSearchParams(searchParams);
     if (value === 'all') {
-        params.delete('status');
+        router.push('/tournaments', { scroll: false });
     } else {
+        const params = new URLSearchParams(searchParams);
         params.set('status', value);
+        router.push(`?${params.toString()}`, { scroll: false });
     }
-    router.push(`?${params.toString()}`, { scroll: false });
   };
   
   const getFilteredAndSortedTournaments = (status?: Tournament['status']) => {
@@ -100,7 +100,7 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
                       </div>
                     );
                 }
-                const formattedDate = item.startDate ? format(new Date(item.startDate), "MMM dd, yyyy 'at' p") : "Date TBD";
+                const formattedDate = item.startDate ? format(new Date(item.startDate), "PPPp") : "Date TBD";
                 return <TournamentCard key={item.id} tournament={item} formattedStartDate={formattedDate} />;
               })}
             </div>
