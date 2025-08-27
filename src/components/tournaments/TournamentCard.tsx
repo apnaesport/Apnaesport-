@@ -15,21 +15,11 @@ import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
   tournament: Tournament;
+  formattedStartDate: string;
 }
 
-export function TournamentCard({ tournament }: TournamentCardProps) {
-  const formattedStartDate = useMemo(() => {
-    if (!tournament.startDate) {
-      return "No date specified";
-    }
-    try {
-      return format(new Date(tournament.startDate), "MMM dd, yyyy 'at' p");
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "Invalid date";
-    }
-  }, [tournament.startDate]);
-
+export function TournamentCard({ tournament, formattedStartDate }: TournamentCardProps) {
+  
   const getStatusBadgeVariant = (status: Tournament["status"]) => {
     switch (status) {
       case "Live":
