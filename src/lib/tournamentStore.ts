@@ -23,6 +23,7 @@ import {
   increment,
   runTransaction
 } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction } from './types';
 
@@ -43,6 +44,19 @@ const TOURNAMENT_DELETION_PENALTY = 5;
 const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 const DAILY_LOGIN_BONUS = 5;
 const PREMIUM_POINT_BONUS = 200;
+
+// Initialize Firebase Storage
+const storage = getStorage();
+
+export const uploadImageAndGetURL = async (file: File, path: string): Promise<string> => {
+  if (!file) {
+    throw new Error("No file provided for upload.");
+  }
+  const storageRef = ref(storage, path);
+  const snapshot = await uploadBytes(storageRef, file);
+  const downloadURL = await getDownloadURL(snapshot.ref);
+  return downloadURL;
+};
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id' | 'status'> & { startDate: Date, endDate?: Date }): TournamentStatus => {
     const now = new Date();
@@ -178,43 +192,33 @@ export const addTournamentToFirestore = async (
 
 
 export const getTournamentsFromFirestore = async (queryParams?: { status?: Tournament['status'], gameId?: string, count?: number, participantId?: string, featured?: boolean, excludeQuick?: boolean }): Promise<Tournament[]> => {
-  let qConstraints: QueryConstraint[] = [];
+  const constraints: QueryConstraint[] = [orderBy("startDate", "desc")];
   
-  if (!queryParams || Object.keys(queryParams).length === 0) {
-      qConstraints.push(orderBy("startDate", "desc"));
-  } else {
-      qConstraints.push(orderBy("startDate", "desc"));
-  }
-
   if (queryParams?.status) {
-    qConstraints.push(where("status", "==", queryParams.status));
+    constraints.push(where("status", "==", queryParams.status));
   }
-  
   if (queryParams?.gameId) {
-    qConstraints.push(where("gameId", "==", queryParams.gameId));
+    constraints.push(where("gameId", "==", queryParams.gameId));
   }
-
   if (queryParams?.featured !== undefined) {
-    qConstraints.push(where("featured", "==", queryParams.featured));
+    constraints.push(where("featured", "==", queryParams.featured));
   }
-
   if (queryParams?.excludeQuick) {
-      qConstraints.push(where("isQuickTournament", "in", [false, null])); 
+    constraints.push(where("isQuickTournament", "in", [false, null])); 
   }
-  
   if (queryParams?.participantId) {
-    qConstraints.push(where("participants", "array-contains", { id: queryParams.participantId }));
+    constraints.push(where("participants", "array-contains", { id: queryParams.participantId }));
   }
-
   if (queryParams?.count) {
-    qConstraints.push(limit(queryParams.count));
+    constraints.push(limit(queryParams.count));
   }
 
-  const q = query(collection(db, TOURNAMENTS_COLLECTION), ...qConstraints);
+  const q = query(collection(db, TOURNAMENTS_COLLECTION), ...constraints);
   const tournamentsSnapshot = await getDocs(q);
-
   const now = new Date();
-  const batch = writeBatch(db);
+  
+  const tournamentsToUpdate: { ref: any, data: any }[] = [];
+  
   let tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data();
     const tournament = {
@@ -237,19 +241,26 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
     const newStatus = getTournamentStatus(tournament);
     
     if (currentStatus !== newStatus && currentStatus !== "Cancelled") {
-        tournament.status = newStatus;
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
-        batch.update(tournamentRef, { status: newStatus, updatedAt: serverTimestamp() });
+        tournamentsToUpdate.push({ ref: tournamentRef, data: { status: newStatus, updatedAt: serverTimestamp() } });
+        // Return the tournament with the *new* status for immediate UI update
+        return { ...tournament, status: newStatus };
     }
     
     return tournament;
   });
 
+  // Perform updates in a batch if there are any
+  if (tournamentsToUpdate.length > 0) {
+    const batch = writeBatch(db);
+    tournamentsToUpdate.forEach(t => batch.update(t.ref, t.data));
+    await batch.commit();
+  }
+
   if (queryParams?.excludeQuick) {
     tournaments = tournaments.filter(t => !t.isQuickTournament);
   }
 
-  await batch.commit();
   return tournaments;
 };
 
@@ -700,42 +711,25 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
 // --- Premium User Functions ---
 export const updateUserPremiumStatus = async (identifier: string, isPremium: boolean): Promise<void> => {
     return runTransaction(db, async (transaction) => {
-        let userDoc;
-        let userId;
-
+        let userQuery;
         if (identifier.includes('@')) {
-            const userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier), limit(1));
-            const querySnapshot = await getDocs(userQuery); // This is fine outside transaction for lookup
-            if (querySnapshot.empty) {
-                throw new Error("User not found with that email.");
-            }
-            userDoc = querySnapshot.docs[0];
-            userId = userDoc.id;
+            userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier), limit(1));
         } else if (identifier.startsWith('AE')) {
-            const userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier), limit(1));
-            const querySnapshot = await getDocs(userQuery);
-            if (querySnapshot.empty) {
-                throw new Error("User not found with that Apna ID.");
-            }
-            userDoc = querySnapshot.docs[0];
-            userId = userDoc.id;
+            userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier), limit(1));
         } else {
-             const userRef = doc(db, USERS_COLLECTION, identifier);
-             const docSnap = await transaction.get(userRef);
-             if (!docSnap.exists()) {
-                 throw new Error("User not found with that ID.");
-             }
-             userDoc = docSnap;
-             userId = docSnap.id;
+             userQuery = query(collection(db, USERS_COLLECTION), where("uid", "==", identifier), limit(1));
         }
-
-        if (!userDoc) {
-             throw new Error("User not found with that identifier.");
+        
+        // Firestore transactions require all reads to be done first.
+        const querySnapshot = await getDocs(userQuery);
+        if (querySnapshot.empty) {
+            throw new Error("User not found with that identifier.");
         }
-
+        const userDoc = querySnapshot.docs[0];
+        const userId = userDoc.id;
         const userRef = doc(db, USERS_COLLECTION, userId);
         const userData = userDoc.data() as UserProfile;
-        
+
         const updateData: any = {
             isPremium: isPremium,
             updatedAt: serverTimestamp(),
@@ -1251,3 +1245,5 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+
+    
