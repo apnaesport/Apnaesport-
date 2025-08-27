@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Gamepad2, Eye, Coins } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
@@ -18,6 +18,17 @@ interface TournamentCardProps {
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
+  const [formattedStartDate, setFormattedStartDate] = useState("Loading date...");
+
+  useEffect(() => {
+    // This effect runs only on the client, after hydration.
+    // This prevents the server and client from rendering different initial values.
+    if (tournament.startDate) {
+      setFormattedStartDate(format(new Date(tournament.startDate), "PPPp"));
+    } else {
+      setFormattedStartDate("Date TBD");
+    }
+  }, [tournament.startDate]);
   
   const getStatusBadgeVariant = (status: Tournament["status"]) => {
     switch (status) {
@@ -34,13 +45,6 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   };
   
   const isFreeEntry = !tournament.entryFee || tournament.entryFee <= 0;
-
-  // Format the date here on the client side to avoid hydration errors
-  const formattedStartDate = useMemo(() => {
-    if (!tournament.startDate) return "Date TBD";
-    // The date comes in as an ISO string, convert it to a Date object first
-    return format(new Date(tournament.startDate), "PPPp");
-  }, [tournament.startDate]);
 
   return (
     <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">

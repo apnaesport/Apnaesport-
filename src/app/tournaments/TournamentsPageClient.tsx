@@ -12,7 +12,6 @@ import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSearchParams, useRouter } from "next/navigation";
-import { format } from "date-fns";
 
 
 interface TournamentsPageClientProps {
@@ -100,8 +99,7 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
                       </div>
                     );
                 }
-                const formattedDate = item.startDate ? format(new Date(item.startDate), "PPPp") : "Date TBD";
-                return <TournamentCard key={item.id} tournament={item} formattedStartDate={formattedDate} />;
+                return <TournamentCard key={item.id} tournament={item} />;
               })}
             </div>
       )

@@ -14,7 +14,7 @@ const serializeTournament = (tournament: Tournament): any => {
   for (const key in serialized) {
     const value = serialized[key as keyof Tournament];
     // Safely check for Timestamp by looking for the .toDate() method
-    if (value && typeof value === 'object' && typeof (value as any).toDate === 'function') {
+    if (value && typeof (value as any).toDate === 'function') {
       serialized[key] = (value as any).toDate().toISOString();
     } else if (value instanceof Date) {
       serialized[key] = (value as Date).toISOString();
