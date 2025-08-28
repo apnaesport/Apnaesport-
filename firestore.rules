@@ -42,6 +42,11 @@ service cloud.firestore {
     function isCommunityOwner(communityId) {
       return get(/databases/$(database)/documents/communities/$(communityId)).data.ownerId == request.auth.uid;
     }
+    
+    // Checks if the requesting user is a premium member.
+    function isPremium() {
+      return isVerified() && getUserData(request.auth.uid).isPremium == true;
+    }
 
     // --- Default Security: Deny all access unless explicitly allowed ---
     match /{document=**} {
@@ -103,44 +108,61 @@ service cloud.firestore {
     
     // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
-        // Tournament data is public and readable by anyone.
+        // Anyone can read public tournament data.
         allow read: if true;
-        
-        // --- Tournament Creation Rules ---
-        allow create: if isVerified() && (
-            // Rule for regular tournaments: User must have enough points.
-            (
-                (request.resource.data.isQuickTournament == false || !('isQuickTournament' in request.resource.data)) &&
-                getUserData(request.auth.uid).points >= 40
-            ) ||
-            // Rule for Quick Tournaments: Creator must be the owner of the specified community.
-            (
-                request.resource.data.isQuickTournament == true &&
-                isCommunityOwner(request.resource.data.communityId)
-            )
-        );
-        
-        // Complex update logic for tournaments.
-        allow update: if isVerified() && (
-            // Admins can update anything.
-            isAdmin() ||
-            
-            // Tournament organizers can update specific non-critical fields.
-            (isTournamentOrganizer(tournamentId) && 
-              !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'createdAt', 'status'])) ||
 
-            // Any user can join a tournament by adding themselves to the participants list.
+        // Allow creation if the user is verified and meets specific criteria.
+        allow create: if isVerified() &&
+            // Organizer ID must match the person creating it.
+            request.resource.data.organizerId == request.auth.uid &&
+            // Regular tournament creation costs points.
+            ((!request.resource.data.isQuickTournament && getUserData(request.auth.uid).points >= 40) ||
+            // Quick tournament creation requires community ownership.
+            (request.resource.data.isQuickTournament == true && isCommunityOwner(request.resource.data.communityId)));
+
+        // Allow updates under specific, controlled conditions.
+        allow update: if isVerified() && (
+            // Condition 1: A user joining a tournament.
             (
+                // The tournament must be open for registration.
+                resource.data.status == "Upcoming" &&
+                // The participants list is the only thing changing, along with prize pool and timestamp.
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
+                // The user is adding themselves to the list.
                 request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
                 request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
-                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
-            )
+                // Ensure the user has enough points for the entry fee.
+                getUserData(request.auth.uid).points >= resource.data.entryFee
+            ) ||
+            // Condition 2: The organizer updating management fields.
+            (
+                isTournamentOrganizer(tournamentId) &&
+                // Organizer can only update these specific fields.
+                request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                    'description', 'rules', 'registrationInstructions',
+                    'roomCode', 'roomPassword', 'updatedAt', 'bannerImageUrl',
+                    'sponsorName', 'sponsorLogoUrl', 'featured'
+                ]) &&
+                // Organizer cannot change fundamental properties post-creation.
+                request.resource.data.organizerId == resource.data.organizerId &&
+                request.resource.data.gameId == resource.data.gameId
+            ) ||
+            // Condition 3: The organizer or an admin ending the tournament and declaring winners.
+            (
+                (isTournamentOrganizer(tournamentId) || isAdmin()) &&
+                resource.data.status != "Completed" &&
+                request.resource.data.status == "Completed" &&
+                // Ensure winners are being added and status is being changed.
+                request.resource.data.diff(resource.data).affectedKeys().hasAll(['status', 'winners', 'updatedAt'])
+            ) ||
+            // Condition 4: An admin can update any field for moderation purposes.
+            isAdmin()
         );
-        
-        // Organizer or admin can delete a tournament.
-        allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
+
+        // Allow deletion only by the organizer or an admin.
+        allow delete: if isVerified() && (isTournamentOrganizer(tournamentId) || isAdmin());
     }
-    
+
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
         // Any verified user can read notifications.
