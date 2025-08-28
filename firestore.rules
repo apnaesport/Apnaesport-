@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -104,52 +103,96 @@ service cloud.firestore {
     
     // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
-      // Anyone can read a list of tournaments or a single tournament.
-      // This is safe because sensitive info (room codes) is handled by other rules.
+      // Tournament data is public and readable by anyone.
       allow read: if true;
 
-      // --- Tournament Creation ---
-      allow create: if isVerified() && (
-        // Standard Tournament Creation: Requires a fee.
+      // --- Tournament Creation Rules ---
+      allow create: if isVerified() &&
+        // General security checks for all tournament creations
+        request.resource.data.organizerId == request.auth.uid &&
+        request.resource.data.participants.size() == 0 &&
+        request.resource.data.winners.size() == 0 &&
         (
-          (request.resource.data.isQuickTournament == false || !('isQuickTournament' in request.resource.data)) &&
+          // --- Rules for Standard Tournaments ---
+          (
+            // Ensure it's not a quick tournament
+            !('isQuickTournament' in request.resource.data) || request.resource.data.isQuickTournament == false
+          ) &&
+          // Check if the user has enough points for the creation fee
           getUserData(request.auth.uid).points >= 40
         ) ||
-        // Quick Tournament Creation: Must be the owner of the community.
         (
-          request.resource.data.isQuickTournament == true &&
+          // --- Rules for Quick Tournaments ---
+          (
+            'isQuickTournament' in request.resource.data && request.resource.data.isQuickTournament == true
+          ) &&
+          // Verify the creator owns the community they are creating for
           isCommunityOwner(request.resource.data.communityId)
         )
       );
 
-      // --- Tournament Updates ---
+      // --- Tournament Update Rules ---
       allow update: if isVerified() && (
-        // Admin can update any field.
+        // --- ADMIN: Admins can perform any update ---
         isAdmin() ||
-        // Any user can trigger an automatic status update (e.g., upcoming -> live).
-        // This is safe because it only allows changing the status and timestamp.
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) ||
-        // Tournament organizers can update specific non-critical fields.
+
+        // --- ANY USER: Safe status update (e.g., Upcoming -> Live) ---
+        (
+          // Check that only 'status' and 'updatedAt' fields are being modified.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+          // Allow changing status to Live or Completed, but not backwards or to Cancelled.
+          (request.resource.data.status == 'Live' || request.resource.data.status == 'Completed') &&
+          resource.data.status != 'Completed' && resource.data.status != 'Cancelled'
+        ) ||
+
+        // --- ORGANIZER: Update management details ---
         (
           isTournamentOrganizer(tournamentId) &&
+          // Organizer must not be able to change critical data.
           !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'organizerId', 'gameId', 'createdAt', 'participants', 'prizePool', 'entryFee'
+            'organizerId', 'gameId', 'createdAt', 'prizePool', 'entryFee', 'participants'
           ])
         ) ||
-        // Any verified user can join a tournament by adding themselves to the participants list.
+
+        // --- ORGANIZER: End tournament and declare winners ---
         (
-          resource.data.status == "Upcoming" &&
+          isTournamentOrganizer(tournamentId) &&
+          // Only status, winners, and updatedAt can be modified.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt']) &&
+          // The status must be moving to 'Completed'.
+          request.resource.data.status == 'Completed' &&
+          resource.data.status != 'Completed' &&
+          // The winners list must not be empty.
+          request.resource.data.winners.size() > 0
+        ) ||
+
+        // --- PARTICIPANT: Join a tournament ---
+        (
+          // The user must be the one being added.
           request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
           request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
+          
+          // Only participants list and prize pool (from entry fee) can change.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
+          
+          // Tournament must be open for registration.
+          resource.data.status == 'Upcoming' &&
+          
+          // Tournament must not be full.
+          resource.data.participants.size() < resource.data.maxParticipants &&
+          
+          // User must have enough points for the entry fee.
           getUserData(request.auth.uid).points >= resource.data.entryFee &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
+
+          // Ensure prize pool is correctly incremented by the entry fee.
+          request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee
         )
       );
       
-      // Organizer or admin can delete a tournament.
+      // --- Tournament Deletion Rules ---
       allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
     }
-    
+
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
         // Any verified user can read notifications.
