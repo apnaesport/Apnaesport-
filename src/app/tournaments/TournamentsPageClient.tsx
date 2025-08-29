@@ -22,10 +22,7 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
   const searchParams = useSearchParams();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
-  const { settings } = useSiteSettings();
-  const adFrequency = settings?.adFrequencyInLists || 0;
   
-  // Default to 'all', but allow URL to override the active tab
   const activeTab = searchParams.get('status') || 'all';
 
   const handleTabChange = (value: string) => {
@@ -63,21 +60,7 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
   }
 
   const renderTournamentList = (tournaments: Tournament[]) => {
-      const itemsWithAds = useMemo(() => {
-        if (!adFrequency || adFrequency <= 0) return tournaments;
-
-        const newItems: (Tournament | { isAd: true })[] = [];
-        
-        tournaments.forEach((item, index) => {
-          newItems.push(item);
-          if ((index + 1) % adFrequency === 0 && index < tournaments.length -1) {
-            newItems.push({ isAd: true });
-          }
-        });
-        return newItems;
-      }, [tournaments, adFrequency]);
-
-      if (itemsWithAds.length === 0) {
+      if (tournaments.length === 0) {
           return (
              <div className="text-center py-10 border-2 border-dashed rounded-lg">
                 <h3 className="text-xl font-semibold">No Tournaments Found</h3>
@@ -90,16 +73,9 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
       
       return (
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {itemsWithAds.map((item, index) => {
-                if ('isAd' in item) {
-                    return (
-                      <div key={`ad-${index}`} className="flex items-center justify-center">
-                        <AdsterraBlock format="square" className="h-full min-h-[300px] w-full" />
-                      </div>
-                    );
-                }
-                return <TournamentCard key={item.id} tournament={item} />;
-              })}
+              {tournaments.map((tournament) => (
+                <TournamentCard key={tournament.id} tournament={tournament} />
+              ))}
             </div>
       )
   }
