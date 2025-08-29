@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -5,14 +6,12 @@ service cloud.firestore {
 
     // --- Helper Functions ---
 
-    // Checks if a user is signed in. Does NOT check for email verification here,
-    // as unverified users need to be able to create their own profile.
+    // Checks if a user is signed in.
     function isSignedIn() {
       return request.auth != null;
     }
 
     // Checks if the requesting user's email is verified.
-    // This is used for actions AFTER the user has a profile.
     function isVerified() {
       return isSignedIn() && request.auth.token.email_verified == true;
     }
@@ -29,13 +28,20 @@ service cloud.firestore {
 
     // Checks if the current user is an admin.
     function isAdmin() {
-      // Use isVerified() here to ensure only verified users can be admins.
       return isVerified() && getUserData(request.auth.uid).isAdmin == true;
     }
 
     // Checks if the current user is the organizer of a specific tournament.
     function isTournamentOrganizer(tournamentId) {
-      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.organizerId == request.auth.uid;
+      // Use resource.data for create/update rules on the tournament itself.
+      // Use get() for rules on other documents that need to reference the tournament.
+      let tournamentData = get(/databases/$(database)/documents/tournaments/$(tournamentId)).data;
+      return isVerified() && tournamentData.organizerId == request.auth.uid;
+    }
+    
+    // Checks if the user is the organizer based on incoming request data.
+    function isRequestingOrganizer() {
+        return isVerified() && request.resource.data.organizerId == request.auth.uid;
     }
 
     // Checks if the current user is the owner of a specific community.
@@ -50,183 +56,127 @@ service cloud.firestore {
 
     // --- User Profiles (`users`) ---
     match /users/{userId} {
-      // Anyone can read public profile data (e.g., for leaderboards or participant lists).
-      // `read` covers both `get` (single document) and `list` (collection query).
+      // Anyone can read public profile data.
       allow read: if true;
 
       // A user can create their own profile document.
-      // This is the only place we use `isSignedIn()` instead of `isVerified()`.
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
                     && request.resource.data.points == 10
                     && !('communityId' in request.resource.data)
                     && request.resource.data.uid == userId;
       
-      // A user can update their own profile, but with restrictions.
+      // Update rules for user profiles.
       allow update: if isVerified() && (
         // Admins can update specific fields on any profile.
         (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'apnaId', 'createdAt', 'uid'])) ||
-        // A user can update their own profile...
+        // A user can update their own profile, but not protected fields.
         (isSelf(userId) &&
-          // but they cannot change these protected fields.
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isPremium', 'premiumSince', 'hasReceivedPremiumBonus', 'points', 'apnaId', 'createdAt', 'uid'])
         ) ||
-        // Allow updating only lastBonusClaimedAt and points for the daily bonus.
+        // A user can update their points for a daily bonus claim.
         (isSelf(userId) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastBonusClaimedAt', 'points', 'updatedAt']) &&
-          request.resource.data.points == resource.data.points + 5 // Enforce daily bonus increment
+          request.resource.data.points == resource.data.points + 5
         )
       );
       
-      // Only an admin can delete a user account.
       allow delete: if isAdmin();
 
-      // --- Rewards Transaction History (Subcollection) ---
+      // Transaction subcollection rules.
       match /transactions/{transactionId} {
-        // A user can read their OWN transaction history.
         allow read: if isSelf(userId) || isAdmin();
-        // A user can create their own transaction record (for daily bonus, etc.).
-        // An admin can also create a transaction for a user (adjusting points).
         allow create: if isSelf(userId) || isAdmin();
-        // Nobody can manually update or delete transactions.
         allow update, delete: if false;
       }
     }
 
     // --- Games (`games`) ---
     match /games/{gameId} {
-      // Game data is public and readable by anyone.
       allow read: if true;
-      // Only admins can create, update, or delete games.
       allow write: if isAdmin();
     }
     
     // --- Tournaments (`tournaments`) ---
     match /tournaments/{tournamentId} {
-      // Tournament data is public and readable by anyone.
-      allow read: if true;
+        // ANYONE can read tournament data for dashboards and lists.
+        allow read: if true;
 
-      // --- Tournament Creation Rules ---
-      allow create: if isVerified() &&
-        // General security checks for all tournament creations
-        request.resource.data.organizerId == request.auth.uid &&
-        request.resource.data.participants.size() == 0 &&
-        request.resource.data.winners.size() == 0 &&
-        (
-          // --- Rules for Standard Tournaments ---
-          (
-            // Ensure it's not a quick tournament
-            !('isQuickTournament' in request.resource.data) || request.resource.data.isQuickTournament == false
-          ) &&
-          // Check if the user has enough points for the creation fee
-          getUserData(request.auth.uid).points >= 40
-        ) ||
-        (
-          // --- Rules for Quick Tournaments ---
-          (
-            'isQuickTournament' in request.resource.data && request.resource.data.isQuickTournament == true
-          ) &&
-          // Verify the creator owns the community they are creating for
-          isCommunityOwner(request.resource.data.communityId)
-        )
-      );
+        // CREATE: A verified user can create a tournament if they meet conditions.
+        allow create: if isVerified() && isRequestingOrganizer() && (
+            // Standard tournament creation: must have enough points.
+            (
+              (!request.resource.data.isQuickTournament || request.resource.data.isQuickTournament == false) &&
+              getUserData(request.auth.uid).points >= 40
+            ) ||
+            // Quick tournament creation: must be the owner of the target community.
+            (
+              request.resource.data.isQuickTournament == true &&
+              isCommunityOwner(request.resource.data.communityId)
+            )
+        );
 
-      // --- Tournament Update Rules ---
-      allow update: if isVerified() && (
-        // --- ADMIN: Admins can perform any update ---
-        isAdmin() ||
+        // UPDATE: Different roles can update different things.
+        allow update: if isVerified() && (
+            // ADMINS can update any tournament.
+            isAdmin() ||
 
-        // --- ANY USER: Safe status update (e.g., Upcoming -> Live) ---
-        (
-          // Check that only 'status' and 'updatedAt' fields are being modified.
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']) &&
-          // Allow changing status to Live or Completed, but not backwards or to Cancelled.
-          (request.resource.data.status == 'Live' || request.resource.data.status == 'Completed') &&
-          resource.data.status != 'Completed' && resource.data.status != 'Cancelled'
-        ) ||
+            // ORGANIZER can manage their own tournament.
+            (isTournamentOrganizer(tournamentId) && (
+                // Scenario 1: Updating room details
+                request.resource.data.diff(resource.data).affectedKeys().hasAny(['roomCode', 'roomPassword', 'updatedAt'])
+                ||
+                // Scenario 2: Ending the tournament and awarding winners.
+                (
+                  request.resource.data.status == "Completed" &&
+                  request.resource.data.winners.size() > 0 &&
+                  request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt'])
+                )
+            )) ||
 
-        // --- ORGANIZER: Update management details ---
-        (
-          isTournamentOrganizer(tournamentId) &&
-          // Organizer must not be able to change critical data.
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'organizerId', 'gameId', 'createdAt', 'prizePool', 'entryFee', 'participants'
-          ])
-        ) ||
+            // ANY VERIFIED USER can join a tournament.
+            (
+                resource.data.status == "Upcoming" && // Can only join upcoming tournaments
+                request.resource.data.participants.size() == resource.data.participants.size() + 1 && // Only adding one participant
+                request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid && // The participant is the current user
+                getUserData(request.auth.uid).points >= resource.data.entryFee && // User has enough points
+                // Only participants and prizePool can change during a join operation.
+                request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
+            ) ||
+            
+            // ANYONE can trigger a status update (e.g. from Upcoming to Live).
+            // This is a safe operation needed for the automated status checker.
+            (
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+            )
+        );
 
-        // --- ORGANIZER: End tournament and declare winners ---
-        (
-          isTournamentOrganizer(tournamentId) &&
-          // Only status, winners, and updatedAt can be modified.
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt']) &&
-          // The status must be moving to 'Completed'.
-          request.resource.data.status == 'Completed' &&
-          resource.data.status != 'Completed' &&
-          // The winners list must not be empty.
-          request.resource.data.winners.size() > 0
-        ) ||
-
-        // --- PARTICIPANT: Join a tournament ---
-        (
-          // The user must be the one being added.
-          request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
-          request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid &&
-          
-          // Only participants list and prize pool (from entry fee) can change.
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
-          
-          // Tournament must be open for registration.
-          resource.data.status == 'Upcoming' &&
-          
-          // Tournament must not be full.
-          resource.data.participants.size() < resource.data.maxParticipants &&
-          
-          // User must have enough points for the entry fee.
-          getUserData(request.auth.uid).points >= resource.data.entryFee &&
-
-          // Ensure prize pool is correctly incremented by the entry fee.
-          request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee
-        )
-      );
-      
-      // --- Tournament Deletion Rules ---
-      allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
+        // DELETE: Only the organizer or an admin can delete.
+        allow delete: if isVerified() && (isAdmin() || isTournamentOrganizer(tournamentId));
     }
-
+    
     // --- Notifications (`notifications`) ---
     match /notifications/{notificationId} {
-        // Any verified user can read notifications.
         allow read: if true;
-        // Only admins can create/write notifications.
         allow write: if isAdmin();
     }
     
     // --- Site Settings (`settings`) ---
     match /settings/{setting} {
-        // Site settings are public and readable by anyone.
         allow read: if true;
-        // Only admins can change site settings.
         allow write: if isAdmin();
     }
     
     // --- Sponsorships (`sponsorships`) ---
     match /sponsorships/{sponsorshipId} {
-      // Any verified user can create a request.
       allow create: if isVerified();
-      // Only admins can read, update status, or delete requests.
       allow read, update, delete: if isAdmin();
     }
     
     // --- Communities (`communities`) ---
     match /communities/{communityId} {
-      // Anyone can view a community's public page.
       allow read: if true;
-
-      // A verified user can create a community, setting themself as the owner.
       allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
-      
-      // Community owner or a platform admin can update details.
-      // Other users can join, which only increments member count.
       allow update: if isVerified() && (
         (isAdmin() || isCommunityOwner(communityId)) ||
         (
@@ -234,56 +184,36 @@ service cloud.firestore {
           request.resource.data.memberCount == resource.data.memberCount + 1
         )
       );
-      
-      // Only the community owner or a platform admin can delete the community.
       allow delete: if isVerified() && (isAdmin() || isCommunityOwner(communityId));
       
-      // --- Community Members (`members`) ---
       match /members/{userId} {
-        // Anyone can see who is in the community.
         allow read: if true;
-        // A user can join a community (create their own member doc).
         allow create: if isSelf(userId);
-        // A user can leave a community (delete their own member doc).
-        // The community owner can also remove (kick) members.
         allow delete: if isSelf(userId) || isCommunityOwner(communityId);
-        // Roles and other details can only be updated by the community owner or an admin.
         allow update: if isAdmin() || isCommunityOwner(communityId);
       }
 
-      // --- Community Announcements (`announcements`) ---
       match /announcements/{announcementId} {
-        // Announcements are public.
         allow read: if true;
-        // Only the owner can create, update, or delete announcements.
         allow write: if isCommunityOwner(communityId);
       }
     }
     
     // --- Creator Hub (`creatorApplications` and `creators`) ---
     match /creatorApplications/{applicationId} {
-      // A user can create their own application.
       allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
-      // An admin can read any application. A user can read their own.
       allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
-      // Only admins can update status or delete applications.
       allow update, delete: if isAdmin();
     }
     
     match /creators/{creatorId} {
-      // Anyone can view the list of approved creators.
       allow read: if true;
-      // Only admins can create (approve) or delete creator profiles.
       allow create, delete: if isAdmin();
-      // An admin can update any field.
-      // A signed-in user can vote securely.
       allow update: if isVerified() && (
         isAdmin() ||
         (
           request.resource.data.votes == resource.data.votes + 1 &&
-          // Ensure the user is not already in the votedBy array.
           !resource.data.votedBy.hasAny([request.auth.uid]) && 
-          // Ensure only votes and votedBy are being changed.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy', 'updatedAt'])
         )
       );
