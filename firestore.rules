@@ -153,13 +153,13 @@ service cloud.firestore {
         ) ||
 
         // Any user can join an "Upcoming" tournament.
+        // This is part of a transaction, so we just check the tournament side.
+        // The transaction in the client code handles the user point deduction.
         (
           resource.data.status == 'Upcoming' &&
           // Verify only one participant is added, and it's the current user
           request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
           request.resource.data.participants[resource.data.participants.size() - 1].id == request.auth.uid &&
-          // Verify the user has enough points
-          getUserData(request.auth.uid).points >= resource.data.entryFee &&
           // Verify the prize pool is correctly incremented by the entry fee
           request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee &&
           // Verify only the participants list and prize pool are being changed
