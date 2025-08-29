@@ -4,7 +4,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Youtube, Twitter, Instagram, Download, Users } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Download, Users, Star } from "lucide-react"; 
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { Community } from "@/lib/types";
