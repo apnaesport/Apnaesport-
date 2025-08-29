@@ -2,9 +2,24 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { Youtube, Twitter, Instagram, Download, Users } from "lucide-react"; 
+import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
+import type { Community } from "@/lib/types";
+import { listenToCommunityById } from "@/lib/tournamentStore";
+
 import { Header } from "@/components/layout/Header";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { Logo } from "@/components/shared/Logo";
+import { SponsorshipCTA } from "@/components/layout/SponsorshipCTA";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   SidebarProvider,
   Sidebar,
@@ -12,20 +27,6 @@ import {
   SidebarContent,
   SidebarInset,
 } from "@/components/ui/sidebar";
-import Link from "next/link";
-import { SponsorshipCTA } from "./SponsorshipCTA";
-import { Separator } from "../ui/separator";
-import { Youtube, Twitter, Instagram, Facebook, Download, Users, PlusCircle, Home, Star } from "lucide-react"; 
-import { Button } from "../ui/button";
-import { useSiteSettings } from "@/contexts/SiteSettingsContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
-import { useAuth } from "@/contexts/AuthContext";
-import { Badge } from "../ui/badge";
-import { ImageWithFallback } from "../shared/ImageWithFallback";
-import { Skeleton } from "../ui/skeleton";
-import { useState, useEffect } from "react";
-import type { Community } from "@/lib/types";
-import { listenToCommunityById } from "@/lib/tournamentStore";
 
 interface MainLayoutProps {
   children: ReactNode;

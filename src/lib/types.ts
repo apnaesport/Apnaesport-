@@ -1,5 +1,4 @@
 
-
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -24,6 +23,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   communityId?: string | null;
   points: number;
   wins?: number;
+  monthlyWins?: number;
   kills?: number;
   deaths?: number;
   apnaId?: string;

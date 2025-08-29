@@ -34,6 +34,7 @@ import { Separator } from "../ui/separator";
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
   { href: "/community", label: "Communities", icon: Users },
   { href: "/creators", label: "Creators", icon: Star },
   { href: "/games", label: "Games", icon: Gamepad2 },

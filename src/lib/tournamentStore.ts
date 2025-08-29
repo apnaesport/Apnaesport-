@@ -443,7 +443,7 @@ export const awardTournamentWinners = async (
         const processWinner = (participant: Participant, rank: 1 | 2 | 3, prize: number) => {
             if (prize > 0) {
                 const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-                transaction.update(winnerRef, { points: increment(prize) });
+                transaction.update(winnerRef, { points: increment(prize), monthlyWins: increment(1) });
                 const prizeTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
                 transaction.set(prizeTransactionRef, {
                     amount: prize,
@@ -536,6 +536,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
+      monthlyWins: data.monthlyWins || 0,
       kills: data.kills || 0,
       deaths: data.deaths || 0,
       apnaId: data.apnaId,
@@ -635,11 +636,23 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       communityId: data.communityId || null,
       points: data.points || 0,
       wins: data.wins || 0,
+      monthlyWins: data.monthlyWins || 0,
       kills: data.kills || 0,
       deaths: data.deaths || 0,
       apnaId: data.apnaId,
     };
   });
+};
+
+export const getTopPlayersByMonthlyWins = async (count: number): Promise<UserProfile[]> => {
+    const q = query(
+        collection(db, USERS_COLLECTION),
+        where("monthlyWins", ">", 0),
+        orderBy("monthlyWins", "desc"),
+        limit(count)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => doc.data() as UserProfile);
 };
 
 export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: boolean): Promise<void> => {
@@ -1219,5 +1232,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-
-    
