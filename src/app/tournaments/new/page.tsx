@@ -18,14 +18,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Slider } from "@/components/ui/slider";
 
 
 const tournamentSchema = z.object({
@@ -34,8 +33,7 @@ const tournamentSchema = z.object({
   description: z.string().min(20, "Description must be at least 20 characters.").max(500, "Description must be 500 characters or less."),
   startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
-  prizePool: z.coerce.number().min(0, "Prize pool must be 0 or more."),
-  entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more."),
+  entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more.").max(40, "Entry fee cannot exceed 40."),
   matchType: z.string({ required_error: "Match type is required."}),
   mapName: z.string().optional(),
   teamSize: z.enum(["Solo", "Duo", "Squad"], { required_error: "Team size is required." }),
@@ -69,7 +67,6 @@ export default function CreateTournamentPage() {
       description: "",
       startDate: undefined,
       maxParticipants: 16,
-      prizePool: 0,
       entryFee: 0,
       matchType: "",
       mapName: "",
@@ -85,6 +82,14 @@ export default function CreateTournamentPage() {
   
   const selectedGameId = form.watch("gameId");
   const selectedGame = availableGames.find(g => g.id === selectedGameId);
+  const entryFee = form.watch("entryFee");
+  const maxParticipants = form.watch("maxParticipants");
+
+  const totalPrizePool = entryFee * maxParticipants;
+  const firstPrize = Math.floor(totalPrizePool * 0.5);
+  const secondPrize = Math.floor(totalPrizePool * 0.3);
+  const thirdPrize = Math.floor(totalPrizePool * 0.2);
+
 
   const fetchGames = useCallback(async () => {
     setIsLoadingGames(true);
@@ -144,7 +149,7 @@ export default function CreateTournamentPage() {
     }
 
 
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bracketType'> & { startDate: Date } = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'prizePool'> & { startDate: Date } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
@@ -153,7 +158,7 @@ export default function CreateTournamentPage() {
       description: data.description,
       startDate: finalStartDate, 
       maxParticipants: data.maxParticipants,
-      prizePool: data.prizePool || 0,
+      entryFee: data.entryFee || 0,
       matchType: data.matchType,
       mapName: data.mapName,
       teamSize: data.teamSize,
@@ -164,7 +169,6 @@ export default function CreateTournamentPage() {
       participants: [], 
       matches: [], 
       featured: data.featured || false,
-      entryFee: data.entryFee || 0,
       sponsorName: isPremium ? data.sponsorName || undefined : undefined,
       sponsorLogoUrl: isPremium ? data.sponsorLogoUrl || undefined : undefined,
     };
@@ -389,6 +393,66 @@ export default function CreateTournamentPage() {
                 />
               {form.formState.errors.startDate && <p className="text-destructive text-xs mt-1">{form.formState.errors.startDate.message}</p>}
             </div>
+            
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-lg">Entry Fee & Prize Pool</CardTitle>
+                    <CardDescription>Set the entry fee. The prize pool is calculated automatically.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <div>
+                        <Label htmlFor="entryFee">Entry Fee</Label>
+                         <Controller
+                            name="entryFee"
+                            control={form.control}
+                            render={({ field }) => (
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-sm font-medium">{field.value === 0 ? "Free Entry" : `${field.value} AE Coins`}</span>
+                                        <Button type="button" variant="outline" size="sm" onClick={() => field.onChange(0)}>Set as Free</Button>
+                                    </div>
+                                    <Slider
+                                        id="entryFee"
+                                        min={0}
+                                        max={40}
+                                        step={5}
+                                        value={[field.value]}
+                                        onValueChange={(value) => field.onChange(value[0])}
+                                        disabled={isSubmittingForm}
+                                    />
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span>Free</span>
+                                        <span>5</span>
+                                        <span>10</span>
+                                        <span>15</span>
+                                        <span>20</span>
+                                        <span>25</span>
+                                        <span>30</span>
+                                        <span>35</span>
+                                        <span>40</span>
+                                    </div>
+                                </div>
+                            )}
+                         />
+                        {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
+                     </div>
+                     {entryFee > 0 && (
+                        <Alert variant="default" className="border-primary/30">
+                            <Trophy className="h-4 w-4" />
+                            <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
+                            <AlertDescription>
+                                Based on a full tournament ({maxParticipants} players). Prizes are:
+                                <ul className="list-disc pl-5 mt-2">
+                                    <li>1st Place: {firstPrize} AE Coins</li>
+                                    <li>2nd Place: {secondPrize} AE Coins</li>
+                                    <li>3rd Place: {thirdPrize} AE Coins</li>
+                                </ul>
+                            </AlertDescription>
+                        </Alert>
+                     )}
+                </CardContent>
+            </Card>
+
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -415,26 +479,6 @@ export default function CreateTournamentPage() {
                     )}
                 />
                 {form.formState.errors.teamSize && <p className="text-destructive text-xs mt-1">{form.formState.errors.teamSize.message}</p>}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               <div>
-                <Label htmlFor="entryFee">Entry Fee (in AE Points)</Label>
-                <div className="relative">
-                    <Coins className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-500" />
-                    <Input id="entryFee" type="number" step="1" {...form.register("entryFee")} className="pl-9" disabled={isSubmittingForm}/>
-                </div>
-                {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="prizePool">Total Prize Pool (AE Points)</Label>
-                 <div className="relative">
-                    <Coins className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-yellow-500" />
-                    <Input id="prizePool" type="number" step="1" {...form.register("prizePool")} className="pl-9" placeholder="e.g., 1000" disabled={isSubmittingForm} />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">This amount will be increased by entry fees collected.</p>
-                {form.formState.errors.prizePool && <p className="text-destructive text-xs mt-1">{form.formState.errors.prizePool.message}</p>}
               </div>
             </div>
 
@@ -489,3 +533,5 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
+    

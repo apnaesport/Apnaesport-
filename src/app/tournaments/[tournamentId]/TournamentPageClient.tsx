@@ -39,7 +39,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
+import { differenceInMinutes, format, formatDistanceToNow, addMinutes } from "date-fns";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -329,12 +329,13 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   }
 
   const isFreeEntry = tournament.entryFee <= 0;
+  const canDeclareWinners = isTournamentCreator && tournament.status === 'Live' && differenceInMinutes(new Date(), getStartDate()) >= 5;
 
   const canManageRoom = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Upcoming');
-  const canEndTournament = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Ongoing');
 
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;
+  const prizePool = tournament.entryFee * tournament.participants.length;
 
   const TeamIcon = tournament.teamSize ? teamSizeIcons[tournament.teamSize] : Users;
 
@@ -478,7 +479,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                         <Trophy className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
                             <p className="font-semibold">Prize Pool</p>
-                            <p className="text-muted-foreground flex items-center gap-1">{tournament.prizePool} <Coins className="h-4 w-4 text-yellow-500" /></p>
+                            <p className="text-muted-foreground flex items-center gap-1">{prizePool > 0 ? `${prizePool} AE Points` : 'No Prize Pool'}</p>
                         </div>
                     </div>
                     <div className="flex items-start space-x-3">
@@ -640,7 +641,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 </Card>
                 )}
 
-                {canEndTournament && (
+                {canDeclareWinners && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" /> Declare Winners</CardTitle>
@@ -871,3 +872,5 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     </>
   );
 }
+
+    

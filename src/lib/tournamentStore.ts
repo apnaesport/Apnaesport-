@@ -143,7 +143,7 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 // --- Tournament Functions ---
 
 export const addTournamentToFirestore = async (
-    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'currency' | 'bracketType'> & { startDate: Date }, 
+    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'prizePool'> & { startDate: Date }, 
     userId: string
 ): Promise<string> => {
   
@@ -164,13 +164,12 @@ export const addTournamentToFirestore = async (
       ...restData,
       startDate: Timestamp.fromDate(startDate),
       status: getTournamentStatus({ ...restData, startDate, status: 'Upcoming' }),
+      prizePool: 0, // Prize pool starts at 0 and is funded by entry fees
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       matches: tournamentData.matches || [],
       featured: tournamentData.featured || false,
       entryFee: tournamentData.entryFee || 0,
-      prizePool: tournamentData.prizePool || 0,
-      bannerImageUrl: tournamentData.bannerImageUrl || game.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentData.name)}`,
       sponsorName: tournamentData.sponsorName || null,
       sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
     };
@@ -427,15 +426,19 @@ export const awardTournamentWinners = async (
 
         if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
         const tournamentData = tournamentDoc.data() as Tournament;
+        if (tournamentData.status !== "Live" && tournamentData.status !== "Ongoing") {
+             throw new Error("Tournament is not live and cannot be ended.");
+        }
         if (tournamentData.winners && tournamentData.winners.length > 0) {
             throw new Error("Winners have already been declared for this tournament.");
         }
 
-        const prizePool = tournamentData.prizePool || 0;
+        const totalPrizePool = (tournamentData.entryFee || 0) * tournamentData.participants.length;
+
         const prizeDistribution = {
-            first: Math.floor(prizePool * 0.5),
-            second: Math.floor(prizePool * 0.3),
-            third: Math.floor(prizePool * 0.2)
+            first: Math.floor(totalPrizePool * 0.5),
+            second: Math.floor(totalPrizePool * 0.3),
+            third: Math.floor(totalPrizePool * 0.2)
         };
         const finalWinners: Winner[] = [];
 
@@ -1034,7 +1037,7 @@ export const addQuickTournamentToFirestore = async (
         throw new Error("Cannot create a tournament for a past time.");
     }
 
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'currency' | 'bracketType'> = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'prizePool'> = {
         name: data.name,
         gameId: data.gameId,
         gameName: game.name,
@@ -1043,7 +1046,6 @@ export const addQuickTournamentToFirestore = async (
         description: `A quick tournament for the ${community.name} community.`,
         startDate: startDate,
         maxParticipants: 50,
-        prizePool: 0, // Starts at 0, funded by entry fees
         entryFee: 10, // Default entry fee for quick tournaments
         matchType: game.matchTypes?.[0] || 'Battle Royale',
         mapName: data.mapName || game.mapNames?.[0] || 'Not specified',
@@ -1060,8 +1062,9 @@ export const addQuickTournamentToFirestore = async (
 
     const docRef = await addDoc(collection(db, TOURNAMENTS_COLLECTION), {
         ...newTournamentData,
+        prizePool: 0,
         startDate: Timestamp.fromDate(startDate),
-        status: getTournamentStatus({ ...newTournamentData, status: 'Upcoming' }),
+        status: getTournamentStatus({ ...newTournamentData, startDate, status: 'Upcoming' }),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     });
@@ -1232,3 +1235,5 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+
+    

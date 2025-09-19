@@ -93,8 +93,8 @@ export type Tournament = {
   endDate?: Date | Timestamp;
   participants: Participant[];
   maxParticipants: number;
-  prizePool: number; // Changed to number for AE points
-  entryFee: number; // Changed to number for AE points
+  prizePool: number; // This will now be the calculated total
+  entryFee: number; 
   rules?: string;
   registrationInstructions?: string;
   matchType: string;
@@ -121,8 +121,7 @@ export type TournamentFormDataUI = {
   description: string;
   startDate: Date;
   maxParticipants: number;
-  prizePool: number; // Changed to number
-  entryFee: number; // Changed to number
+  entryFee: number; 
   matchType: string;
   mapName?: string;
   teamSize: TeamSize;
@@ -130,7 +129,7 @@ export type TournamentFormDataUI = {
   registrationInstructions?: string;
   featured?: boolean;
   bannerImageUrl?: string;
-  bannerImageFile?: FileList; // Added for custom upload
+  bannerImageFile?: FileList; 
   sponsorName?: string;
   sponsorLogoUrl?: string;
 };
@@ -295,9 +294,11 @@ export interface CreatorApplication {
     email: string;
     photoURL?: string;
     channelUrl: string;
-    tags: string;
+  tags: string;
     message?: string;
     status: CreatorApplicationStatus;
     createdAt: Timestamp;
     communityId?: string;
 }
+
+    
