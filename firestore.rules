@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -113,9 +112,10 @@ service cloud.firestore {
       );
 
       allow update: if isVerified() && (
+        // Admins can update anything
         isAdmin() ||
 
-        // Organizer can end a tournament and declare winners.
+        // Organizer can end a tournament and declare winners
         (
           isTournamentOrganizer(tournamentId) &&
           (resource.data.status == 'Live' || resource.data.status == 'Ongoing') &&
@@ -123,32 +123,27 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt'])
         ) ||
 
-        // Any verified user can join an "Upcoming" tournament.
+        // Organizer can update room details and other non-critical fields
+        (
+          isTournamentOrganizer(tournamentId) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizerId', 'gameId', 'createdAt', 'prizePool', 'participants', 'entryFee'])
+        ) ||
+
+        // A regular user can trigger a safe, automatic status update
+        (
+          !isAdmin() && !isTournamentOrganizer(tournamentId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+        ) ||
+
+        // Any verified user can join an "Upcoming" tournament
         (
           resource.data.status == 'Upcoming' &&
-          // Check that only the participants list, prize pool, and timestamp are being changed.
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
-          
-          // Verify prize pool is incremented correctly. `get` provides a default value if the field is missing.
-          request.resource.data.prizePool == (resource.data.get('prizePool', 0)) + (resource.data.get('entryFee', 0)) &&
-
-          // --- Participant list update logic ---
-          (
-            // Case 1: The 'participants' field does not exist yet.
-            // The new list must have exactly one member: the current user.
-            !('participants' in resource.data) &&
-            request.resource.data.participants.size() == 1 &&
-            request.resource.data.participants[0].id == request.auth.uid
-          ) ||
-          (
-            // Case 2: The 'participants' list already exists.
-            // The new list size must be exactly one greater than the old list.
-            'participants' in resource.data &&
-            request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
-            // The new participant (at the end of the list) must be the current user.
-            // This relies on the client transaction to add the user to the end of the array.
-            request.resource.data.participants[resource.data.participants.size()].id == request.auth.uid
-          )
+          request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
+          request.resource.data.participants[resource.data.participants.size() - 1].id == request.auth.uid &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.points >= resource.data.entryFee &&
+          request.resource.data.prizePool == resource.data.prizePool + resource.data.entryFee &&
+          // This only allows the 'participants' and 'prizePool' to be updated during a join operation.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt'])
         )
       );
 
