@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
   const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
   const prizePool = tournament.entryFee * tournament.maxParticipants;
   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
-  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport (apnasport). Starts on ${format(startDate, "PPP")}. ${prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : ''} Sign up now!`;
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${format(startDate, "PPP")}. ${prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : ''} Sign up now!`;
 
   return {
     title,
@@ -44,8 +44,16 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
     keywords: ["Apna Esport", "apnasport", tournament.name, `${tournament.gameName} tournament`, "online tournament", "gaming competition"],
     openGraph: {
       title: title,
-      description: tournament.description,
-      images: [tournament.bannerImageUrl, ...previousImages],
+      description: description,
+      images: [
+          {
+            url: tournament.bannerImageUrl,
+            width: 1200,
+            height: 630,
+            alt: tournament.name,
+          },
+          ...previousImages
+      ],
       type: 'website',
     },
     twitter: {

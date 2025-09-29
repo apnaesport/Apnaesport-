@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle, Map, Swords, User as UserIcon, Users2 } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle, Map, Swords, User as UserIcon, Users2, Share2 } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useMemo } from "react"; 
@@ -254,6 +254,22 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     navigator.clipboard.writeText(text);
     toast({ title: "Copied!", description: "Password copied to clipboard." });
   }
+
+  const handleShare = () => {
+    if (navigator.share) {
+        navigator.share({
+            title: tournament?.name,
+            text: `Check out the ${tournament?.name} tournament on Apna Esport!`,
+            url: window.location.href,
+        }).catch(console.error);
+    } else {
+        navigator.clipboard.writeText(window.location.href);
+        toast({
+            title: "Link Copied!",
+            description: "Tournament link has been copied to your clipboard.",
+        });
+    }
+  };
 
   const handleEndTournament: SubmitHandler<WinnerFormData> = async (data) => {
       if (!tournament || !isTournamentCreator || tournament.participants.length < 3) return;
@@ -518,7 +534,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                                             <AvatarFallback>{winner.participant.name.substring(0, 2)}</AvatarFallback>
                                         </Avatar>
                                         <div className="flex-grow">
-                                            <p className="font-bold text-lg">{winner.rank}{winner.rank === 1 ? 'st' : winner.rank === 2 ? 'nd' : 'rd'} Place</p>
+                                            <p className="font-bold text-lg">{winner.rank}{winner.rank === 1 ? 'st' : winner.rank === 2 ? 'nd' : '3rd'} Place</p>
                                             <p className="text-muted-foreground">{winner.participant.name}</p>
                                         </div>
                                         <div className="text-right">
@@ -764,25 +780,25 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 )}
             </CardHeader>
             <CardContent>
-                <p className="mb-4 text-sm sm:text-base">
-                {tournament.status === "Upcoming" && "Registrations are open! Secure your spot now."}
-                {tournament.status === "Live" && "Tournament is live! Check registration details. You might still be able to join late if allowed by the organizer."}
-                {tournament.status === "Completed" && "This tournament has concluded. Check out the results!"}
-                {tournament.status === "Cancelled" && "This tournament has been cancelled."}
-                </p>
-                {(tournament.status === "Upcoming" || tournament.status === "Live") && (
-                    <DialogTrigger asChild>
-                        <Button 
-                        size="lg" 
-                        className="w-full bg-background text-foreground hover:bg-background/90"
-                        disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
-                        >
-                        {isRegistered ? "You are Registered" : 
-                        (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
-                        tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
-                        </Button>
-                    </DialogTrigger>
-                )}
+                <div className="flex gap-2">
+                    {(tournament.status === "Upcoming" || tournament.status === "Live") && (
+                        <DialogTrigger asChild>
+                            <Button 
+                            size="lg" 
+                            className="w-full bg-background text-foreground hover:bg-background/90"
+                            disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
+                            >
+                            {isRegistered ? "You are Registered" : 
+                            (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
+                            tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
+                            </Button>
+                        </DialogTrigger>
+                    )}
+                    <Button size="lg" variant="outline" className="bg-background/20 border-white/50 hover:bg-background/40" onClick={handleShare}>
+                        <Share2 className="h-5 w-5" />
+                        <span className="sr-only">Share</span>
+                    </Button>
+                </div>
                 {tournament.status === "Completed" && (
                     <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
                 )}

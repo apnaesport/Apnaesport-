@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Apna Esports — Elite Leaderboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #0f1528;
+      --bg-card: #141b2e;
+      --bg-glass: rgba(20, 27, 46, 0.4);
+      --bg-glass-light: rgba(255, 255, 255, 0.02);
+      
+      --accent-primary: #00d4ff;
+      --accent-secondary: #7c3aed;
+      --accent-tertiary: #f59e0b;
+      --accent-success: #10b981;
+      --accent-danger: #ef4444;
+      
+      --gold: linear-gradient(135deg, #ffd700, #ffed4e, #ffc107);
+      --silver: linear-gradient(135deg, #e5e7eb, #f3f4f6, #d1d5db);
+      --bronze: linear-gradient(135deg, #d97706, #f59e0b, #fbbf24);
+      
+      --text-primary: #ffffff;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --border: rgba(255, 255, 255, 0.08);
+      --border-light: rgba(255, 255, 255, 0.04);
+      
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    * { box-sizing: border-box; }
+    
+    html, body { 
+      height: 100%; 
+      margin: 0; 
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: 
+        radial-gradient(ellipse 800px 600px at -100% 0%, rgba(124, 58, 237, 0.15), transparent),
+        radial-gradient(ellipse 600px 400px at 120% 100%, rgba(0, 212, 255, 0.1), transparent),
+        radial-gradient(ellipse 1200px 800px at 50% 50%, rgba(15, 21, 40, 0.8), transparent),
+        var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    .animated-bg {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      z-index: -1;
+    }
+
+    .bg-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.6;
+      animation: float 6s ease-in-out infinite;
+    }
+
+    .bg-orb:nth-child(1) {
+      width: 200px;
+      height: 200px;
+      background: var(--accent-primary);
+      top: 10%;
+      left: 10%;
+      animation-delay: 0s;
+    }
+
+    .bg-orb:nth-child(2) {
+      width: 150px;
+      height: 150px;
+      background: var(--accent-secondary);
+      top: 60%;
+      right: 10%;
+      animation-delay: 2s;
+    }
+
+    .bg-orb:nth-child(3) {
+      width: 100px;
+      height: 100px;
+      background: var(--accent-tertiary);
+      bottom: 20%;
+      left: 20%;
+      animation-delay: 4s;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(30px, -30px) scale(1.1); }
+      66% { transform: translate(-20px, 20px) scale(0.9); }
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-xl);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .container::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+    }
+
+    .header {
+      padding: 24px 24px 0;
+      position: relative;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 24px;
+      color: white;
+      box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
+      position: relative;
+    }
+
+    .logo::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 20px;
+      padding: 2px;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask-composite: xor;
+      opacity: 0.6;
+    }
+
+    .header-content {
+      flex: 1;
+    }
+
+    .header-content h1 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.2;
+    }
+
+    .header-content p {
+      margin: 4px 0 0;
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      padding: 0 24px;
+      margin-bottom: 20px;
+    }
+
+    .control-btn {
+      background: var(--bg-glass-light);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(10px);
+    }
+
+    .control-btn:hover {
+      background: var(--bg-glass);
+      color: var(--accent-primary);
+      border-color: var(--accent-primary);
+      transform: translateY(-2px);
+    }
+
+    .control-btn.active {
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      color: white;
+      border-color: transparent;
+    }
+
+    .leaderboard {
+      padding: 0 24px 24px;
+    }
+
+    .player-entry {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: var(--bg-glass-light);
+      border: 1px solid var(--border-light);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .player-entry::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+      transition: left 0.5s ease;
+    }
+
+    .player-entry:hover {
+      transform: translateY(-4px);
+      background: var(--bg-glass);
+      border-color: var(--accent-primary);
+      box-shadow: 0 20px 40px rgba(0, 212, 255, 0.15);
+    }
+
+    .player-entry:hover::before {
+      left: 100%;
+    }
+
+    .rank-badge {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .rank-badge.gold {
+      background: var(--gold);
+      color: #1a1a1a;
+      box-shadow: 0 8px 25px rgba(255, 215, 0, 0.4);
+    }
+
+    .rank-badge.silver {
+      background: var(--silver);
+      color: #1a1a1a;
+      box-shadow: 0 8px 25px rgba(229, 231, 235, 0.4);
+    }
+
+    .rank-badge.bronze {
+      background: var(--bronze);
+      color: #1a1a1a;
+      box-shadow: 0 8px 25px rgba(217, 119, 6, 0.4);
+    }
+
+    .rank-badge.default {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .player-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      overflow: hidden;
+      border: 2px solid var(--border);
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .player-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .player-avatar::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 12px;
+      box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .player-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .player-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .player-name h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .player-tag {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+      background: var(--bg-glass-light);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .player-stats {
+      font-size: 13px;
+      color: var(--text-secondary);
+      display: flex;
+      gap: 12px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .player-score {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent-primary);
+      text-align: right;
+      min-width: 80px;
+    }
+
+    .profile-drawer {
+      position: absolute;
+      right: 24px;
+      top: 24px;
+      width: 340px;
+      max-width: 90vw;
+      background: var(--bg-glass);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      transform: translateX(120%);
+      transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-xl);
+      z-index: 100;
+    }
+
+    .profile-drawer.open {
+      transform: translateX(0);
+    }
+
+    .profile-header {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .profile-avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--border);
+    }
+
+    .profile-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .profile-info h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .profile-info .tag {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+
+    .profile-rank {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--accent-primary);
+    }
+
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: var(--bg-glass-light);
+      border: 1px solid var(--border-light);
+      border-radius: 12px;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .profile-about {
+      margin-bottom: 20px;
+    }
+
+    .profile-about h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    .profile-about p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .profile-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .action-btn {
+      flex: 1;
+      background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+      border: none;
+      border-radius: 10px;
+      padding: 12px;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(0, 212, 255, 0.4);
+    }
+
+    .action-btn.secondary {
+      background: var(--bg-glass-light);
+      border: 1px solid var(--border);
+      color: var(--text-secondary);
+    }
+
+    .action-btn.secondary:hover {
+      background: var(--bg-glass);
+      box-shadow: var(--shadow);
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        max-width: 100%;
+        border-radius: 20px;
+      }
+      
+      .profile-drawer {
+        right: 12px;
+        top: 12px;
+        width: calc(100vw - 24px);
+        max-width: none;
+      }
+    }
+
+    /* Loading animations */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .loading {
+      animation: pulse 2s infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="animated-bg">
+    <div class="bg-orb"></div>
+    <div class="bg-orb"></div>
+    <div class="bg-orb"></div>
+  </div>
+
+  <div class="container" role="region" aria-label="Apna Esports leaderboard">
+    <div class="header">
+      <div class="header-top">
+        <div class="logo">AE</div>
+        <div class="header-content">
+          <h1>Apna Esports</h1>
+          <p>Elite Leaderboard • Weekly Rankings</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button class="control-btn active" id="weeklyBtn">Weekly</button>
+      <button class="control-btn" id="monthlyBtn">Monthly</button>
+      <button class="control-btn" id="refreshBtn">🔄 Refresh</button>
+    </div>
+
+    <div class="leaderboard" id="leaderboard">
+      <!-- Player entries will be inserted here -->
+    </div>
+
+    <div class="profile-drawer" id="profileDrawer" aria-hidden="true">
+      <div class="profile-header">
+        <div class="profile-avatar">
+          <img id="profileAvatar" src="" alt="Player avatar">
+        </div>
+        <div class="profile-info" style="flex: 1;">
+          <h3 id="profileName">Player Name</h3>
+          <div class="tag" id="profileTag">@player</div>
+          <div class="profile-rank" id="profileRank">#1</div>
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="stat-card">
+          <div class="stat-label">Wins</div>
+          <div class="stat-value" id="profileWins">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">K/D Ratio</div>
+          <div class="stat-value" id="profileKDA">0.0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Points</div>
+          <div class="stat-value" id="profilePoints">0</div>
+        </div>
+      </div>
+
+      <div class="profile-about">
+        <h4>About Player</h4>
+        <p id="profileAbout">Elite player with exceptional skills and strategic gameplay. Known for clutch performances in high-pressure situations.</p>
+      </div>
+
+      <div class="profile-actions">
+        <button class="action-btn" id="challengeBtn">🎯 Challenge</button>
+        <button class="action-btn secondary" id="closeDrawer">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Enhanced player data with more realistic esports stats
+    const playersData = [
+      {
+        id: 1,
+        name: 'Rohit Blaze',
+        tag: '@rohit_blaze',
+        avatar: 'https://i.pravatar.cc/150?img=33',
+        points: 2850,
+        wins: 68,
+        kda: 2.45,
+        about: 'Professional sniper with exceptional map control. Known for game-changing plays and clutch victories in tournament finals.'
+      },
+      {
+        id: 2,
+        name: 'KaranX',
+        tag: '@karanx_pro',
+        avatar: 'https://i.pravatar.cc/150?img=12',
+        points: 2720,
+        wins: 61,
+        kda: 2.18,
+        about: 'Strategic mastermind and team captain. Excels in tactical coordination and has led multiple teams to championship victories.'
+      },
+      {
+        id: 3,
+        name: 'A1_Sniper',
+        tag: '@a1_sniper',
+        avatar: 'https://i.pravatar.cc/150?img=5',
+        points: 2605,
+        wins: 54,
+        kda: 2.02,
+        about: 'Lightning-fast reflexes and incredible accuracy. Holds multiple records for consecutive headshots and fastest kill streaks.'
+      },
+      {
+        id: 4,
+        name: 'Nisha Storm',
+        tag: '@nisha_storm',
+        avatar: 'https://i.pravatar.cc/150?img=47',
+        points: 2480,
+        wins: 49,
+        kda: 1.89,
+        about: 'Rising star with innovative strategies. Known for creative flanking routes and unexpected tactical plays that surprise opponents.'
+      },
+      {
+        id: 5,
+        name: 'DragonV',
+        tag: '@dragon_v',
+        avatar: 'https://i.pravatar.cc/150?img=7',
+        points: 2320,
+        wins: 43,
+        kda: 1.76,
+        about: 'Versatile player who adapts to any role. Excellent communication skills and ability to perform under pressure in crucial moments.'
+      },
+      {
+        id: 6,
+        name: 'SilentJ',
+        tag: '@silent_j',
+        avatar: 'https://i.pravatar.cc/150?img=14',
+        points: 2205,
+        wins: 38,
+        kda: 1.62,
+        about: 'Stealth specialist with perfect game sense. Masters the art of positioning and timing to secure strategic advantages.'
+      },
+      {
+        id: 7,
+        name: 'Bolt Thunder',
+        tag: '@bolt_007',
+        avatar: 'https://i.pravatar.cc/150?img=25',
+        points: 2103,
+        wins: 35,
+        kda: 1.48,
+        about: 'Aggressive entry fragger with explosive plays. Creates space for the team with fearless rushes and high-impact eliminations.'
+      },
+      {
+        id: 8,
+        name: 'Viper Elite',
+        tag: '@viper_elite',
+        avatar: 'https://i.pravatar.cc/150?img=41',
+        points: 1980,
+        wins: 31,
+        kda: 1.34,
+        about: 'Tactical support player with exceptional utility usage. Provides crucial intel and support that enables team victories.'
+      }
+    ];
+
+    let currentFilter = 'weekly';
+    const leaderboard = document.getElementById('leaderboard');
+    const profileDrawer = document.getElementById('profileDrawer');
+
+    function renderLeaderboard() {
+      leaderboard.innerHTML = '';
+      
+      // Sort players by points
+      const sortedPlayers = [...playersData].sort((a, b) => b.points - a.points);
+      
+      sortedPlayers.forEach((player, index) => {
+        const rank = index + 1;
+        const rankClass = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : 'default';
+        
+        const entry = document.createElement('div');
+        entry.className = 'player-entry';
+        entry.setAttribute('data-id', player.id);
+        entry.tabIndex = 0;
+        
+        entry.innerHTML = `
+          <div class="rank-badge ${rankClass}">#${rank}</div>
+          <div class="player-avatar">
+            <img src="${player.avatar}" alt="${player.name}" loading="lazy">
+          </div>
+          <div class="player-info">
+            <div class="player-name">
+              <h3>${player.name}</h3>
+              <span class="player-tag">${player.tag}</span>
+            </div>
+            <div class="player-stats">
+              <span class="stat">🏆 ${player.wins}</span>
+              <span class="stat">⚔️ ${player.kda}</span>
+            </div>
+          </div>
+          <div class="player-score">${player.points.toLocaleString()}</div>
+        `;
+        
+        entry.addEventListener('click', () => openProfile(player, rank));
+        entry.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            openProfile(player, rank);
+          }
+        });
+        
+        leaderboard.appendChild(entry);
+      });
+    }
+
+    function openProfile(player, rank) {
+      document.getElementById('profileAvatar').src = player.avatar;
+      document.getElementById('profileName').textContent = player.name;
+      document.getElementById('profileTag').textContent = player.tag;
+      document.getElementById('profileRank').textContent = `#${rank}`;
+      document.getElementById('profileWins').textContent = player.wins;
+      document.getElementById('profileKDA').textContent = player.kda.toFixed(2);
+      document.getElementById('profilePoints').textContent = player.points.toLocaleString();
+      document.getElementById('profileAbout').textContent = player.about;
+      
+      profileDrawer.classList.add('open');
+      profileDrawer.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeProfile() {
+      profileDrawer.classList.remove('open');
+      profileDrawer.setAttribute('aria-hidden', 'true');
+    }
+
+    function refreshLeaderboard() {
+      // Add loading state
+      leaderboard.classList.add('loading');
+      
+      // Simulate data refresh with random point changes
+      playersData.forEach(player => {
+        const change = Math.round((Math.random() * 100) - 50);
+        player.points = Math.max(0, player.points + change);
+        
+        // Occasionally update other stats
+        if (Math.random() > 0.8) {
+          player.wins += Math.random() > 0.5 ? 1 : 0;
+          player.kda += (Math.random() - 0.5) * 0.1;
+          player.kda = Math.max(0.1, Math.round(player.kda * 100) / 100);
+        }
+      });
+      
+      setTimeout(() => {
+        renderLeaderboard();
+        leaderboard.classList.remove('loading');
+      }, 1000);
+    }
+
+    // Event listeners
+    document.getElementById('weeklyBtn').addEventListener('click', function() {
+      document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+      this.classList.add('active');
+      currentFilter = 'weekly';
+    });
+
+    document.getElementById('monthlyBtn').addEventListener('click', function() {
+      document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+      this.classList.add('active');
+      currentFilter = 'monthly';
+    });
+
+    document.getElementById('refreshBtn').addEventListener('click', refreshLeaderboard);
+    document.getElementById('closeDrawer').addEventListener('click', closeProfile);
+    
+    document.getElementById('challengeBtn').addEventListener('click', () => {
+      alert('Challenge feature coming soon! 🎮');
+    });
+
+    // Close drawer when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!profileDrawer.contains(e.target) && !e.target.closest('.player-entry')) {
+        closeProfile();
+      }
+    });
+
+    // Close drawer with Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeProfile();
+      }
+    });
+
+    // Initial render
+    renderLeaderboard();
+  </script>
+</body>
+</html>
