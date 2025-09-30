@@ -655,8 +655,50 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<UserPro
         limit(count)
     );
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => doc.data() as UserProfile);
+    return snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Ensure all necessary fields are present
+        return {
+            uid: doc.id,
+            displayName: data.displayName || "Anonymous",
+            photoURL: data.photoURL || '',
+            apnaId: data.apnaId || 'N/A',
+            monthlyWins: data.monthlyWins || 0,
+             points: data.points || 0,
+            kills: data.kills || 0,
+            kda: data.deaths > 0 ? (data.kills / data.deaths).toFixed(2) : data.kills.toFixed(2), // Calculate KDA
+        } as UserProfile & { kda: string };
+    });
 };
+
+export const listenToTopPlayersByMonthlyWins = (count: number, callback: (players: (UserProfile & { kda: string })[]) => void): (() => void) => {
+    const q = query(
+        collection(db, USERS_COLLECTION),
+        where("monthlyWins", ">", 0),
+        orderBy("monthlyWins", "desc"),
+        limit(count)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const players = snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                uid: doc.id,
+                displayName: data.displayName || "Anonymous",
+                photoURL: data.photoURL || '',
+                apnaId: data.apnaId || 'N/A',
+                monthlyWins: data.monthlyWins || 0,
+                points: data.points || 0,
+                kills: data.kills || 0,
+                kda: data.deaths > 0 ? (data.kills / data.deaths).toFixed(2) : data.kills.toFixed(2),
+            } as UserProfile & { kda: string };
+        });
+        callback(players);
+    });
+
+    return unsubscribe;
+};
+
 
 export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: boolean): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
@@ -711,7 +753,7 @@ export const updateUserPremiumStatus = async (identifier: string, isPremium: boo
              userQuery = query(collection(db, USERS_COLLECTION), where("uid", "==", identifier), limit(1));
         }
         
-        const querySnapshot = await transaction.get(userQuery);
+        const querySnapshot = await getDocs(userQuery);
         if (querySnapshot.empty) {
             throw new Error("User not found with that identifier.");
         }
