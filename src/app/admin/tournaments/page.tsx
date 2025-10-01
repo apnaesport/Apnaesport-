@@ -1,9 +1,17 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
-import AdminTournamentsClient from "./AdminTournamentsClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminTournamentsClient = dynamic(() => import("./AdminTournamentsClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-64 w-full" />,
+});
 
 export default function AdminTournamentsPage() {
 

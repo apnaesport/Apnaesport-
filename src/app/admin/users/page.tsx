@@ -1,9 +1,17 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react"; 
 import Link from "next/link";
-import AdminUsersClient from "./AdminUsersClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminUsersClient = dynamic(() => import("./AdminUsersClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full" />,
+});
 
 export default function AdminUsersPage() {
   return (

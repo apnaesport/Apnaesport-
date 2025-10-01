@@ -1,6 +1,14 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
-import AdminSponsorshipsClient from "./AdminSponsorshipsClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminSponsorshipsClient = dynamic(() => import("./AdminSponsorshipsClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full" />,
+});
 
 export default function AdminSponsorshipsPage() {
 

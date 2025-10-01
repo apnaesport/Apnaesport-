@@ -1,6 +1,14 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
-import AdminCreatorsClient from "./AdminCreatorsClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminCreatorsClient = dynamic(() => import("./AdminCreatorsClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full" />,
+});
 
 export default function AdminCreatorsPage() {
 

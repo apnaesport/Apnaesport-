@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: 'Inter', sans-serif, Arial, Helvetica, sans-serif; /* Added Inter as a modern font */
-}
-
 @layer base {
   :root {
     --background: 220 15% 12%; /* Darker background: #1A1D26 */

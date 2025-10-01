@@ -1,6 +1,14 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
-import AdminGamesClient from "./AdminGamesClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminGamesClient = dynamic(() => import("./AdminGamesClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full" />,
+});
 
 export default function AdminGamesPage() {
 

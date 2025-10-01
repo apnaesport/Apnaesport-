@@ -1,7 +1,6 @@
 
-
 import type { Metadata } from "next";
-import { Inter } from "next/font/google"; // Using Inter font for a modern look
+import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppProviders } from "@/components/layout/AppProviders";
 import { cn } from "@/lib/utils";
@@ -15,6 +14,7 @@ import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans", 
+  display: 'swap',
 });
 
 
@@ -48,12 +48,6 @@ export async function generateMetadata(): Promise<Metadata> {
     }
   };
 }
-
-
-// This forces all pages to be dynamically rendered.
-// It's a broad-stroke solution to prevent prerendering errors on Vercel
-// for pages that fetch data from Firebase on the server.
-export const dynamic = 'force-dynamic';
 
 export default function RootLayout({
   children,

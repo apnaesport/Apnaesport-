@@ -1,6 +1,14 @@
 
+"use client";
+
 import { PageTitle } from "@/components/shared/PageTitle";
-import AdminPremiumClient from "./AdminPremiumClient";
+import dynamic from 'next/dynamic';
+import { Skeleton } from "@/components/ui/skeleton";
+
+const AdminPremiumClient = dynamic(() => import("./AdminPremiumClient"), {
+  ssr: false,
+  loading: () => <Skeleton className="h-96 w-full" />,
+});
 
 export default function AdminPremiumPage() {
   return (

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans", 
+  display: 'swap',
 });
 
 // This layout is minimal and specific to the landing page.
