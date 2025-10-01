@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -59,7 +60,10 @@ service cloud.firestore {
 
     // --- User Profiles (`users`) ---
     match /users/{userId} {
-      allow read: if true;
+      // Allow single document reads for anyone (public profiles).
+      allow get: if true;
+      // Allow collection queries (like for leaderboards) only for verified users.
+      allow list: if isVerified();
 
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
@@ -129,9 +133,9 @@ service cloud.firestore {
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt'])
         ) ||
 
-        // Any verified user can join an "Upcoming" tournament.
+        // Any verified user can join an "Upcoming" or "Live" tournament.
         (
-          resource.data.status == 'Upcoming' &&
+          (resource.data.status == 'Upcoming' || resource.data.status == 'Live') &&
           // Check that only the participants list, prize pool, and timestamp are being changed.
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
           
@@ -153,7 +157,7 @@ service cloud.firestore {
             request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
             // The new participant (at the end of the list) must be the current user.
             // This relies on the client transaction to add the user to the end of the array.
-            request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid
+            request.resource.data.participants[resource.data.participants.size() - 1].id == request.auth.uid
           )
         )
       );
