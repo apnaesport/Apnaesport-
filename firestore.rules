@@ -1,4 +1,3 @@
-
 rules_version = '2';
 
 service cloud.firestore {
@@ -60,10 +59,10 @@ service cloud.firestore {
 
     // --- User Profiles (`users`) ---
     match /users/{userId} {
-      // Allow single document reads for anyone (public profiles).
+      // Anyone can get a single user's public profile.
       allow get: if true;
-      // Allow collection queries (like for leaderboards) only for verified users.
-      allow list: if isVerified();
+      // Anyone can list users, necessary for the public leaderboard.
+      allow list: if true;
 
       allow create: if isSelf(userId)
                     && request.resource.data.isAdmin == false
@@ -81,7 +80,6 @@ service cloud.firestore {
           request.resource.data.points == resource.data.points + 5
         ) ||
         // Allow point deduction ONLY for tournament entry fee.
-        // This must happen in the same transaction as joining the tournament.
         (
           isSelf(userId) &&
           request.resource.data.points < resource.data.points &&
@@ -157,7 +155,7 @@ service cloud.firestore {
             request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
             // The new participant (at the end of the list) must be the current user.
             // This relies on the client transaction to add the user to the end of the array.
-            request.resource.data.participants[resource.data.participants.size() - 1].id == request.auth.uid
+            request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid
           )
         )
       );
