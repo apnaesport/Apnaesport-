@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   doc,
@@ -647,7 +648,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
   });
 };
 
-export const getTopPlayersByMonthlyWins = async (count: number): Promise<UserProfile[]> => {
+export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserProfile & { kda: string })[]> => {
     const q = query(
         collection(db, USERS_COLLECTION),
         where("monthlyWins", ">", 0),
@@ -657,16 +658,17 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<UserPro
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => {
         const data = doc.data();
-        // Ensure all necessary fields are present
+        const kills = data.kills || 0;
+        const deaths = data.deaths || 0;
         return {
             uid: doc.id,
             displayName: data.displayName || "Anonymous",
             photoURL: data.photoURL || '',
             apnaId: data.apnaId || 'N/A',
             monthlyWins: data.monthlyWins || 0,
-             points: data.points || 0,
-            kills: data.kills || 0,
-            kda: data.deaths > 0 ? (data.kills / data.deaths).toFixed(2) : data.kills.toFixed(2), // Calculate KDA
+            points: data.points || 0,
+            kills: kills,
+            kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2), // Calculate KDA
         } as UserProfile & { kda: string };
     });
 };
@@ -682,6 +684,8 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const players = snapshot.docs.map(doc => {
             const data = doc.data();
+            const kills = data.kills || 0;
+            const deaths = data.deaths || 0;
             return {
                 uid: doc.id,
                 displayName: data.displayName || "Anonymous",
@@ -689,8 +693,8 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
                 apnaId: data.apnaId || 'N/A',
                 monthlyWins: data.monthlyWins || 0,
                 points: data.points || 0,
-                kills: data.kills || 0,
-                kda: data.deaths > 0 ? (data.kills / data.deaths).toFixed(2) : data.kills.toFixed(2),
+                kills: kills,
+                kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2),
             } as UserProfile & { kda: string };
         });
         callback(players);
@@ -1279,3 +1283,4 @@ export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
 
     
+
