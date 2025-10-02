@@ -1,5 +1,4 @@
 
-
 import { PageTitle } from "@/components/shared/PageTitle";
 import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamentCard";
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
@@ -13,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DashboardPageClient from "./DashboardPageClient";
 import { auth } from "@/lib/firebase";
 import { get } from "http";
+import { format } from "date-fns";
 
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
@@ -21,11 +21,14 @@ const serializeObjectWithTimestamps = (obj: any): any => {
     // Create a new object to avoid mutating the original
     const newObj = { ...obj };
     for (const key in newObj) {
+        // Firestore Timestamps have a toDate method
         if (newObj[key] && typeof newObj[key] === 'object' && typeof newObj[key].toDate === 'function') {
             newObj[key] = newObj[key].toDate().toISOString();
+        } else if (newObj[key] instanceof Date) { // Also handle JS Date objects
+            newObj[key] = newObj[key].toISOString();
         }
     }
-    return newObj;
+    return JSON.parse(JSON.stringify(newObj)); // Deep clone and serialize
 };
 
 
@@ -56,6 +59,11 @@ export default async function DashboardPage() {
     });
     featuredTournament = sortedByCreation[0];
   }
+  
+  const completedWithWinners = tournaments.filter(t => t.status === "Completed" && t.winners && t.winners.length > 0);
+  completedWithWinners.sort((a,b) => new Date(b.updatedAt as any).getTime() - new Date(a.updatedAt as any).getTime());
+  const recentWinners = completedWithWinners.length > 0 ? completedWithWinners[0] : null;
+
 
   const liveTournaments = tournaments.filter(t => t.status === "Live" || t.status === "Ongoing");
 
@@ -70,10 +78,10 @@ export default async function DashboardPage() {
     { title: "Matches Played", value: totalMatchesPlayed, icon: "Gamepad2" as LucideIconName },
   ];
   
-  const serializableGames = games.map(serializeObjectWithTimestamps);
-  // We no longer pass all users to the client, as it's inefficient.
+  const serializableGames = games.map(g => serializeObjectWithTimestamps(g));
   const serializableFeaturedTournament = featuredTournament ? serializeObjectWithTimestamps(featuredTournament) : undefined;
-  const serializableLiveTournaments = liveTournaments.map(serializeObjectWithTimestamps);
+  const serializableLiveTournaments = liveTournaments.map(t => serializeObjectWithTimestamps(t));
+  const serializableRecentWinners = recentWinners ? serializeObjectWithTimestamps(recentWinners) : null;
 
 
   return (
@@ -82,6 +90,7 @@ export default async function DashboardPage() {
         featuredTournament={serializableFeaturedTournament}
         liveTournaments={serializableLiveTournaments}
         allGames={serializableGames}
+        recentWinners={serializableRecentWinners}
      />
   );
 }

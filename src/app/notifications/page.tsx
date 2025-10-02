@@ -49,7 +49,7 @@ export default function UserNotificationsPage() {
     if (!user) return; 
     setIsLoading(true);
     try {
-      const fetchedNotifications = await getNotificationsFromFirestore("all_users");
+      const fetchedNotifications = await getNotificationsFromFirestore(undefined, user.uid);
       setNotifications(fetchedNotifications);
     } catch (error) {
       console.error("Error fetching notifications:", error);

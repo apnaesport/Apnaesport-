@@ -5,6 +5,14 @@ import type { icons } from "lucide-react";
 
 export type LucideIconName = keyof typeof icons;
 
+export interface UnseenWin {
+    id: string; // Unique ID for the win, e.g., `${tournamentId}-${rank}`
+    tournamentId: string;
+    tournamentName: string;
+    rank: 1 | 2 | 3;
+    prize: number;
+}
+
 export interface UserProfile extends Partial<FirebaseUser> {
   displayName: string | null;
   email: string | null;
@@ -27,6 +35,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   kills?: number;
   deaths?: number;
   apnaId?: string;
+  unseenWins?: UnseenWin[];
 }
 
 export type PointTransaction = {
@@ -78,6 +87,8 @@ export type Winner = {
     rank: 1 | 2 | 3;
     participant: Participant;
     prize: number;
+    kills?: number;
+    deaths?: number;
 };
 
 export type Tournament = {
@@ -175,6 +186,8 @@ export interface NotificationMessage {
   message: string;
   type: NotificationType;
   target: NotificationTarget;
+  targetUserId?: string; // For user-specific notifications
+  tournamentId?: string; // For tournament-specific notifications
   createdAt: Timestamp;
 }
 
@@ -183,6 +196,7 @@ export interface NotificationFormData {
   message: string;
   type: NotificationType;
   target: NotificationTarget;
+  tournamentId?: string;
 }
 
 export type SponsorshipRequestStatus = "New" | "Contacted" | "In Progress" | "Closed";
@@ -300,5 +314,3 @@ export interface CreatorApplication {
     createdAt: Timestamp;
     communityId?: string;
 }
-
-    

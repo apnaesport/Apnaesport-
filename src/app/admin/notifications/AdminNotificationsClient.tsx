@@ -13,8 +13,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
-import type { NotificationMessage, NotificationFormData, NotificationType } from "@/lib/types";
-import { sendNotificationToFirestore, getNotificationsFromFirestore } from "@/lib/tournamentStore";
+import type { NotificationMessage, NotificationFormData, NotificationType, Tournament } from "@/lib/types";
+import { sendNotificationToFirestore, getNotificationsFromFirestore, getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -23,7 +23,17 @@ const notificationSchema = z.object({
   message: z.string().min(10, "Message must be at least 10 characters.").max(1000, "Message too long."),
   target: z.enum(["all_users", "specific_users", "tournament_participants"]), 
   type: z.enum(["info", "warning", "success", "error", "announcement"]),
+  tournamentId: z.string().optional(),
+}).refine(data => {
+    if (data.target === "tournament_participants") {
+        return !!data.tournamentId;
+    }
+    return true;
+}, {
+    message: "A tournament must be selected for this audience.",
+    path: ["tournamentId"],
 });
+
 
 const NotificationIcon = ({ type }: { type: NotificationType }) => {
   switch (type) {
@@ -41,6 +51,7 @@ export default function AdminNotificationsClient() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sentNotifications, setSentNotifications] = useState<NotificationMessage[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -49,14 +60,21 @@ export default function AdminNotificationsClient() {
       message: "",
       target: "all_users",
       type: "announcement",
+      tournamentId: "",
     },
   });
+
+  const selectedTarget = form.watch("target");
 
   const fetchNotificationHistory = useCallback(async () => {
     setIsLoadingHistory(true);
     try {
-      const history = await getNotificationsFromFirestore();
+      const [history, tournaments] = await Promise.all([
+        getNotificationsFromFirestore(),
+        getTournamentsFromFirestore(),
+      ]);
       setSentNotifications(history);
+      setAllTournaments(tournaments);
     } catch (error) {
       console.error("Error fetching notification history:", error);
       toast({ title: "Error", description: "Could not load notification history.", variant: "destructive" });
@@ -74,7 +92,7 @@ export default function AdminNotificationsClient() {
       await sendNotificationToFirestore(data);
       toast({
         title: "Notification Sent!",
-        description: `"${data.title}" has been broadcasted to ${data.target.replace('_', ' ')}.`,
+        description: `Your message has been broadcasted.`,
       });
       form.reset();
       await fetchNotificationHistory(); 
@@ -122,8 +140,8 @@ export default function AdminNotificationsClient() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all_users">All Users</SelectItem>
+                        <SelectItem value="tournament_participants">Tournament Participants</SelectItem>
                         <SelectItem value="specific_users" disabled>Specific Users (Coming Soon)</SelectItem>
-                        <SelectItem value="tournament_participants" disabled>Tournament Participants (Coming Soon)</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -151,6 +169,27 @@ export default function AdminNotificationsClient() {
                 />
               </div>
             </div>
+
+            {selectedTarget === "tournament_participants" && (
+                 <div>
+                    <Label htmlFor="tournamentId">Select Tournament</Label>
+                    <Controller
+                        name="tournamentId"
+                        control={form.control}
+                        render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value} disabled={isSubmitting}>
+                                <SelectTrigger><SelectValue placeholder="Choose a tournament..."/></SelectTrigger>
+                                <SelectContent>
+                                    {allTournaments.map(t => (
+                                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
+                    />
+                    {form.formState.errors.tournamentId && <p className="text-destructive text-xs mt-1">{form.formState.errors.tournamentId.message}</p>}
+                 </div>
+            )}
             
             <Button type="submit" size="lg" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
@@ -197,7 +236,7 @@ export default function AdminNotificationsClient() {
                         </span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1 pl-6 truncate">{notif.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1 pl-6">Target: {notif.target.replace("_", " ")}</p>
+                    <p className="text-xs text-muted-foreground mt-1 pl-6">Target: {notif.targetUserId ? "Specific User" : notif.tournamentId ? "Tournament Participants" : "All Users"}</p>
                 </li>
               ))}
             </ul>

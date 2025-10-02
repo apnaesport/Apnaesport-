@@ -1,5 +1,4 @@
 
-
 import {
   collection,
   doc,
@@ -26,7 +25,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -39,6 +38,7 @@ const SPONSORSHIPS_COLLECTION = "sponsorships";
 const COMMUNITIES_COLLECTION = "communities";
 const CREATORS_COLLECTION = "creators";
 const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
+const UNSEEN_WINS_COLLECTION = "unseenWins";
 
 const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
@@ -105,8 +105,8 @@ export const getGamesFromFirestore = async (): Promise<Game[]> => {
       ...data,
       iconUrl: data.iconUrl || `https://placehold.co/40x40.png?text=${(data.name || "G").substring(0,2)}`,
       bannerUrl: data.bannerUrl || `https://placehold.co/400x300.png?text=${encodeURIComponent(data.name || "Game Banner")}`,
-      createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : undefined,
-      updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : undefined,
+      createdAt: data.createdAt as Timestamp,
+      updatedAt: data.updatedAt as Timestamp,
     } as Game;
   });
 };
@@ -216,6 +216,8 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
       id: docSnapshot.id,
       ...data,
       startDate: (data.startDate as Timestamp).toDate(),
+      createdAt: data.createdAt as Timestamp,
+      updatedAt: data.updatedAt as Timestamp,
     } as Tournament;
 
     const currentStatus = tournament.status;
@@ -419,7 +421,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
 
 export const awardTournamentWinners = async (
     tournamentId: string, 
-    winners: { first: Participant, second: Participant, third: Participant }
+    winners: { first: Winner, second: Winner, third: Winner }
 ): Promise<void> => {
     return runTransaction(db, async (transaction) => {
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
@@ -443,11 +445,24 @@ export const awardTournamentWinners = async (
         };
         const finalWinners: Winner[] = [];
 
-        // Award winners and create transaction logs
-        const processWinner = (participant: Participant, rank: 1 | 2 | 3, prize: number) => {
+        const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, prize: number) => {
+            const { participant, kills, deaths } = winnerData;
+            
+            const winnerRef = doc(db, USERS_COLLECTION, participant.id);
+            const updatePayload: any = {
+                monthlyWins: increment(1),
+                kills: increment(kills || 0),
+                deaths: increment(deaths || 0),
+                unseenWins: arrayUnion({
+                    id: `${tournamentId}-${rank}`,
+                    tournamentId,
+                    tournamentName: tournamentData.name,
+                    rank,
+                    prize,
+                })
+            };
             if (prize > 0) {
-                const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-                transaction.update(winnerRef, { points: increment(prize), monthlyWins: increment(1) });
+                updatePayload.points = increment(prize);
                 const prizeTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
                 transaction.set(prizeTransactionRef, {
                     amount: prize,
@@ -457,7 +472,8 @@ export const awardTournamentWinners = async (
                     createdAt: serverTimestamp()
                 });
             }
-            finalWinners.push({ rank, participant, prize });
+            transaction.update(winnerRef, updatePayload);
+            finalWinners.push({ rank, participant, prize, kills, deaths });
         };
         
         processWinner(winners.first, 1, prizeDistribution.first);
@@ -470,24 +486,68 @@ export const awardTournamentWinners = async (
 };
 
 
-
 // --- Notification Functions ---
 
-export const sendNotificationToFirestore = async (notificationData: NotificationFormData): Promise<string> => {
-  const docRef = await addDoc(collection(db, NOTIFICATIONS_COLLECTION), {
-    ...notificationData,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
+export const sendNotificationToFirestore = async (notificationData: NotificationFormData): Promise<string[]> => {
+  const batch = writeBatch(db);
+  const docIds: string[] = [];
+
+  if (notificationData.target === 'tournament_participants' && notificationData.tournamentId) {
+      const tournament = await getTournamentByIdFromFirestore(notificationData.tournamentId);
+      if (tournament && tournament.participants.length > 0) {
+          tournament.participants.forEach(p => {
+              const docRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+              batch.set(docRef, { 
+                  ...notificationData, 
+                  targetUserId: p.id, // Target specific user
+                  createdAt: serverTimestamp() 
+              });
+              docIds.push(docRef.id);
+          });
+      } else {
+          throw new Error("Tournament not found or has no participants.");
+      }
+  } else {
+      const docRef = doc(collection(db, NOTIFICATIONS_COLLECTION));
+      batch.set(docRef, { 
+          ...notificationData, 
+          target: "all_users", // Default to all_users if not targeting specific tournament
+          createdAt: serverTimestamp() 
+      });
+      docIds.push(docRef.id);
+  }
+
+  await batch.commit();
+  return docIds;
 };
 
-export const getNotificationsFromFirestore = async (target?: NotificationTarget): Promise<NotificationMessage[]> => {
-  let qConstraints: QueryConstraint[] = [orderBy("createdAt", "desc")];
+export const getNotificationsFromFirestore = async (target?: NotificationTarget, userId?: string): Promise<NotificationMessage[]> => {
+  let q;
+  const notificationsRef = collection(db, NOTIFICATIONS_COLLECTION);
+  
+  if (userId) {
+      // Fetch global notifications OR notifications targeted to this user
+      const globalQuery = query(notificationsRef, where("target", "==", "all_users"));
+      const userSpecificQuery = query(notificationsRef, where("targetUserId", "==", userId));
+      
+      const [globalSnapshot, userSnapshot] = await Promise.all([
+          getDocs(globalQuery),
+          getDocs(userSpecificQuery)
+      ]);
+      
+      const allNotifications: NotificationMessage[] = [];
+      globalSnapshot.forEach(doc => allNotifications.push({ id: doc.id, ...doc.data() } as NotificationMessage));
+      userSnapshot.forEach(doc => allNotifications.push({ id: doc.id, ...doc.data() } as NotificationMessage));
+      
+      // Sort combined notifications by date
+      allNotifications.sort((a, b) => (b.createdAt as Timestamp).toMillis() - (a.createdAt as Timestamp).toMillis());
+      return allNotifications;
 
-  if (target) {
-    qConstraints.push(where("target", "==", target));
+  } else {
+      // Admin view: fetch all notifications
+      q = query(notificationsRef, orderBy("createdAt", "desc"));
   }
-  const q = query(collection(db, NOTIFICATIONS_COLLECTION), ...qConstraints);
+  
   const notificationsSnapshot = await getDocs(q);
 
   return notificationsSnapshot.docs.map(doc => {
@@ -544,6 +604,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       kills: data.kills || 0,
       deaths: data.deaths || 0,
       apnaId: data.apnaId,
+      unseenWins: data.unseenWins || [],
     } as UserProfile;
   }
   return null;
@@ -607,6 +668,21 @@ export const claimDailyBonus = async (userId: string): Promise<{ success: boolea
     }
 };
 
+export const getUnseenWinsFromFirestore = async (userId: string): Promise<UnseenWin[]> => {
+    const user = await getUserProfileFromFirestore(userId);
+    return user?.unseenWins || [];
+};
+
+export const clearUnseenWinsFromFirestore = async (userId: string, winId: string): Promise<void> => {
+    const userRef = doc(db, USERS_COLLECTION, userId);
+    const user = await getUserProfileFromFirestore(userId);
+    if (user && user.unseenWins) {
+        const winsToKeep = user.unseenWins.filter(win => win.id !== winId);
+        await updateDoc(userRef, { unseenWins: winsToKeep });
+    }
+};
+
+
 export const getPointTransactions = async (userId: string): Promise<PointTransaction[]> => {
     const transactionsRef = collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION);
     const q = query(transactionsRef, orderBy("createdAt", "desc"), limit(50));
@@ -668,6 +744,7 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserPr
             monthlyWins: data.monthlyWins || 0,
             points: data.points || 0,
             kills: kills,
+            deaths: deaths,
             kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2), // Calculate KDA
         } as UserProfile & { kda: string };
     });
@@ -689,11 +766,12 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
             return {
                 uid: doc.id,
                 displayName: data.displayName || "Anonymous",
-                photoURL: data.photoURL || '',
+                photoURL: data.photoURL || `https://i.pravatar.cc/150?u=${doc.id}`,
                 apnaId: data.apnaId || 'N/A',
                 monthlyWins: data.monthlyWins || 0,
                 points: data.points || 0,
                 kills: kills,
+                deaths: deaths,
                 kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2),
             } as UserProfile & { kda: string };
         });
@@ -1283,4 +1361,3 @@ export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
 
     
-
