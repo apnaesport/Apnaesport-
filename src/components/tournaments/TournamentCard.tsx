@@ -14,21 +14,10 @@ import { useState, useEffect } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
-  tournament: Tournament;
+  tournament: Tournament & { formattedStartDate: string };
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {
-  const [formattedStartDate, setFormattedStartDate] = useState("Loading date...");
-
-  useEffect(() => {
-    // This effect runs only on the client, after hydration.
-    // This prevents the server and client from rendering different initial values.
-    if (tournament.startDate) {
-      setFormattedStartDate(format(new Date(tournament.startDate), "PPPp"));
-    } else {
-      setFormattedStartDate("Date TBD");
-    }
-  }, [tournament.startDate]);
   
   const getStatusBadgeVariant = (status: Tournament["status"]) => {
     switch (status) {
@@ -89,7 +78,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
           <div className="flex items-center text-muted-foreground">
             <CalendarDays className="h-4 w-4 mr-2 text-primary" />
-            <span>{formattedStartDate}</span>
+            <span>{tournament.formattedStartDate}</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2 text-primary" />

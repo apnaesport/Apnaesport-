@@ -34,7 +34,7 @@ const tournamentSchema = z.object({
   startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
   entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more.").max(40, "Entry fee cannot exceed 40."),
-  matchType: z.string({ required_error: "Match type is required."}),
+  matchType: z.string({ required_error: "Match type is required."}).min(1, "Match type is required."),
   mapName: z.string().optional(),
   teamSize: z.enum(["Solo", "Duo", "Squad"], { required_error: "Team size is required." }),
   rules: z.string().optional(),
@@ -69,7 +69,7 @@ export default function CreateTournamentPage() {
       maxParticipants: 16,
       entryFee: 0,
       matchType: "",
-      mapName: "",
+      mapName: "any",
       teamSize: "Solo",
       rules: "",
       registrationInstructions: "",
@@ -97,8 +97,13 @@ export default function CreateTournamentPage() {
       const gamesFromDb = await getGamesFromFirestore();
       setAvailableGames(gamesFromDb);
       const preselectedGameId = searchParams.get("gameId");
-      if (preselectedGameId && gamesFromDb.some(g => g.id === preselectedGameId)) {
-        form.setValue("gameId", preselectedGameId);
+      if (preselectedGameId) {
+          const game = gamesFromDb.find(g => g.id === preselectedGameId);
+          if (game) {
+              form.setValue("gameId", preselectedGameId);
+              form.setValue("matchType", game.matchTypes?.[0] || "");
+              form.setValue("mapName", "any");
+          }
       }
     } catch (error) {
       console.error("Error fetching games:", error);
@@ -160,7 +165,7 @@ export default function CreateTournamentPage() {
       maxParticipants: data.maxParticipants,
       entryFee: data.entryFee || 0,
       matchType: data.matchType,
-      mapName: data.mapName,
+      mapName: data.mapName === "any" ? "" : data.mapName,
       teamSize: data.teamSize,
       rules: data.rules,
       registrationInstructions: data.registrationInstructions,
@@ -533,5 +538,3 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
-
-    
