@@ -8,19 +8,38 @@ import TournamentsPageClient from './TournamentsPageClient';
 import type { Tournament } from "@/lib/types";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 import { format } from "date-fns";
+import type { Timestamp } from "firebase/firestore";
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeTournament = (tournament: Tournament): any => {
+    const safeToDate = (ts: Date | Timestamp | any): Date | null => {
+        if (!ts) return null;
+        if (ts.toDate) return (ts as Timestamp).toDate(); // Firestore Timestamp
+        if (ts instanceof Date) return ts; // Already a Date
+        try {
+            const date = new Date(ts);
+            if (!isNaN(date.getTime())) return date;
+        } catch (e) {
+            // ignore
+        }
+        return null;
+    };
+    
+    const createdAtDate = safeToDate(tournament.createdAt);
+    const updatedAtDate = safeToDate(tournament.updatedAt);
+    const startDateDate = safeToDate(tournament.startDate);
+    const endDateDate = safeToDate(tournament.endDate);
+
     return {
       ...tournament,
       id: tournament.id, // ensure id is there
       // Convert all date-like fields to ISO strings for serialization
-      startDate: tournament.startDate ? new Date(tournament.startDate as any).toISOString() : new Date().toISOString(),
-      endDate: tournament.endDate ? new Date(tournament.endDate as any).toISOString() : undefined,
-      createdAt: tournament.createdAt ? new Date(tournament.createdAt as any).toISOString() : new Date().toISOString(),
-      updatedAt: tournament.updatedAt ? new Date(tournament.updatedAt as any).toISOString() : new Date().toISOString(),
+      startDate: startDateDate ? startDateDate.toISOString() : new Date().toISOString(),
+      endDate: endDateDate ? endDateDate.toISOString() : undefined,
+      createdAt: createdAtDate ? createdAtDate.toISOString() : new Date().toISOString(),
+      updatedAt: updatedAtDate ? updatedAtDate.toISOString() : new Date().toISOString(),
       // Add a pre-formatted date string
-      formattedStartDate: tournament.startDate ? format(new Date(tournament.startDate as any), "PPPp") : "Date TBD"
+      formattedStartDate: startDateDate ? format(startDateDate, "PPPp") : "Date TBD"
     };
 };
 
