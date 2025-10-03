@@ -3,9 +3,10 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import type { SiteSettings } from '@/lib/types';
+import type { SiteSettings, NavIndicator } from '@/lib/types';
 import { getSiteSettingsFromFirestore } from '@/lib/tournamentStore';
 import { useToast } from '@/hooks/use-toast';
+import { mainNavItemsForAdmin } from '@/components/layout/SidebarNav';
 
 interface SiteSettingsContextType {
   settings: SiteSettings | null;
@@ -14,6 +15,12 @@ interface SiteSettingsContextType {
 }
 
 const SiteSettingsContext = createContext<SiteSettingsContextType | undefined>(undefined);
+
+const defaultNavIndicators = mainNavItemsForAdmin.reduce((acc, item) => {
+    acc[item.href] = { enabled: false, text: 'New', color: 'primary' };
+    return acc;
+}, {} as Record<string, NavIndicator>);
+
 
 const defaultSettings: SiteSettings = {
     siteName: "Apna Esport",
@@ -25,6 +32,7 @@ const defaultSettings: SiteSettings = {
     downloadAppLink: "",
     defaultTheme: "system",
     basePlayerCount: 0,
+    navIndicators: defaultNavIndicators,
 };
 
 
@@ -38,7 +46,9 @@ export function SiteSettingsProvider({ children }: { children: ReactNode }) {
     try {
       const loadedSettings = await getSiteSettingsFromFirestore();
       if (loadedSettings) {
-        setSettings({ ...defaultSettings, ...loadedSettings });
+        // Merge default indicators with loaded ones to ensure all nav items are present
+        const mergedIndicators = { ...defaultNavIndicators, ...loadedSettings.navIndicators };
+        setSettings({ ...defaultSettings, ...loadedSettings, navIndicators: mergedIndicators });
       } else {
         // Set default settings if none are found in Firestore
         setSettings(defaultSettings);
@@ -74,5 +84,3 @@ export const useSiteSettings = (): SiteSettingsContextType => {
   }
   return context;
 };
-
-    

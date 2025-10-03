@@ -9,19 +9,27 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins } from "lucide-react";
-import { useForm, type SubmitHandler, Controller } from "react-hook-form";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins, Tags } from "lucide-react";
+import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
-import type { SiteSettings } from "@/lib/types";
+import type { SiteSettings, NavIndicator } from "@/lib/types";
 import { useEffect, useState, useCallback } from "react";
 import { getSiteSettingsFromFirestore, saveSiteSettingsToFirestore } from "@/lib/tournamentStore";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useSiteSettings as useGlobalSiteSettings, SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { mainNavItemsForAdmin } from "@/components/layout/SidebarNav";
 
+
+const navIndicatorSchema = z.object({
+  text: z.string().max(10, "Text too long").optional(),
+  enabled: z.boolean(),
+  color: z.enum(['primary', 'destructive', 'amber']),
+});
 
 const settingsSchema = z.object({
   siteName: z.string().min(3, "Site name must be at least 3 characters."),
@@ -37,6 +45,7 @@ const settingsSchema = z.object({
   adsEnabled: z.boolean().optional(),
   adsterraNativeAdKey: z.string().optional(),
   aeCoinLogoUrl: z.string().url("Must be a valid URL for the coin logo.").or(z.literal('')).optional(),
+  navIndicators: z.record(z.string(), navIndicatorSchema).optional(),
 });
 
 
@@ -54,6 +63,10 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   adsEnabled: false,
   adsterraNativeAdKey: "",
   aeCoinLogoUrl: "",
+  navIndicators: mainNavItemsForAdmin.reduce((acc, item) => {
+    acc[item.href] = { enabled: false, text: 'New', color: 'primary' };
+    return acc;
+  }, {} as Record<string, NavIndicator>),
 };
 
 function AdminSettingsPageContent() {
@@ -68,13 +81,20 @@ function AdminSettingsPageContent() {
     defaultValues: defaultSettingsValues,
   });
 
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "navIndicators" as any, // Need to type cast for record
+  });
+
   const fetchSettings = useCallback(async () => {
     setIsFetchingSettings(true);
     if (globalSettings) {
+      const mergedIndicators = { ...defaultSettingsValues.navIndicators, ...globalSettings.navIndicators };
       form.reset({
         ...defaultSettingsValues, 
         ...globalSettings,
         basePlayerCount: globalSettings.basePlayerCount || 0,
+        navIndicators: mergedIndicators,
       });
       if (globalSettings.defaultTheme && ["light", "dark", "system"].includes(globalSettings.defaultTheme)) {
         setTheme(globalSettings.defaultTheme as "light" | "dark" | "system");
@@ -82,10 +102,12 @@ function AdminSettingsPageContent() {
     } else {
       const loadedSettings = await getSiteSettingsFromFirestore();
       if (loadedSettings) {
+        const mergedIndicators = { ...defaultSettingsValues.navIndicators, ...loadedSettings.navIndicators };
         form.reset({
             ...defaultSettingsValues,
             ...loadedSettings,
             basePlayerCount: loadedSettings.basePlayerCount || 0,
+            navIndicators: mergedIndicators,
         });
         if (loadedSettings.defaultTheme) setTheme(loadedSettings.defaultTheme as "light" | "dark" | "system");
       } else {
@@ -271,6 +293,59 @@ function AdminSettingsPageContent() {
             </div>
         </CardContent>
       </Card>
+      
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center"><Tags className="mr-2 h-5 w-5 text-primary" /> Navigation Indicators</CardTitle>
+                <CardDescription>Highlight important navigation links with a text indicator badge.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {mainNavItemsForAdmin.map((item) => (
+                    <div key={item.href} className="p-4 border rounded-lg space-y-4 bg-muted/30">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor={`indicator-enabled-${item.href}`} className="flex items-center gap-2 font-semibold">
+                                <item.icon className="h-5 w-5 text-muted-foreground"/> {item.label}
+                            </Label>
+                             <Controller
+                                name={`navIndicators.${item.href}.enabled`}
+                                control={form.control}
+                                render={({ field }) => (
+                                    <Switch
+                                        id={`indicator-enabled-${item.href}`}
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                        disabled={isSaving}
+                                    />
+                                )}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <Label htmlFor={`indicator-text-${item.href}`}>Badge Text</Label>
+                                <Input id={`indicator-text-${item.href}`} {...form.register(`navIndicators.${item.href}.text`)} placeholder="e.g. New" disabled={isSaving}/>
+                            </div>
+                            <div>
+                                <Label htmlFor={`indicator-color-${item.href}`}>Color</Label>
+                                 <Controller
+                                    name={`navIndicators.${item.href}.color`}
+                                    control={form.control}
+                                    render={({ field }) => (
+                                        <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
+                                            <SelectTrigger><SelectValue/></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="primary">Primary (Blue)</SelectItem>
+                                                <SelectItem value="destructive">Destructive (Red)</SelectItem>
+                                                <SelectItem value="amber">Amber (Yellow)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </CardContent>
+        </Card>
 
       <Card>
         <CardHeader>

@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState, useCallback } from "react";
 import type { UserProfile, Game, CreatorApplication } from "@/lib/types";
 import { updateUserProfileInFirestore, getUserProfileFromFirestore, getGamesFromFirestore, getMyApplicationsFromFirestore } from "@/lib/tournamentStore";
-import { updateProfile as updateFirebaseProfile } from "firebase/auth"; 
+import { updateProfile as updateFirebaseProfile, sendPasswordResetEmail } from "firebase/auth"; 
 import { auth } from "@/lib/firebase";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,6 +29,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 const profileSchema = z.object({
@@ -80,6 +91,7 @@ export default function ProfilePage() {
   const [availableGames, setAvailableGames] = useState<Game[]>([]);
   const [applications, setApplications] = useState<CreatorApplication[]>([]);
   const [isLoadingApps, setIsLoadingApps] = useState(true);
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -133,6 +145,26 @@ export default function ProfilePage() {
   const getInitials = (name: string | null | undefined) => {
     if (!name) return "AE"; 
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
+  };
+
+  const handleChangePassword = async () => {
+    if (!user || !user.email) return;
+    setIsSendingReset(true);
+    try {
+        await sendPasswordResetEmail(auth, user.email);
+        toast({
+            title: "Password Reset Email Sent",
+            description: "Check your inbox for instructions to reset your password. It may be in your spam folder.",
+        });
+    } catch (error: any) {
+        toast({
+            title: "Error",
+            description: "Failed to send password reset email. Please try again.",
+            variant: "destructive",
+        });
+    } finally {
+        setIsSendingReset(false);
+    }
   };
 
   const onSubmit: SubmitHandler<ProfileFormData> = async (data) => {
@@ -237,6 +269,37 @@ export default function ProfilePage() {
             </CardHeader>
           </Card>
           {isPremium && <PremiumBenefitsCard />}
+           <Card>
+                <CardHeader>
+                    <CardTitle>Account Security</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="outline" className="w-full" disabled={isSendingReset}>
+                                {isSendingReset ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                                Change Password
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Change Password?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This will send a password reset link to your email address ({user.email}). Are you sure you want to proceed?
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel disabled={isSendingReset}>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleChangePassword} disabled={isSendingReset}>
+                                    {isSendingReset && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Send Link
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                    <Button variant="destructive" className="w-full" disabled>Delete Account</Button>
+                </CardContent>
+            </Card>
         </div>
 
         <div className="md:col-span-2">

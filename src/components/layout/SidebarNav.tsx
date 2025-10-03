@@ -33,14 +33,14 @@ import { Separator } from "../ui/separator";
 import { Badge } from "../ui/badge";
 import type { NavIndicator } from "@/lib/types";
 
-const mainNavItems = [
+export const mainNavItemsForAdmin = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
   { href: "/community", label: "Communities", icon: Users },
   { href: "/creators", label: "Creators", icon: Star },
   { href: "/games", label: "Games", icon: Gamepad2 },
-  { href: "/rewards", label: "Rewards", icon: Coins }, // Added
+  { href: "/rewards", label: "Rewards", icon: Coins },
   { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 
@@ -90,7 +90,7 @@ export function SidebarNav() {
   return (
     <>
       <SidebarMenu>
-        {mainNavItems.map((item) => {
+        {mainNavItemsForAdmin.map((item) => {
             const indicator = settings?.navIndicators?.[item.href];
             const isNotifications = item.href === '/notifications';
           return (
