@@ -30,6 +30,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { Separator } from "../ui/separator";
+import { Badge } from "../ui/badge";
+import type { NavIndicator } from "@/lib/types";
 
 const mainNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -46,9 +48,25 @@ const secondaryNavItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+const NavIndicatorBadge = ({ indicator }: { indicator: NavIndicator | undefined }) => {
+    if (!indicator || !indicator.enabled) return null;
+
+    const colorClasses = {
+        primary: 'bg-primary text-primary-foreground',
+        destructive: 'bg-destructive text-destructive-foreground',
+        amber: 'bg-amber-500 text-white',
+    }
+
+    return (
+        <Badge className={cn("ml-auto h-5 px-2 text-xs", colorClasses[indicator.color])}>
+            {indicator.text}
+        </Badge>
+    )
+}
+
 export function SidebarNav() {
   const pathname = usePathname();
-  const { logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, hasUnreadNotifications } = useAuth();
   const { settings, loadingSettings } = useSiteSettings();
   const [navigatingTo, setNavigatingTo] = useState<string | null>(null);
 
@@ -72,7 +90,10 @@ export function SidebarNav() {
   return (
     <>
       <SidebarMenu>
-        {mainNavItems.map((item) => (
+        {mainNavItems.map((item) => {
+            const indicator = settings?.navIndicators?.[item.href];
+            const isNotifications = item.href === '/notifications';
+          return (
           <SidebarMenuItem key={item.href}>
             <Link href={item.href} passHref legacyBehavior>
               <SidebarMenuButton
@@ -86,10 +107,14 @@ export function SidebarNav() {
               >
                 {navigatingTo === item.href ? <Loader2 className="animate-spin" /> : <item.icon />}
                 <span>{item.label}</span>
+                {isNotifications && hasUnreadNotifications && !indicator?.enabled && (
+                    <span className="ml-auto h-2 w-2 rounded-full bg-destructive" />
+                )}
+                <NavIndicatorBadge indicator={indicator} />
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>
-        ))}
+        )})}
       </SidebarMenu>
       
       <div className="mt-auto flex flex-col gap-2">

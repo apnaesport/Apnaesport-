@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signInWithEmailAndPassword, sendEmailVerification, type User } from "firebase/auth";
+import { signInWithEmailAndPassword, sendEmailVerification, type User, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -20,14 +20,101 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { auth } from "@/lib/firebase";
 import Link from "next/link";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogClose,
+  DialogFooter
+} from "@/components/ui/dialog";
 
 const formSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
 });
+
+const forgotPasswordSchema = z.object({
+    email: z.string().email({ message: "Please enter a valid email address." }),
+});
+
+function ForgotPasswordDialog() {
+    const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+    
+    const form = useForm<{email: string}>({
+        resolver: zodResolver(forgotPasswordSchema),
+        defaultValues: { email: "" },
+    });
+
+    const handlePasswordReset = async (values: {email: string}) => {
+        setIsLoading(true);
+        try {
+            await sendPasswordResetEmail(auth, values.email);
+            toast({
+                title: "Password Reset Email Sent",
+                description: "Check your inbox for a link to reset your password. It might be in your spam folder.",
+            });
+            setIsDialogOpen(false);
+            form.reset();
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Failed to send password reset email.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    
+    return (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+                <Button variant="link" size="sm" className="p-0 h-auto text-primary">Forgot Password?</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Reset Your Password</DialogTitle>
+                    <DialogDescription>
+                        Enter your email address and we'll send you a link to reset your password.
+                    </DialogDescription>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handlePasswordReset)} className="space-y-4">
+                         <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input placeholder="yourname@example.com" {...field} disabled={isLoading} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="ghost" disabled={isLoading}>Cancel</Button></DialogClose>
+                            <Button type="submit" disabled={isLoading}>
+                                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Send Reset Link
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 
 export function LoginForm() {
   const router = useRouter();
@@ -139,7 +226,10 @@ export function LoginForm() {
           name="password"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Password</FormLabel>
+              <div className="flex justify-between items-center">
+                <FormLabel>Password</FormLabel>
+                <ForgotPasswordDialog />
+              </div>
               <FormControl>
                 <div className="relative">
                   <Input type={showPassword ? "text" : "password"} placeholder="••••••••" {...field} />
@@ -172,3 +262,4 @@ export function LoginForm() {
     </Form>
   );
 }
+

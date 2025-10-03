@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -25,6 +26,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   emailVerified: boolean;
   createdAt?: Timestamp;
   lastBonusClaimedAt?: Timestamp;
+  lastNotificationCheck?: Timestamp; // For unread notifications
   bio?: string;
   favoriteGameIds?: string[];
   streamingChannelUrl?: string;
@@ -153,6 +155,12 @@ export type StatItem = {
   change?: string;
 };
 
+export interface NavIndicator {
+  text: string;
+  enabled: boolean;
+  color: 'primary' | 'destructive' | 'amber';
+}
+
 export interface SiteSettings {
   id?: string;
   siteName: string;
@@ -175,6 +183,7 @@ export interface SiteSettings {
   adKeySocialBar?: string;
   adFrequencyInLists?: number;
   aeCoinLogoUrl?: string;
+  navIndicators?: { [key: string]: NavIndicator };
 }
 
 export type NotificationType = "info" | "warning" | "success" | "error" | "announcement";
