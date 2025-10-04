@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Gamepad2, Eye, Coins } from "lucide-react";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
@@ -78,7 +77,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
           <div className="flex items-center text-muted-foreground">
             <CalendarDays className="h-4 w-4 mr-2 text-primary" />
-            <span>{tournament.formattedStartDate} (IST)</span>
+            <span>{tournament.formattedStartDate}</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2 text-primary" />

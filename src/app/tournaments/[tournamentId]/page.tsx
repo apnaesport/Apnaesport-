@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { DollarSign, ChevronLeft, AlertTriangle } from "lucide-react"; 
-import { format as formatInTimeZone, toDate as fnsToDate } from 'date-fns-tz';
 import { getTournamentByIdFromFirestore } from "@/lib/tournamentStore"; 
 import TournamentPageClient from "./TournamentPageClient";
 import type { Tournament, Timestamp } from "@/lib/types";
@@ -48,7 +47,7 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
   
   // Correctly format the date first, then construct the description string.
-  const formattedDate = formatInTimeZone(startDate, 'Asia/Kolkata', "PPP");
+  const formattedDate = new Date(startDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
   const prizeText = prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : '';
   const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${formattedDate}. ${prizeText} Sign up now!`;
 
@@ -90,9 +89,3 @@ export default function TournamentPage({ params }: TournamentPageProps) {
     </div>
   );
 }
-
-    
-
-
-
-

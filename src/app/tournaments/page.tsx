@@ -8,8 +8,7 @@ import { getTournamentsFromFirestore } from "@/lib/tournamentStore";
 import TournamentsPageClient from './TournamentsPageClient';
 import type { Tournament } from "@/lib/types";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
-import { format, zonedTimeToUtc, toDate as fnsToDate } from 'date-fns-tz';
-import { format as regularFormat } from 'date-fns';
+import { format } from 'date-fns';
 import type { Timestamp } from "firebase/firestore";
 
 export const dynamic = 'force-dynamic';
@@ -36,8 +35,12 @@ const serializeTournament = (tournament: Tournament): any => {
     endDate: tournament.endDate ? toDate(tournament.endDate).toISOString() : undefined,
     createdAt: tournament.createdAt ? toDate(tournament.createdAt).toISOString() : new Date().toISOString(),
     updatedAt: tournament.updatedAt ? toDate(tournament.updatedAt).toISOString() : new Date().toISOString(),
-    // Add a pre-formatted date string in IST
-    formattedStartDate: format(startDate, "PPPp", { timeZone: 'Asia/Kolkata' }),
+    // Add a pre-formatted date string
+    formattedStartDate: new Date(startDate).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    })
   };
 };
 

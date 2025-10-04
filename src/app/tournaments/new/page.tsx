@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -20,7 +21,6 @@ import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
 import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy } from "lucide-react";
 import { format } from "date-fns";
-import { formatInTimeZone, toDate } from 'date-fns-tz';
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
@@ -363,14 +363,8 @@ export default function CreateTournamentPage() {
                                 onChange={(e) => {
                                     const [hours, minutes] = e.target.value.split(':').map(Number);
                                     const newDate = field.value ? new Date(field.value) : new Date();
-                                    
-                                    newDate.setHours(hours);
-                                    newDate.setMinutes(minutes);
-
-                                    // This date is now considered local. We convert it to UTC from IST for storage.
-                                    const utcDate = toDate(newDate.toISOString(), { timeZone: 'Asia/Kolkata' });
-
-                                    field.onChange(utcDate);
+                                    newDate.setHours(hours, minutes);
+                                    field.onChange(newDate);
                                 }}
                             />
                         </div>

@@ -39,8 +39,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { differenceInMinutes, format as regularFormat, formatDistanceToNow } from "date-fns";
-import { format as formatInTimeZone } from 'date-fns-tz';
+import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -306,7 +305,11 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const formattedStartDate = useMemo(() => {
     if (!tournament?.startDate) return "Loading date...";
     const date = new Date(tournament.startDate as any);
-    return formatInTimeZone(date, 'Asia/Kolkata', "PPPPp");
+    return new Date(date).toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'full',
+      timeStyle: 'short',
+    });
   }, [tournament?.startDate]);
 
 
@@ -885,5 +888,3 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     </>
   );
 }
-
-    
