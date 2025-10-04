@@ -594,6 +594,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
+      hasSeenPremiumPopup: data.hasSeenPremiumPopup,
       bio: data.bio || "",
       favoriteGameIds: data.favoriteGameIds || [],
       streamingChannelUrl: data.streamingChannelUrl || "",
@@ -851,6 +852,7 @@ export const updateUserPremiumStatus = async (identifier: string, isPremium: boo
 
         if (isPremium) {
             updateData.premiumSince = serverTimestamp();
+            updateData.hasSeenPremiumPopup = false; // Set to false so user sees the popup
             if (!userData.hasReceivedPremiumBonus) {
                 updateData.points = increment(PREMIUM_POINT_BONUS);
                 updateData.hasReceivedPremiumBonus = true;
@@ -1359,5 +1361,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-
-    

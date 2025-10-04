@@ -21,7 +21,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   isAdmin?: boolean;
   isPremium?: boolean;
   premiumSince?: Timestamp;
-  hasReceivedPremiumBonus?: boolean; // New field for one-time bonus
+  hasReceivedPremiumBonus?: boolean;
+  hasSeenPremiumPopup?: boolean; // New field for one-time welcome
   emailVerified: boolean;
   createdAt?: Timestamp;
   lastBonusClaimedAt?: Timestamp;

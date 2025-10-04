@@ -7,7 +7,7 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, UserProfile, UnseenWin } from "@/lib/types";
-import { Heart, Megaphone, Coins, Gift, Trophy } from "lucide-react";
+import { Heart, Megaphone, Coins, Gift, Trophy, Crown } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
-import { isDailyBonusAvailable, getUnseenWinsFromFirestore, clearUnseenWinsFromFirestore } from "@/lib/tournamentStore";
+import { isDailyBonusAvailable, getUnseenWinsFromFirestore, clearUnseenWinsFromFirestore, updateUserProfileInFirestore } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -65,6 +65,34 @@ const DailyBonusCard = ({ bonusAvailable }: { bonusAvailable: boolean }) => {
     )
 }
 
+const WelcomePremiumDialog = ({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) => {
+    const { width, height } = useWindowSize();
+    
+    return (
+        <>
+            <Confetti width={width} height={height} recycle={false} numberOfPieces={open ? 400 : 0} />
+            <AlertDialog open={open} onOpenChange={onOpenChange}>
+                <AlertDialogContent className="text-center">
+                    <AlertDialogHeader>
+                        <Crown className="h-16 w-16 mx-auto text-amber-400" />
+                        <AlertDialogTitle className="text-3xl font-bold">Welcome to Premium!</AlertDialogTitle>
+                        <AlertDialogDescription className="text-lg">
+                           You've unlocked exclusive benefits, including a <strong className="text-primary">200 AE Point bonus!</strong>
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                     <div className="py-4">
+                        <p className="text-muted-foreground">Thank you for being a valued member of our community.</p>
+                    </div>
+                    <AlertDialogFooter className="sm:justify-center">
+                        <AlertDialogAction onClick={() => onOpenChange(false)}>Awesome!</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+        </>
+    );
+};
+
+
 const WinnerShowcaseDialog = ({ win, open, onOpenChange }: { win: UnseenWin; open: boolean; onOpenChange: (open: boolean) => void; }) => {
     const { width, height } = useWindowSize();
     
@@ -106,7 +134,9 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
     const { settings, loadingSettings } = useSiteSettings();
     const [bonusAvailable, setBonusAvailable] = useState(false);
     const [unseenWin, setUnseenWin] = useState<UnseenWin | null>(null);
-    const [isShowcaseOpen, setIsShowcaseOpen] = useState(false);
+    const [showWinnerShowcase, setShowWinnerShowcase] = useState(false);
+    const [showPremiumWelcome, setShowPremiumWelcome] = useState(false);
+
 
     const adFrequency = settings?.adFrequencyInLists || 0;
 
@@ -119,18 +149,29 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                 const wins = await getUnseenWinsFromFirestore(user.uid);
                 if (wins.length > 0) {
                     setUnseenWin(wins[0]); // Show the first one
-                    setIsShowcaseOpen(true);
+                    setShowWinnerShowcase(true);
+                }
+
+                if(user.isPremium && user.hasSeenPremiumPopup === false) {
+                    setShowPremiumWelcome(true);
                 }
             }
         };
         checkFeatures();
     }, [user]);
     
-    const handleShowcaseClose = async (open: boolean) => {
+    const handleWinnerShowcaseClose = async (open: boolean) => {
         if (!open && user && unseenWin) {
             await clearUnseenWinsFromFirestore(user.uid, unseenWin.id);
         }
-        setIsShowcaseOpen(open);
+        setShowWinnerShowcase(open);
+    }
+    
+    const handlePremiumWelcomeClose = async (open: boolean) => {
+        if (!open && user) {
+            await updateUserProfileInFirestore(user.uid, { hasSeenPremiumPopup: true });
+        }
+        setShowPremiumWelcome(open);
     }
 
     const stats = useMemo(() => {
@@ -161,7 +202,9 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
 
     return (
         <div className="space-y-8">
-            {unseenWin && <WinnerShowcaseDialog win={unseenWin} open={isShowcaseOpen} onOpenChange={handleShowcaseClose} />}
+            {unseenWin && <WinnerShowcaseDialog win={unseenWin} open={showWinnerShowcase} onOpenChange={handleWinnerShowcaseClose} />}
+            {showPremiumWelcome && <WelcomePremiumDialog open={showPremiumWelcome} onOpenChange={handlePremiumWelcomeClose} />}
+
 
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
             
