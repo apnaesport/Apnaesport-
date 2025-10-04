@@ -46,8 +46,11 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
   const startDate = toDate(tournament.startDate);
   const prizePool = (tournament.entryFee || 0) * (tournament.maxParticipants || 0);
   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
-  const prizeText = prizePool > 0 ? `Prize Pool: ${prizePool} 'AE Points'.` : '';
-  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${formatInTimeZone(startDate, 'Asia/Kolkata', "PPP")}. ${prizeText} Sign up now!`;
+  
+  // Correctly format the date first, then construct the description string.
+  const formattedDate = formatInTimeZone(startDate, 'Asia/Kolkata', "PPP");
+  const prizeText = prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : '';
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${formattedDate}. ${prizeText} Sign up now!`;
 
 
   return {
@@ -89,5 +92,6 @@ export default function TournamentPage({ params }: TournamentPageProps) {
 }
 
     
+
 
 
