@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { DollarSign, ChevronLeft, AlertTriangle } from "lucide-react"; 
-import { format } from "date-fns";
+import { format as formatInTimeZone, toDate as fnsToDate } from 'date-fns-tz';
 import { getTournamentByIdFromFirestore } from "@/lib/tournamentStore"; 
 import TournamentPageClient from "./TournamentPageClient";
-import type { Tournament } from "@/lib/types";
+import type { Tournament, Timestamp } from "@/lib/types";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
@@ -21,10 +21,20 @@ interface TournamentPageProps {
 // This forces the page to be dynamically rendered, ensuring metadata is fresh
 export const dynamic = 'force-dynamic';
 
+const toDate = (timestamp: Timestamp | Date | undefined): Date => {
+    if (!timestamp) return new Date();
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof (timestamp as Timestamp).toDate === 'function') return (timestamp as Timestamp).toDate();
+    const parsedDate = new Date(timestamp as any);
+    return !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
+};
+
+
 export async function generateMetadata({ params }: TournamentPageProps, parent: ResolvingMetadata): Promise<Metadata> {
   const { tournamentId } = params;
   const tournament = await getTournamentByIdFromFirestore(tournamentId);
   const previousImages = (await parent).openGraph?.images || [];
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.app';
 
   if (!tournament) {
     return {
@@ -33,10 +43,10 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
     };
   }
 
-  const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
-  const prizePool = tournament.entryFee * tournament.maxParticipants;
+  const startDate = toDate(tournament.startDate);
+  const prizePool = (tournament.entryFee || 0) * (tournament.maxParticipants || 0);
   const title = `${tournament.name} | ${tournament.gameName} Tournament | Apna Esport`;
-  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${format(startDate, "PPP")}. ${prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : ''} Sign up now!`;
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${formatInTimeZone(startDate, 'Asia/Kolkata', "PPP")}. ${prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : ''} Sign up now!`;
 
   return {
     title,
@@ -55,6 +65,7 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
           ...previousImages
       ],
       type: 'website',
+      url: `${BASE_URL}/tournaments/${tournamentId}`,
     },
     twitter: {
         card: 'summary_large_image',

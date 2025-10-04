@@ -7,13 +7,20 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.
 
 // Helper function to safely convert Firestore Timestamps
 const toDate = (timestamp: Timestamp | Date | undefined): Date => {
+    if (!timestamp) return new Date();
     if (timestamp instanceof Date) {
         return timestamp;
     }
-    if (timestamp && typeof (timestamp as Timestamp).toDate === 'function') {
+    if (typeof (timestamp as Timestamp).toDate === 'function') {
         return (timestamp as Timestamp).toDate();
     }
-    return new Date(); // Fallback to now
+    // Attempt to parse if it's a string, otherwise fallback
+    const parsedDate = new Date(timestamp as any);
+    if (!isNaN(parsedDate.getTime())) {
+        return parsedDate;
+    }
+    
+    return new Date();
 };
 
 

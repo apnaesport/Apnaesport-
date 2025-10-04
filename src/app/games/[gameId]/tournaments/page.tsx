@@ -21,6 +21,7 @@ export async function generateMetadata({ params }: GameTournamentsPageProps, par
   const { gameId } = params;
   const game = await getGameDetails(gameId);
   const previousImages = (await parent).openGraph?.images || [];
+  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.app';
 
   if (!game) {
     return {
@@ -29,28 +30,42 @@ export async function generateMetadata({ params }: GameTournamentsPageProps, par
     };
   }
 
+  const title = `${game.name} Tournaments | Apna Esport`;
+  const description = `Find, join, and compete in ${game.name} tournaments on Apna Esport (apnasport). See upcoming, live, and completed events for ${game.name}.`;
+
   return {
-    title: `${game.name} Tournaments | Apna Esport`,
-    description: `Find, join, and compete in ${game.name} tournaments on Apna Esport (apnasport). See upcoming, live, and completed events for ${game.name}.`,
+    title,
+    description,
     keywords: ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", `${game.name} tournaments`, "gaming competition site", game.name, `${game.name} tournament registration`],
     openGraph: {
       title: `${game.name} Tournaments on Apna Esport`,
       description: `Browse all available tournaments for ${game.name}.`,
       images: [game.bannerUrl || game.iconUrl, ...previousImages],
+      url: `${BASE_URL}/games/${gameId}/tournaments`,
     },
   };
 }
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeTournament = (tournament: Tournament): any => {
-  return JSON.parse(JSON.stringify(tournament, (key, value) => {
-    // Firestore Timestamps have a toDate method
-    if (value && typeof value === 'object' && typeof value.toDate === 'function') {
-      return value.toDate().toISOString();
-    }
-    return value;
-  }));
-}
+    const toDateSafe = (timestamp: any): string | null => {
+        if (!timestamp) return null;
+        if (timestamp.toDate) return timestamp.toDate().toISOString();
+        if (typeof timestamp === 'string') return timestamp;
+        if (timestamp instanceof Date) return timestamp.toISOString();
+        return new Date().toISOString();
+    };
+
+    return {
+        ...tournament,
+        id: tournament.id,
+        startDate: toDateSafe(tournament.startDate),
+        endDate: toDateSafe(tournament.endDate),
+        createdAt: toDateSafe(tournament.createdAt),
+        updatedAt: toDateSafe(tournament.updatedAt),
+    };
+};
+
 
 
 export default async function GameTournamentsPage({ params }: GameTournamentsPageProps) {

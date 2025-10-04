@@ -17,16 +17,18 @@ const inter = Inter({
   display: 'swap',
 });
 
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://apnaesport.vercel.app';
 
 export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsFromFirestore();
 
   const siteName = settings?.siteName || 'Apna Esport';
-  const defaultTitle = "Apna Esport | Play, Compete & Win in Esports Tournaments";
+  const defaultTitle = "Apna Esport | India's Premier Gaming Tournament Platform";
   const defaultDescription = "Join Apna Esport (or apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games like BGMI and Free Fire, play online matches, earn AE Points, and connect with the esports community.";
   const keywords = ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments", "apna esport login", "apna esport registration", "AE Points", "Apna ID"];
 
   return {
+    metadataBase: new URL(BASE_URL),
     title: {
       template: `%s | ${siteName}`,
       default: defaultTitle,
@@ -45,6 +47,15 @@ export async function generateMetadata(): Promise<Metadata> {
         siteName: siteName,
         type: 'website',
         locale: 'en_IN',
+        url: BASE_URL,
+        images: [
+            {
+                url: `${BASE_URL}/og-image.png`, // Assuming you have a default OG image
+                width: 1200,
+                height: 630,
+                alt: 'Apna Esport Banner',
+            }
+        ]
     }
   };
 }
@@ -54,9 +65,34 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "Apna Esport",
+    "url": BASE_URL,
+    "logo": `${BASE_URL}/logo.png`, // Assuming you have a logo file
+    "sameAs": [
+      "https://m.youtube.com/@apnaesport"
+    ],
+    "potentialAction": {
+      "@type": "SearchAction",
+      "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": `${BASE_URL}/tournaments?search={search_term_string}`
+      },
+      "query-input": "required name=search_term_string"
+    }
+  };
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Structured Data */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         {/* Google Tag Manager */}
         <Script id="google-tag-manager-head" strategy="afterInteractive">
           {`
