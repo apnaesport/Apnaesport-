@@ -12,23 +12,45 @@ import { Skeleton } from "@/components/ui/skeleton";
 import DashboardPageClient from "./DashboardPageClient";
 import { auth } from "@/lib/firebase";
 import { get } from "http";
-import { format } from "date-fns";
+import { format } from "date-fns-tz";
+import type { Timestamp } from "firebase/firestore";
+
+
+const toDate = (timestamp: Timestamp | Date | undefined): Date => {
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    if (timestamp && typeof (timestamp as Timestamp).toDate === 'function') {
+        return (timestamp as Timestamp).toDate();
+    }
+    return new Date(); // Fallback to now
+};
 
 
 // Helper to convert Firestore Timestamps to a serializable format for Client Components
 const serializeObjectWithTimestamps = (obj: any): any => {
     if (!obj) return obj;
-    // Create a new object to avoid mutating the original
-    const newObj = { ...obj };
-    for (const key in newObj) {
-        // Firestore Timestamps have a toDate method
-        if (newObj[key] && typeof newObj[key] === 'object' && typeof newObj[key].toDate === 'function') {
-            newObj[key] = newObj[key].toDate().toISOString();
-        } else if (newObj[key] instanceof Date) { // Also handle JS Date objects
-            newObj[key] = newObj[key].toISOString();
+
+    const newObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const value = obj[key];
+            if (value && typeof value.toDate === 'function') {
+                newObj[key] = value.toDate().toISOString();
+            } else if (value instanceof Date) {
+                newObj[key] = value.toISOString();
+            } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                newObj[key] = serializeObjectWithTimestamps(value);
+            }
+             else if (Array.isArray(value)) {
+                newObj[key] = value.map(serializeObjectWithTimestamps);
+            }
+            else {
+                newObj[key] = value;
+            }
         }
     }
-    return JSON.parse(JSON.stringify(newObj)); // Deep clone and serialize
+    return newObj;
 };
 
 
@@ -44,24 +66,24 @@ export default async function DashboardPage() {
 
   let featuredTournament: Tournament | undefined = undefined;
   const explicitlyFeaturedAndActive = upcomingOrLiveTournaments.filter(t => t.featured);
-  explicitlyFeaturedAndActive.sort((a, b) => new Date(a.startDate as any).getTime() - new Date(b.startDate as any).getTime());
+  explicitlyFeaturedAndActive.sort((a, b) => toDate(a.startDate).getTime() - toDate(b.startDate).getTime());
 
   if (explicitlyFeaturedAndActive.length > 0) {
     featuredTournament = explicitlyFeaturedAndActive[0];
   } else if (upcomingOrLiveTournaments.length > 0) {
-    upcomingOrLiveTournaments.sort((a, b) => new Date(a.startDate as any).getTime() - new Date(b.startDate as any).getTime());
+    upcomingOrLiveTournaments.sort((a, b) => toDate(a.startDate).getTime() - toDate(b.startDate).getTime());
     featuredTournament = upcomingOrLiveTournaments[0];
   } else {
     const sortedByCreation = [...tournaments].sort((a, b) => {
-        const dateA = a.createdAt ? (a.createdAt as any).toDate ? (a.createdAt as any).toDate().getTime() : 0 : 0;
-        const dateB = b.createdAt ? (b.createdAt as any).toDate ? (b.createdAt as any).toDate().getTime() : 0 : 0;
+        const dateA = toDate(a.createdAt).getTime();
+        const dateB = toDate(b.createdAt).getTime();
         return dateB - dateA;
     });
     featuredTournament = sortedByCreation[0];
   }
   
   const completedWithWinners = tournaments.filter(t => t.status === "Completed" && t.winners && t.winners.length > 0);
-  completedWithWinners.sort((a,b) => new Date(b.updatedAt as any).getTime() - new Date(a.updatedAt as any).getTime());
+  completedWithWinners.sort((a,b) => toDate(b.updatedAt).getTime() - toDate(a.updatedAt).getTime());
   const recentWinners = completedWithWinners.length > 0 ? completedWithWinners[0] : null;
 
 

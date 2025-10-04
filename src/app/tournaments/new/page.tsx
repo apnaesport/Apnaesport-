@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
 import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy } from "lucide-react";
 import { format } from "date-fns";
+import { formatInTimeZone, toDate } from 'date-fns-tz';
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
@@ -138,16 +139,6 @@ export default function CreateTournamentPage() {
       return;
     }
     
-    let finalStartDate = data.startDate;
-    if (finalStartDate && finalStartDate.getHours() === 0 && finalStartDate.getMinutes() === 0 && finalStartDate.getSeconds() === 0) {
-        const now = new Date();
-        finalStartDate.setHours(now.getHours(), now.getMinutes());
-        if (finalStartDate < new Date()) { 
-            finalStartDate = new Date(data.startDate); 
-            finalStartDate.setHours(23, 59); 
-        }
-    }
-    
     let finalBannerUrl = data.bannerImageUrl || selectedGame.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`;
     if (isPremium && bannerPreview && bannerPreview.startsWith('data:')) {
         finalBannerUrl = bannerPreview;
@@ -161,7 +152,7 @@ export default function CreateTournamentPage() {
       gameIconUrl: selectedGame.iconUrl,
       bannerImageUrl: finalBannerUrl,
       description: data.description,
-      startDate: finalStartDate, 
+      startDate: data.startDate, 
       maxParticipants: data.maxParticipants,
       entryFee: data.entryFee || 0,
       matchType: data.matchType,
@@ -260,7 +251,12 @@ export default function CreateTournamentPage() {
                 name="gameId"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || isLoadingGames}>
+                  <Select onValueChange={(value) => {
+                      field.onChange(value);
+                      const game = availableGames.find(g => g.id === value);
+                      form.setValue('matchType', game?.matchTypes?.[0] || "");
+                      form.setValue('mapName', 'any');
+                  }} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || isLoadingGames}>
                     <SelectTrigger id="gameId">
                       <SelectValue placeholder="Select a game..." />
                     </SelectTrigger>
@@ -334,7 +330,7 @@ export default function CreateTournamentPage() {
             </div>
 
             <div>
-              <Label htmlFor="startDate">Start Date & Time</Label>
+              <Label htmlFor="startDate">Start Date & Time (IST)</Label>
               <Controller
                 name="startDate"
                 control={form.control}
@@ -354,41 +350,27 @@ export default function CreateTournamentPage() {
                         <Calendar
                             mode="single"
                             selected={field.value}
-                            onSelect={(date) => {
-                                if (date) {
-                                    const currentTime = field.value ? { hours: field.value.getHours(), minutes: field.value.getMinutes() } : { hours: 12, minutes: 0 };
-                                    date.setHours(currentTime.hours);
-                                    date.setMinutes(currentTime.minutes);
-                                }
-                                field.onChange(date);
-                            }}
+                            onSelect={field.onChange}
                             initialFocus
                             disabled={isSubmittingForm || ((date) => date < new Date(new Date().setDate(new Date().getDate() -1)))} 
                         />
                         <div className="p-3 border-t border-border">
-                            <Label>Time (HH:MM)</Label>
+                            <Label>Time (IST)</Label>
                             <Input 
                                 type="time" 
                                 defaultValue={field.value ? format(field.value, "HH:mm") : "12:00"}
                                 disabled={isSubmittingForm}
                                 onChange={(e) => {
                                     const [hours, minutes] = e.target.value.split(':').map(Number);
-                                    const newDate = field.value ? new Date(field.value) : new Date(); 
-                                    if (!field.value) { 
-                                        const today = new Date();
-                                        newDate.setDate(today.getDate());
-                                        newDate.setMonth(today.getMonth());
-                                        newDate.setFullYear(today.getFullYear());
-                                    }
+                                    const newDate = field.value ? new Date(field.value) : new Date();
+                                    
                                     newDate.setHours(hours);
                                     newDate.setMinutes(minutes);
-                                    
-                                    if (newDate < new Date() && !(newDate.toDateString() === new Date().toDateString() && newDate.getTime() >= new Date().getTime())) {
-                                        toast({ title: "Invalid Time", description: "Cannot select a past time.", variant: "destructive" });
-                                        
-                                        return;
-                                    }
-                                    field.onChange(newDate);
+
+                                    // This date is now considered local. We convert it to UTC from IST for storage.
+                                    const utcDate = toDate(newDate.toISOString(), { timeZone: 'Asia/Kolkata' });
+
+                                    field.onChange(utcDate);
                                 }}
                             />
                         </div>

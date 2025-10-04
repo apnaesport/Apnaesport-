@@ -39,7 +39,8 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { differenceInMinutes, format, formatDistanceToNow, addMinutes } from "date-fns";
+import { differenceInMinutes, format as regularFormat, formatDistanceToNow } from "date-fns";
+import { format as formatInTimeZone } from 'date-fns-tz';
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -138,7 +139,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
   useEffect(() => {
     if (tournament?.startDate) {
-        const startDate = tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
+        const startDate = new Date(tournament.startDate as any);
         const calculateTime = () => {
             setTimeUntilStart(differenceInMinutes(startDate, new Date()));
         };
@@ -302,14 +303,10 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   };
 
 
-  const getStartDate = (): Date => {
-    if (!tournament?.startDate) return new Date();
-    return tournament.startDate instanceof Date ? tournament.startDate : (tournament.startDate as any).toDate();
-  };
-  
   const formattedStartDate = useMemo(() => {
     if (!tournament?.startDate) return "Loading date...";
-    return format(getStartDate(), "PPPPp");
+    const date = new Date(tournament.startDate as any);
+    return formatInTimeZone(date, 'Asia/Kolkata', "PPPPp");
   }, [tournament?.startDate]);
 
 
@@ -345,7 +342,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   }
 
   const isFreeEntry = tournament.entryFee <= 0;
-  const canDeclareWinners = isTournamentCreator && tournament.status === 'Live' && differenceInMinutes(new Date(), getStartDate()) >= 5;
+  const canDeclareWinners = isTournamentCreator && tournament.status === 'Live' && differenceInMinutes(new Date(), new Date(tournament.startDate as any)) >= 5;
 
   const canManageRoom = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Upcoming');
 
@@ -459,7 +456,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                     <div className="flex items-start space-x-3">
                         <CalendarDays className="h-5 w-5 text-primary mt-1 shrink-0" />
                         <div>
-                            <p className="font-semibold">Date & Time</p>
+                            <p className="font-semibold">Date & Time (IST)</p>
                             <p className="text-muted-foreground">{formattedStartDate}</p>
                         </div>
                     </div>

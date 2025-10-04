@@ -78,7 +78,7 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
           </div>
           <div className="flex items-center text-muted-foreground">
             <CalendarDays className="h-4 w-4 mr-2 text-primary" />
-            <span>{tournament.formattedStartDate}</span>
+            <span>{tournament.formattedStartDate} (IST)</span>
           </div>
           <div className="flex items-center text-muted-foreground">
             <Users className="h-4 w-4 mr-2 text-primary" />
