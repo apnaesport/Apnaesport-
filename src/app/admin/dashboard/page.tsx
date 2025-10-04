@@ -8,9 +8,8 @@ import { Users, Swords, Gamepad2, Bell, PlusCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { getGamesFromFirestore, getTournamentsFromFirestore, getAllUsersFromFirestore, getSiteSettingsFromFirestore } from "@/lib/tournamentStore";
-import { useState, useEffect, useCallback } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useGames, useTournaments, useUsers, useSiteSettings } from "@/lib/hooks";
 
 const quickActions = [
     {label: "Create Tournament", href: "/tournaments/new", icon: PlusCircle},
@@ -20,35 +19,12 @@ const quickActions = [
 ];
 
 export default function AdminDashboardPage() {
-  const [currentGames, setCurrentGames] = useState<Game[]>([]);
-  const [currentTournaments, setCurrentTournaments] = useState<Tournament[]>([]);
-  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
-  const [settings, setSettings] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: currentGames = [], isLoading: isLoadingGames } = useGames();
+  const { data: currentTournaments = [], isLoading: isLoadingTournaments } = useTournaments();
+  const { data: allUsers = [], isLoading: isLoadingUsers } = useUsers();
+  const { data: settings, isLoading: isLoadingSettings } = useSiteSettings();
 
-  const fetchData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [games, tournaments, users, siteSettings] = await Promise.all([
-        getGamesFromFirestore(),
-        getTournamentsFromFirestore(),
-        getAllUsersFromFirestore(),
-        getSiteSettingsFromFirestore()
-      ]);
-      setCurrentGames(games);
-      setCurrentTournaments(tournaments);
-      setAllUsers(users);
-      setSettings(siteSettings);
-    } catch (error) {
-        console.error("Failed to fetch admin dashboard data", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const isLoading = isLoadingGames || isLoadingTournaments || isLoadingUsers || isLoadingSettings;
 
   if (isLoading) {
     return (

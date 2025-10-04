@@ -18,42 +18,32 @@ import Link from "next/link";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { getTournamentsFromFirestore, deleteTournamentFromFirestore, updateTournamentInFirestore } from "@/lib/tournamentStore";
+import { deleteTournamentFromFirestore, updateTournamentInFirestore } from "@/lib/tournamentStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useTournaments } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function AdminTournamentsClient() {
-  const [tournaments, setTournaments] = useState<Tournament[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: tournaments = [], isLoading } = useTournaments();
   const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isTogglingFeature, setIsTogglingFeature] = useState<string | null>(null);
 
-  const fetchTournaments = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const tournamentsFromDb = await getTournamentsFromFirestore();
-      setTournaments(tournamentsFromDb);
-    } catch (error) {
-      console.error("Error fetching tournaments:", error);
-      toast({ title: "Error", description: "Could not refresh tournaments.", variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [toast]);
+  const invalidateTournamentsQuery = () => {
+      queryClient.invalidateQueries({ queryKey: ['tournaments'] });
+  }
 
-  useEffect(() => {
-    fetchTournaments();
-  }, [fetchTournaments]);
-
-  const handleDeleteTournament = async (tournamentId: string, tournamentName: string) => {
-    if (confirm(`Are you sure you want to delete the tournament: "${tournamentName}"? This action cannot be undone.`)) {
-      setIsDeleting(tournamentId);
+  const handleDeleteTournament = async (tournament: Tournament) => {
+    if (confirm(`Are you sure you want to delete the tournament: "${tournament.name}"? This action cannot be undone.`)) {
+      setIsDeleting(tournament.id);
       try {
-        await deleteTournamentFromFirestore(tournamentId);
-        toast({ title: "Tournament Deleted", description: `"${tournamentName}" has been removed.`, variant: "destructive" });
-        await fetchTournaments();
-      } catch (error) {
+        await deleteTournamentFromFirestore(tournament.id, tournament.organizerId || ''); // Pass organizerId
+        toast({ title: "Tournament Deleted", description: `"${tournament.name}" has been removed.`, variant: "destructive" });
+        invalidateTournamentsQuery();
+      } catch (error: any) {
         console.error("Error deleting tournament:", error);
-        toast({ title: "Error", description: `Could not delete "${tournamentName}".`, variant: "destructive" });
+        toast({ title: "Error", description: error.message || `Could not delete "${tournament.name}".`, variant: "destructive" });
       }
       setIsDeleting(null);
     }
@@ -67,7 +57,7 @@ export default function AdminTournamentsClient() {
         title: "Featured Status Updated",
         description: `"${tournament.name}" is now ${!tournament.featured ? "featured" : "not featured"}.`,
       });
-      await fetchTournaments();
+      invalidateTournamentsQuery();
     } catch (error) {
       console.error("Error updating featured status:", error);
       toast({ title: "Error", description: "Could not update featured status.", variant: "destructive" });
@@ -139,7 +129,7 @@ export default function AdminTournamentsClient() {
                   variant="destructive"
                   size="icon"
                   title="Delete Tournament"
-                  onClick={() => handleDeleteTournament(tournament.id, tournament.name)}
+                  onClick={() => handleDeleteTournament(tournament)}
                   disabled={isDeleting === tournament.id || isTogglingFeature === tournament.id}
                   className="h-8 w-8"
                 >

@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ADMIN_EMAIL } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateUserAdminStatusInFirestore, getAllUsersFromFirestore, adjustUserPoints } from "@/lib/tournamentStore";
+import { updateUserAdminStatusInFirestore, adjustUserPoints } from "@/lib/tournamentStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +40,8 @@ import * as z from "zod";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useUsers } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Helper function to convert Timestamp to a readable string or return a fallback
 const formatDateFromTimestamp = (timestamp: any) => {
@@ -70,8 +72,8 @@ type PointsFormData = z.infer<typeof pointsSchema>;
 
 
 export default function AdminUsersClient() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: users = [], isLoading } = useUsers();
   const { toast } = useToast();
   const { user: currentUser } = useAuth(); 
   const [isUpdatingRole, setIsUpdatingRole] = useState<string | null>(null);
@@ -88,22 +90,9 @@ export default function AdminUsersClient() {
     },
   });
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedUsers = await getAllUsersFromFirestore();
-      setUsers(fetchedUsers);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      toast({ title: "Error", description: "Could not refresh users list.", variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [toast]);
-
-  useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
-
+  const invalidateUsersQuery = () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+  }
 
   const handleToggleAdmin = async (userIdToUpdate: string, currentIsAdmin: boolean | undefined, displayName: string | null) => {
     if (currentUser && userIdToUpdate === currentUser.uid) {
@@ -120,7 +109,7 @@ export default function AdminUsersClient() {
     try {
       await updateUserAdminStatusInFirestore(userIdToUpdate, newIsAdmin);
       toast({ title: "User Role Updated", description: `${displayName || 'User'}'s role has been changed.` });
-      await fetchUsers(); 
+      invalidateUsersQuery(); 
     } catch (error) {
       console.error("Error updating user role:", error);
       toast({ title: "Error", description: "Could not update user role.", variant: "destructive" });
@@ -149,7 +138,7 @@ export default function AdminUsersClient() {
             title: "Points Adjusted",
             description: `${data.amount} points have been ${data.type === 'credit' ? 'added to' : 'removed from'} ${selectedUser.displayName}.`
         });
-        await fetchUsers();
+        invalidateUsersQuery();
         setIsPointsDialogOpen(false);
     } catch(error: any) {
         toast({ title: "Error Adjusting Points", description: error.message || "An unknown error occurred.", variant: "destructive" });

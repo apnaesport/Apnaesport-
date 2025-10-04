@@ -5,11 +5,8 @@ import { useState, useCallback, useEffect } from "react";
 import type { Creator, CreatorApplication, Community } from "@/lib/types";
 import {
   approveCreatorApplicationInFirestore,
-  getCreatorApplicationsFromFirestore,
-  getCreatorsFromFirestore,
   rejectCreatorApplicationInFirestore,
   deleteCreatorFromFirestore,
-  getCommunityByIdFromFirestore
 } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +20,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCreatorApplications, useCreators } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusColors: Record<CreatorApplication['status'], string> = {
     Pending: "bg-yellow-500/20 text-yellow-500 border-yellow-500/30",
@@ -32,40 +31,26 @@ const statusColors: Record<CreatorApplication['status'], string> = {
 
 
 export default function AdminCreatorsClient() {
-  const [applications, setApplications] = useState<CreatorApplication[]>([]);
-  const [creators, setCreators] = useState<Creator[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: applications = [], isLoading: isLoadingApps } = useCreatorApplications();
+  const { data: creators = [], isLoading: isLoadingCreators } = useCreators();
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [fetchedApps, fetchedCreators] = await Promise.all([
-        getCreatorApplicationsFromFirestore(),
-        getCreatorsFromFirestore(),
-      ]);
-      setApplications(fetchedApps);
-      setCreators(fetchedCreators);
-    } catch (error) {
-      console.error("Error fetching creator data:", error);
-      toast({ title: "Error", description: "Could not load creator applications or list.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
+  const isLoading = isLoadingApps || isLoadingCreators;
 
-  useEffect(() => {
-    fetchAllData();
-  }, [fetchAllData]);
+  const invalidateQueries = () => {
+      queryClient.invalidateQueries({ queryKey: ['creatorApplications'] });
+      queryClient.invalidateQueries({ queryKey: ['creators'] });
+  }
 
   const handleApprove = async (app: CreatorApplication) => {
     setIsProcessing(app.id);
     try {
       await approveCreatorApplicationInFirestore(app);
       toast({ title: "Approved!", description: `${app.name} is now a verified creator.` });
-      await fetchAllData();
+      invalidateQueries();
     } catch (error) {
       console.error("Error approving creator:", error);
       toast({ title: "Error", description: "Could not approve creator.", variant: "destructive" });
@@ -79,7 +64,7 @@ export default function AdminCreatorsClient() {
     try {
       await rejectCreatorApplicationInFirestore(appId);
       toast({ title: "Rejected", description: "Application has been rejected.", variant: "destructive" });
-      await fetchAllData();
+      invalidateQueries();
     } catch (error) {
       console.error("Error rejecting creator:", error);
       toast({ title: "Error", description: "Could not reject application.", variant: "destructive" });
@@ -94,7 +79,7 @@ export default function AdminCreatorsClient() {
     try {
         await deleteCreatorFromFirestore(creator.id);
         toast({ title: "Creator Removed", description: `${creator.name} has been removed from the platform.` });
-        await fetchAllData();
+        invalidateQueries();
     } catch (error) {
         console.error("Error deleting creator:", error);
         toast({ title: "Error", description: "Could not delete creator.", variant: "destructive" });
@@ -330,5 +315,3 @@ export default function AdminCreatorsClient() {
     </Tabs>
   );
 }
-
-    

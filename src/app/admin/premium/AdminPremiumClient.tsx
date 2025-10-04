@@ -1,13 +1,13 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { UserProfile } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { getAllUsersFromFirestore, updateUserPremiumStatus } from '@/lib/tournamentStore';
+import { updateUserPremiumStatus } from '@/lib/tournamentStore';
 import { Loader2, Crown, Trash2, BadgeInfo } from 'lucide-react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +18,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { usePremiumUsers } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const grantPremiumSchema = z.object({
   identifier: z.string().min(1, 'Please enter an email or Apna ID.'),
@@ -25,8 +27,8 @@ const grantPremiumSchema = z.object({
 type GrantPremiumFormData = z.infer<typeof grantPremiumSchema>;
 
 export default function AdminPremiumClient() {
-  const [premiumUsers, setPremiumUsers] = useState<UserProfile[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: premiumUsers = [], isLoading } = usePremiumUsers();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
   const { toast } = useToast();
@@ -36,21 +38,10 @@ export default function AdminPremiumClient() {
     defaultValues: { identifier: '' },
   });
 
-  const fetchPremiumUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const allUsers = await getAllUsersFromFirestore();
-      setPremiumUsers(allUsers.filter((user) => user.isPremium));
-    } catch (error) {
-      toast({ title: 'Error', description: 'Could not load premium users.', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchPremiumUsers();
-  }, [fetchPremiumUsers]);
+  const invalidateQueries = () => {
+      queryClient.invalidateQueries({ queryKey: ['users', 'premium'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] }); // Invalidate all users as well
+  }
 
   const handleGrantPremium: SubmitHandler<GrantPremiumFormData> = async (data) => {
     setIsSubmitting(true);
@@ -58,7 +49,7 @@ export default function AdminPremiumClient() {
       await updateUserPremiumStatus(data.identifier, true);
       toast({ title: 'Success!', description: `Premium status granted.` });
       form.reset();
-      await fetchPremiumUsers();
+      invalidateQueries();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Could not grant premium status.', variant: 'destructive' });
     } finally {
@@ -71,7 +62,7 @@ export default function AdminPremiumClient() {
     try {
       await updateUserPremiumStatus(userId, false);
       toast({ title: 'Premium Revoked', description: 'User no longer has premium status.', variant: 'destructive' });
-      await fetchPremiumUsers();
+      invalidateQueries();
     } catch (error: any) {
       toast({ title: 'Error', description: error.message || 'Could not revoke premium status.', variant: 'destructive' });
     } finally {

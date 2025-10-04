@@ -14,9 +14,11 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useCallback, useEffect } from "react";
 import type { NotificationMessage, NotificationFormData, NotificationType, Tournament } from "@/lib/types";
-import { sendNotificationToFirestore, getNotificationsFromFirestore, getTournamentsFromFirestore } from "@/lib/tournamentStore";
+import { sendNotificationToFirestore } from "@/lib/tournamentStore";
 import { format } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNotifications, useTournaments } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const notificationSchema = z.object({
   title: z.string().min(5, "Title must be at least 5 characters.").max(100, "Title too long."),
@@ -47,11 +49,11 @@ const NotificationIcon = ({ type }: { type: NotificationType }) => {
 };
 
 export default function AdminNotificationsClient() {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [sentNotifications, setSentNotifications] = useState<NotificationMessage[]>([]);
-  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [allTournaments, setAllTournaments] = useState<Tournament[]>([]);
+  const { data: sentNotifications = [], isLoading: isLoadingHistory } = useNotifications('all_users');
+  const { data: allTournaments = [] } = useTournaments();
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -66,26 +68,6 @@ export default function AdminNotificationsClient() {
 
   const selectedTarget = form.watch("target");
 
-  const fetchNotificationHistory = useCallback(async () => {
-    setIsLoadingHistory(true);
-    try {
-      const [history, tournaments] = await Promise.all([
-        getNotificationsFromFirestore(),
-        getTournamentsFromFirestore(),
-      ]);
-      setSentNotifications(history);
-      setAllTournaments(tournaments);
-    } catch (error) {
-      console.error("Error fetching notification history:", error);
-      toast({ title: "Error", description: "Could not load notification history.", variant: "destructive" });
-    }
-    setIsLoadingHistory(false);
-  }, [toast]);
-
-  useEffect(() => {
-    fetchNotificationHistory();
-  }, [fetchNotificationHistory]);
-
   const onSubmit: SubmitHandler<NotificationFormData> = async (data) => {
     setIsSubmitting(true);
     try {
@@ -95,7 +77,7 @@ export default function AdminNotificationsClient() {
         description: `Your message has been broadcasted.`,
       });
       form.reset();
-      await fetchNotificationHistory(); 
+      queryClient.invalidateQueries({ queryKey: ['notifications'] }); 
     } catch (error) {
       console.error("Error sending notification:", error);
       toast({ title: "Send Failed", description: "Could not send notification.", variant: "destructive" });

@@ -41,11 +41,13 @@ import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
-import { getGamesFromFirestore, addGameToFirestore, updateGameInFirestore, deleteGameFromFirestore } from "@/lib/tournamentStore";
+import { addGameToFirestore, updateGameInFirestore, deleteGameFromFirestore } from "@/lib/tournamentStore";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { useGames } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const gameSchema = z.object({
   id: z.string().optional(),
@@ -61,8 +63,8 @@ const gameSchema = z.object({
 type GameFormData = z.infer<typeof gameSchema>;
 
 export default function AdminGamesClient() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: games = [], isLoading } = useGames();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const { toast } = useToast();
@@ -71,21 +73,9 @@ export default function AdminGamesClient() {
   const [iconPreview, setIconPreview] = useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
 
-  const fetchGames = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedGames = await getGamesFromFirestore();
-      setGames(fetchedGames);
-    } catch (error) {
-      console.error("Error fetching games:", error);
-      toast({ title: "Error", description: "Could not refresh games list.", variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [toast]);
-
-  useEffect(() => {
-    fetchGames();
-  }, [fetchGames]);
+  const invalidateGamesQuery = () => {
+    queryClient.invalidateQueries({ queryKey: ['games'] });
+  }
 
   const form = useForm<GameFormData>({
     resolver: zodResolver(gameSchema),
@@ -166,7 +156,7 @@ export default function AdminGamesClient() {
         await addGameToFirestore(gameDataToSave);
         toast({ title: "Game Added", description: `${data.name} has been added.` });
       }
-      await fetchGames();
+      invalidateGamesQuery();
       form.reset();
       setIconPreview(null);
       setBannerPreview(null);
@@ -199,7 +189,7 @@ export default function AdminGamesClient() {
     try {
       await deleteGameFromFirestore(gameId);
       toast({ title: "Game Deleted", description: `"${gameName}" has been removed.`, variant: "destructive" });
-      await fetchGames(); 
+      invalidateGamesQuery(); 
     } catch (error) {
       console.error("Error deleting game:", error);
       toast({ title: "Error", description: `Could not delete "${gameName}".`, variant: "destructive" });
@@ -281,7 +271,7 @@ export default function AdminGamesClient() {
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="matchTypes" className="text-right pt-2">Match Types</Label>
               <div className="col-span-3">
-                <Textarea id="matchTypes" {...form.register("matchTypes")} placeholder="e.g. Battle Royale, Clash Squad, TDM" disabled={isSubmitting}/>
+                <Textarea id="matchTypes" {...form.register("matchTypes")} placeholder="e.g., Battle Royale, Clash Squad, TDM" disabled={isSubmitting}/>
                 <p className="text-xs text-muted-foreground">Comma-separated list of match types.</p>
                 {form.formState.errors.matchTypes && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.matchTypes.message}</p>}
               </div>
@@ -290,7 +280,7 @@ export default function AdminGamesClient() {
             <div className="grid grid-cols-4 items-start gap-4">
               <Label htmlFor="mapNames" className="text-right pt-2">Map Names</Label>
               <div className="col-span-3">
-                <Textarea id="mapNames" {...form.register("mapNames")} placeholder="e.g. Erangel, Miramar, Sanhok" disabled={isSubmitting}/>
+                <Textarea id="mapNames" {...form.register("mapNames")} placeholder="e.g., Erangel, Miramar, Sanhok" disabled={isSubmitting}/>
                 <p className="text-xs text-muted-foreground">Comma-separated list of available maps.</p>
                 {form.formState.errors.mapNames && <p className="text-destructive text-xs text-right mt-1">{form.formState.errors.mapNames.message}</p>}
               </div>
@@ -390,5 +380,3 @@ export default function AdminGamesClient() {
     </>
   );
 }
-
-    

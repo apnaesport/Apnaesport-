@@ -11,9 +11,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreHorizontal, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { updateSponsorshipRequestStatusInFirestore, getSponsorshipRequestsFromFirestore } from "@/lib/tournamentStore";
+import { updateSponsorshipRequestStatusInFirestore } from "@/lib/tournamentStore";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useSponsorshipRequests } from "@/lib/hooks";
+import { useQueryClient } from "@tanstack/react-query";
 
 const statusColors: Record<SponsorshipRequestStatus, string> = {
     New: "bg-blue-500/20 text-blue-500 border-blue-500/30",
@@ -24,37 +26,17 @@ const statusColors: Record<SponsorshipRequestStatus, string> = {
 
 
 export default function AdminSponsorshipsClient() {
-  const [requests, setRequests] = useState<SponsorshipRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { data: requests = [], isLoading } = useSponsorshipRequests();
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const fetchRequests = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const fetchedRequests = await getSponsorshipRequestsFromFirestore();
-      setRequests(fetchedRequests.map(req => ({
-          ...req,
-          createdAt: (req.createdAt as any).toDate ? (req.createdAt as any).toDate() : new Date(req.createdAt)
-      })));
-    } catch (error) {
-      console.error("Error fetching sponsorship requests:", error);
-      toast({ title: "Error", description: "Could not refresh requests.", variant: "destructive" });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
 
   const handleStatusChange = async (requestId: string, status: SponsorshipRequestStatus) => {
     setIsUpdating(requestId);
     try {
       await updateSponsorshipRequestStatusInFirestore(requestId, status);
       toast({ title: "Status Updated", description: `Request status changed to "${status}".` });
-      await fetchRequests();
+      queryClient.invalidateQueries({ queryKey: ['sponsorshipRequests'] });
     } catch (error) {
       console.error("Error updating status:", error);
       toast({ title: "Error", description: "Could not update status.", variant: "destructive" });

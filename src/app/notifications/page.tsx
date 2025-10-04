@@ -3,17 +3,16 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import type { NotificationMessage, NotificationType } from "@/lib/types";
-import { getNotificationsFromFirestore } from "@/lib/tournamentStore";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, BellRing, AlertTriangle, CheckCircle2, Info, XCircle, Megaphone, LogIn } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
+import { useNotifications } from "@/lib/hooks";
+import { formatDistanceToNow } from 'date-fns';
 
 const NotificationIcon = ({ type, className }: { type: NotificationType, className?: string }) => {
   const iconProps = { className: cn("h-5 w-5", className) };
@@ -42,30 +41,7 @@ const getNotificationCardStyles = (type: NotificationType): string => {
 export default function UserNotificationsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [notifications, setNotifications] = useState<NotificationMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchNotifications = useCallback(async () => {
-    if (!user) return; 
-    setIsLoading(true);
-    try {
-      const fetchedNotifications = await getNotificationsFromFirestore(undefined, user.uid);
-      setNotifications(fetchedNotifications);
-    } catch (error) {
-      console.error("Error fetching notifications:", error);
-      toast({ title: "Error", description: "Could not load notifications.", variant: "destructive" });
-    }
-    setIsLoading(false);
-  }, [user, toast]);
-
-  useEffect(() => {
-    if (!authLoading && user) {
-      fetchNotifications();
-    }
-     if (!authLoading && !user) {
-      setIsLoading(false); 
-    }
-  }, [authLoading, user, fetchNotifications]);
+  const { data: notifications = [], isLoading } = useNotifications('all_users', user?.uid);
 
   if (authLoading || isLoading) {
     return (
