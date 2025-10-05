@@ -40,7 +40,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { TournamentBracket } from "@/components/tournaments/TournamentBracket";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { differenceInMinutes, format, formatDistanceToNow } from "date-fns";
+import { differenceInMinutes, format } from "date-fns";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -186,7 +186,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
       return;
     }
     
-    if (tournament.status !== "Upcoming" && tournament.status !== "Live") {
+    if (tournament.status !== "Upcoming") {
         toast({ title: "Registration Closed", description: "This tournament is not currently open for registration.", variant: "destructive" });
         return;
     }
@@ -817,19 +817,19 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                              "Register Now"}
                             </Button>
                         </DialogTrigger>
-                    ) : tournament.status === "Live" || tournament.status === "Ongoing" ? (
+                    ) : (tournament.status === "Live" || tournament.status === "Ongoing") ? (
                          <div className="w-full">
                             {isRegistered ? (
                                 <p className="text-center p-2 bg-green-500/20 rounded-md">You are registered. The tournament is live!</p>
                             ) : (
-                                <p className="text-center p-2 bg-yellow-500/20 rounded-md">This tournament is live. Results will be posted after it's completed.</p>
+                                <p className="text-center p-2 bg-yellow-500/20 rounded-md">Registration is closed. Results will be posted after completion.</p>
                             )}
                         </div>
                     ): null}
                      {tournament.status === "Completed" && (
-                        <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
+                        <Button size="lg" className="w-full" disabled>View Results</Button>
                     )}
-                    {(!user && !authLoading && (tournament.status === "Upcoming" || tournament.status === "Live")) && (
+                    {(!user && !authLoading && tournament.status === "Upcoming") && (
                         <Button size="lg" className="w-full" asChild>
                         <Link href={`/auth/login?redirect=/tournaments/${tournamentId}`}>Login to Register</Link>
                         </Button>

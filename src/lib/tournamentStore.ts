@@ -1,4 +1,5 @@
 
+
 import {
   collection,
   doc,
@@ -164,7 +165,7 @@ export const addTournamentToFirestore = async (
     const newTournamentData = {
       ...restData,
       startDate: Timestamp.fromDate(startDate),
-      status: getTournamentStatus({ ...restData, startDate, status: 'Upcoming' }),
+      status: "Upcoming", // Always start as upcoming
       prizePool: 0, // Prize pool starts at 0 and is funded by entry fees
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
@@ -208,35 +209,34 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
   const q = query(collection(db, TOURNAMENTS_COLLECTION), ...constraints);
   const tournamentsSnapshot = await getDocs(q);
   
-  const tournamentsToUpdate: { ref: any, data: any }[] = [];
+  const now = new Date();
   
   const tournaments = tournamentsSnapshot.docs.map(docSnapshot => {
     const data = docSnapshot.data() as Omit<Tournament, 'id'>;
-    const tournament = {
+    
+    const startDate = (data.startDate as Timestamp).toDate();
+    let status = data.status;
+
+    if (status !== 'Completed' && status !== 'Cancelled') {
+        const twoHoursAfterStart = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+        if (now >= twoHoursAfterStart) {
+            status = 'Completed';
+        } else if (now >= startDate) {
+            status = 'Live';
+        } else {
+            status = 'Upcoming';
+        }
+    }
+
+    return {
       id: docSnapshot.id,
       ...data,
-      startDate: (data.startDate as Timestamp).toDate(),
+      startDate: startDate,
+      status: status, // Use the dynamically calculated status
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
     } as Tournament;
-
-    const currentStatus = tournament.status;
-    const newStatus = getTournamentStatus(tournament);
-    
-    if (currentStatus !== newStatus && currentStatus !== "Cancelled") {
-        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
-        tournamentsToUpdate.push({ ref: tournamentRef, data: { status: newStatus, updatedAt: serverTimestamp() } });
-        return { ...tournament, status: newStatus };
-    }
-    
-    return tournament;
   });
-
-  if (tournamentsToUpdate.length > 0) {
-    const batch = writeBatch(db);
-    tournamentsToUpdate.forEach(t => batch.update(t.ref, t.data));
-    await batch.commit().catch(err => console.error("Batch update for tournament statuses failed:", err));
-  }
 
   return tournaments;
 };
@@ -246,45 +246,41 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
   if (!tournamentId) return undefined;
   const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
   const docSnap = await getDoc(docRef);
+
   if (docSnap.exists()) {
     const data = docSnap.data();
+    const startDate = (data.startDate as Timestamp).toDate();
+    const now = new Date();
+    let status = data.status;
 
-    let matches = data.matches || [];
-    if (matches.length === 0 && data.participants && data.participants.length >= 2 && data.bracketType === "Single Elimination") {
-        const numMatches = Math.floor(data.participants.length / 2);
-        for(let i = 0; i < numMatches; i++) {
-            matches.push({
-                id: `m-auto-${tournamentId}-${i+1}`,
-                round: 1,
-                participants: [data.participants[i*2] || null, data.participants[i*2+1] || null],
-                status: 'Pending'
-            });
+     if (status !== 'Completed' && status !== 'Cancelled') {
+        const twoHoursAfterStart = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+        if (now >= twoHoursAfterStart) {
+            status = 'Completed';
+        } else if (now >= startDate) {
+            status = 'Live';
+        } else {
+            status = 'Upcoming';
         }
     }
     
     const tournament: Tournament = {
       id: docSnap.id,
       ...data,
+      status: status, // Use the dynamically calculated status
       bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
       gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
-      startDate: (data.startDate as Timestamp).toDate(),
+      startDate: startDate,
       endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
       createdAt: data.createdAt as Timestamp,
       updatedAt: data.updatedAt as Timestamp,
-      matches: matches,
+      matches: data.matches || [],
       entryFee: data.entryFee || 0,
       prizePool: data.prizePool || 0,
       sponsorName: data.sponsorName || undefined,
       sponsorLogoUrl: data.sponsorLogoUrl || undefined,
       isQuickTournament: data.isQuickTournament || false,
     } as Tournament;
-    
-    const currentStatus = tournament.status;
-    const newStatus = getTournamentStatus(tournament);
-    if(currentStatus !== newStatus && currentStatus !== "Cancelled") {
-        tournament.status = newStatus;
-        await updateDoc(docRef, { status: newStatus, updatedAt: serverTimestamp() });
-    }
 
     return tournament;
   }
@@ -788,7 +784,7 @@ export const updateUserAdminStatusInFirestore = async (userId: string, isAdmin: 
   await updateDoc(userRef, { isAdmin, updatedAt: serverTimestamp() });
 };
 
-export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'points' | 'communityId'>>): Promise<void> => {
+export const updateUserProfileInFirestore = async (userId: string, profileData: Partial<Pick<UserProfile, 'displayName' | 'photoURL' | 'bio' | 'favoriteGameIds' | 'streamingChannelUrl' | 'points' | 'communityId' | 'hasSeenPremiumPopup'>>): Promise<void> => {
   const userRef = doc(db, USERS_COLLECTION, userId);
   const dataToUpdate: any = { ...profileData, updatedAt: serverTimestamp() };
   
@@ -1190,7 +1186,7 @@ export const addQuickTournamentToFirestore = async (
         ...newTournamentData,
         prizePool: 0,
         startDate: Timestamp.fromDate(startDate),
-        status: getTournamentStatus({ ...newTournamentData, startDate, status: 'Upcoming' }),
+        status: "Upcoming",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
     });
