@@ -3,7 +3,7 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins, LogIn, UserCheck } from "lucide-react";
+import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins, LogIn, UserCheck, Swords } from "lucide-react";
 import type { Metadata } from 'next';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -96,23 +96,32 @@ export default function PremiumPage() {
             <Card>
                 <CardHeader>
                     <CardTitle>How to Get Premium?</CardTitle>
+                    <CardDescription>
+                        Premium status is currently granted by our team to engaged and positive members of the Apna Esport community.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-muted-foreground">
-                        Premium status is currently invite-only or granted by administrators based on community contribution, fair play, and positive engagement. Here are some ways to get noticed:
+                        Our administrators are continuously looking for users who contribute to the platform. Here’s what we look for:
                     </p>
                     <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                        <li>Consistently host popular and well-managed tournaments.</li>
-                        <li>Be an active and positive leader within your community.</li>
-                        <li>Contribute to a safe and fair gaming environment for all players.</li>
-                        <li>Become a verified content creator and build a strong following.</li>
+                        <li>Consistently hosting popular and well-managed tournaments for the community.</li>
+                        <li>Being an active and positive leader within your own community or on the platform.</li>
+                        <li>Actively participating in tournaments and demonstrating fair play.</li>
+                        <li>Becoming a verified content creator and building a strong, positive following.</li>
                     </ul>
-                    <p className="text-muted-foreground pt-4">
-                        Our admin team regularly reviews user activity and will reach out to deserving members with an invitation to join the premium tier.
+                    <p className="text-muted-foreground pt-2">
+                       The best way to get noticed is to be an active part of Apna Esport. Get started today!
                     </p>
-                    <div className="flex justify-center pt-4">
-                        <Button asChild>
-                            <Link href="/tournaments">Start Creating Tournaments</Link>
+                    <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4">
+                        <Button asChild size="lg">
+                            <Link href="/tournaments/new">
+                                <Swords className="mr-2 h-5 w-5" />
+                                Create a Tournament
+                            </Link>
+                        </Button>
+                        <Button asChild variant="outline" size="lg">
+                             <Link href="/tournaments">Join a Tournament</Link>
                         </Button>
                     </div>
                 </CardContent>
