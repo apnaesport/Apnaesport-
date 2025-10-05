@@ -1,4 +1,5 @@
 
+
 "use client"; 
 
 import type { Tournament, Participant, Winner, TeamSize } from "@/lib/types";
@@ -6,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
 import Link from "next/link";
-import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle, Map, Swords, User as UserIcon, Users2, Share2 } from "lucide-react"; 
+import { CalendarDays, Users, Trophy, Gamepad2, ListChecks, Info, Loader2, Coins, ShieldCheck, Building, Lock, KeyRound, Copy, Eye, EyeOff, Mail, AlertTriangle, CheckCircle, Map, Swords, User as UserIcon, Users2, Share2, Wand2 } from "lucide-react"; 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect, useCallback, useMemo } from "react"; 
@@ -51,6 +52,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import { analyzeTournamentResults } from '@/ai/flows/analyze-results-flow';
+
 
 const registrationSchema = z.object({
   gameUsername: z.string().min(2, "In-game username is required."),
@@ -97,8 +101,15 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const [roomPassword, setRoomPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistrationOpen, setIsRegistrationOpen] = useState(false);
+  const [isWinnerDeclarationOpen, setIsWinnerDeclarationOpen] = useState(false);
+  const [declarationMode, setDeclarationMode] = useState<'manual' | 'ai' | null>(null);
   
   const [timeUntilStart, setTimeUntilStart] = useState<number | null>(null);
+
+  // AI-related state
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   useEffect(() => {
     if (!tournamentId) {
@@ -287,17 +298,63 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
       try {
           await awardTournamentWinners(tournament.id, {
-              first: firstWinner,
-              second: secondWinner,
-              third: thirdWinner
+              first: { participant: firstWinner, rank: 1, prize: 0 },
+              second: { participant: secondWinner, rank: 2, prize: 0 },
+              third: { participant: thirdWinner, rank: 3, prize: 0 }
           });
           await refreshUser(); // Refresh organizer points
           toast({ title: "Tournament Ended!", description: "Winners have been declared and prizes distributed." });
           winnerForm.reset();
+          setIsWinnerDeclarationOpen(false);
       } catch (error: any) {
           toast({ title: "Error", description: error.message || "Failed to end tournament.", variant: "destructive" });
       } finally {
           setIsEnding(false);
+      }
+  };
+  
+   const handleScreenshotFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setScreenshotFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setScreenshotPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleAnalyzeResults = async () => {
+      if (!screenshotFile || !tournament) return;
+      setIsAnalyzing(true);
+      try {
+          const reader = new FileReader();
+          reader.readAsDataURL(screenshotFile);
+          reader.onload = async (e) => {
+              const photoDataUri = e.target?.result as string;
+              const result = await analyzeTournamentResults({
+                  tournamentName: tournament.name,
+                  gameName: tournament.gameName,
+                  participants: tournament.participants,
+                  screenshotDataUri: photoDataUri,
+              });
+
+              if (result.winners && result.winners.length >= 3) {
+                  // Pre-fill the manual form with AI results
+                  winnerForm.setValue('first', result.winners[0].id);
+                  winnerForm.setValue('second', result.winners[1].id);
+                  winnerForm.setValue('third', result.winners[2].id);
+                  toast({ title: "AI Analysis Complete", description: "Review the suggested winners and submit." });
+                  setDeclarationMode('manual'); // Switch to manual mode for confirmation
+              } else {
+                  toast({ title: "AI Analysis Failed", description: "Could not determine winners. Please enter manually.", variant: "destructive" });
+              }
+          };
+      } catch (error) {
+          toast({ title: "Error", description: "Failed to analyze screenshot.", variant: "destructive" });
+      } finally {
+          setIsAnalyzing(false);
       }
   };
 
@@ -345,7 +402,8 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   }
 
   const isFreeEntry = tournament.entryFee <= 0;
-  const canDeclareWinners = isTournamentCreator && tournament.status === 'Live' && differenceInMinutes(new Date(), new Date(tournament.startDate as any)) >= 5;
+  const canDeclareWinners = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Ongoing');
+  const isTooEarlyToDeclare = (timeUntilStart ?? 1) > -5; // Still upcoming or less than 5 mins past start
 
   const canManageRoom = isTournamentCreator && (tournament.status === 'Live' || tournament.status === 'Upcoming');
 
@@ -372,7 +430,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
         <div className="absolute bottom-0 left-0 p-4 md:p-6 lg:p-8">
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant={tournament.status === "Live" ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
+            <Badge variant={tournament.status === "Live" || tournament.status === 'Ongoing' ? "destructive" : "default"} className="text-xs sm:text-sm px-2 sm:px-3 py-1">{tournament.status}</Badge>
              {!isFreeEntry && (
                 <Badge variant="outline" className="bg-primary/90 text-primary-foreground border-primary-foreground/50 text-xs sm:text-sm px-2 sm:px-3 py-1">
                     <Coins className="h-3 w-3 mr-1" /> {tournament.entryFee} AE Entry
@@ -657,65 +715,30 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 </Card>
                 )}
 
-                {canDeclareWinners && (
+                {tournament.status !== 'Completed' && tournament.status !== 'Cancelled' && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2"><Trophy className="h-5 w-5 text-primary" /> Declare Winners</CardTitle>
                             <CardDescription>End the tournament and distribute the AE Points prize pool to the winners.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            {tournament.participants.length >= 3 ? (
-                                <form onSubmit={winnerForm.handleSubmit(handleEndTournament)} className="space-y-4">
-                                     <div>
-                                        <Label>1st Place Winner</Label>
-                                        <Controller
-                                            name="first"
-                                            control={winnerForm.control}
-                                            render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                                                    <SelectTrigger><SelectValue placeholder="Select 1st place..." /></SelectTrigger>
-                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                        {winnerForm.formState.errors.first && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.first.message}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>2nd Place Winner</Label>
-                                        <Controller
-                                            name="second"
-                                            control={winnerForm.control}
-                                            render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                                                    <SelectTrigger><SelectValue placeholder="Select 2nd place..." /></SelectTrigger>
-                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                        {winnerForm.formState.errors.second && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.second.message}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>3rd Place Winner</Label>
-                                        <Controller
-                                            name="third"
-                                            control={winnerForm.control}
-                                            render={({ field }) => (
-                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
-                                                    <SelectTrigger><SelectValue placeholder="Select 3rd place..." /></SelectTrigger>
-                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
-                                                </Select>
-                                            )}
-                                        />
-                                        {winnerForm.formState.errors.third && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.third.message}</p>}
-                                    </div>
-                                    <Button type="submit" disabled={isEnding}>
-                                        {isEnding && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                        End Tournament & Distribute Prizes
+                           <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span tabIndex={0} className="inline-block w-full">
+                                    <Button onClick={() => setIsWinnerDeclarationOpen(true)} disabled={isTooEarlyToDeclare} className="w-full">
+                                        {isTooEarlyToDeclare && <Lock className="mr-2 h-4 w-4" />}
+                                        Declare Winners
                                     </Button>
-                                </form>
-                            ) : (
-                                <p className="text-muted-foreground">You need at least 3 participants to declare winners.</p>
-                            )}
+                                    </span>
+                                </TooltipTrigger>
+                                {isTooEarlyToDeclare && (
+                                    <TooltipContent>
+                                        <p>You can declare winners 5 minutes after the tournament starts.</p>
+                                    </TooltipContent>
+                                )}
+                            </Tooltip>
+                           </TooltipProvider>
                         </CardContent>
                     </Card>
                 )}
@@ -770,6 +793,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 <CardTitle className="text-xl sm:text-2xl">
                 {tournament.status === "Upcoming" && "Ready to Join?"}
                 {tournament.status === "Live" && "Tournament is Live!"}
+                 {tournament.status === "Ongoing" && "Tournament is Ongoing!"}
                 {tournament.status === "Completed" && "Tournament Ended"}
                 {tournament.status === "Cancelled" && "Tournament Cancelled"}
                 </CardTitle>
@@ -781,32 +805,40 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             </CardHeader>
             <CardContent>
                 <div className="flex gap-2">
-                    {(tournament.status === "Upcoming" || tournament.status === "Live") && (
+                    {tournament.status === "Upcoming" ? (
                         <DialogTrigger asChild>
                             <Button 
                             size="lg" 
                             className="w-full bg-background text-foreground hover:bg-background/90"
-                            disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") || (tournament.status !== "Upcoming" && tournament.status !== "Live")}
+                            disabled={authLoading || !user || isRegistered || (tournament.participants.length >= tournament.maxParticipants)}
                             >
                             {isRegistered ? "You are Registered" : 
-                            (tournament.participants.length >= tournament.maxParticipants && tournament.status === "Upcoming") ? "Registrations Full" :
-                            tournament.status === "Upcoming" ? "Register Now" : "Join / Check In"}
+                            (tournament.participants.length >= tournament.maxParticipants) ? "Registrations Full" :
+                             "Register Now"}
                             </Button>
                         </DialogTrigger>
+                    ) : tournament.status === "Live" || tournament.status === "Ongoing" ? (
+                         <div className="w-full">
+                            {isRegistered ? (
+                                <p className="text-center p-2 bg-green-500/20 rounded-md">You are registered. The tournament is live!</p>
+                            ) : (
+                                <p className="text-center p-2 bg-yellow-500/20 rounded-md">This tournament is live. Results will be posted after it's completed.</p>
+                            )}
+                        </div>
+                    ): null}
+                     {tournament.status === "Completed" && (
+                        <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
+                    )}
+                    {(!user && !authLoading && (tournament.status === "Upcoming" || tournament.status === "Live")) && (
+                        <Button size="lg" className="w-full" asChild>
+                        <Link href={`/auth/login?redirect=/tournaments/${tournamentId}`}>Login to Register</Link>
+                        </Button>
                     )}
                     <Button size="lg" variant="outline" className="bg-background/20 border-white/50 hover:bg-background/40" onClick={handleShare}>
                         <Share2 className="h-5 w-5" />
                         <span className="sr-only">Share</span>
                     </Button>
                 </div>
-                {tournament.status === "Completed" && (
-                    <Button size="lg" className="w-full" disabled>View Results (Coming Soon)</Button>
-                )}
-                {(!user && !authLoading && (tournament.status === "Upcoming" || tournament.status === "Live")) && (
-                    <Button size="lg" className="w-full" asChild>
-                    <Link href={`/auth/login?redirect=/tournaments/${tournamentId}`}>Login to Register</Link>
-                    </Button>
-                )}
             </CardContent>
             </Card>
             <DialogContent>
@@ -837,6 +869,110 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 </DialogFooter>
                 </form>
             </DialogContent>
+            </Dialog>
+
+            <Dialog open={isWinnerDeclarationOpen} onOpenChange={setIsWinnerDeclarationOpen}>
+                <DialogContent className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Declare Winners</DialogTitle>
+                        <DialogDescription>
+                            Choose how you want to declare winners for this tournament.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {!declarationMode ? (
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+                            <button onClick={() => setDeclarationMode('manual')} className="p-6 border rounded-lg hover:bg-accent hover:border-primary transition-all text-left">
+                                <Trophy className="h-8 w-8 text-primary mb-2" />
+                                <h3 className="font-semibold text-lg">Manual Entry</h3>
+                                <p className="text-sm text-muted-foreground">Select the winners from the participants list yourself.</p>
+                            </button>
+                             <button onClick={() => setDeclarationMode('ai')} className="p-6 border rounded-lg hover:bg-accent hover:border-primary transition-all text-left">
+                                <Wand2 className="h-8 w-8 text-primary mb-2" />
+                                <h3 className="font-semibold text-lg">AI Assist (Beta)</h3>
+                                <p className="text-sm text-muted-foreground">Upload a screenshot of the results and let AI detect the winners.</p>
+                            </button>
+                        </div>
+                    ) : declarationMode === 'manual' ? (
+                        <>
+                        <h3 className="text-lg font-medium text-center">Manual Winner Selection</h3>
+                        {tournament.participants.length >= 3 ? (
+                                <form onSubmit={winnerForm.handleSubmit(handleEndTournament)} className="space-y-4 pt-4">
+                                     <div>
+                                        <Label>1st Place Winner</Label>
+                                        <Controller
+                                            name="first"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 1st place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.first && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.first.message}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>2nd Place Winner</Label>
+                                        <Controller
+                                            name="second"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 2nd place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.second && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.second.message}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>3rd Place Winner</Label>
+                                        <Controller
+                                            name="third"
+                                            control={winnerForm.control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value} defaultValue={field.value}>
+                                                    <SelectTrigger><SelectValue placeholder="Select 3rd place..." /></SelectTrigger>
+                                                    <SelectContent>{tournament.participants.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {winnerForm.formState.errors.third && <p className="text-destructive text-xs mt-1">{winnerForm.formState.errors.third.message}</p>}
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="ghost" onClick={() => setDeclarationMode(null)}>Back</Button>
+                                        <Button type="submit" disabled={isEnding}>
+                                            {isEnding && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                            Confirm Winners & End Tournament
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            ) : (
+                                <p className="text-muted-foreground text-center py-4">You need at least 3 participants to declare winners.</p>
+                            )}
+                        </>
+                    ) : ( // AI Mode
+                         <>
+                            <h3 className="text-lg font-medium text-center">AI Assisted Winner Selection</h3>
+                            <div className="space-y-4 pt-4">
+                                <div>
+                                    <Label htmlFor="screenshot">Upload Results Screenshot</Label>
+                                    <Input id="screenshot" type="file" accept="image/*" onChange={handleScreenshotFileChange} disabled={isAnalyzing}/>
+                                </div>
+                                {screenshotPreview && (
+                                    <Image src={screenshotPreview} alt="Screenshot Preview" width={400} height={200} className="rounded-md border object-contain mx-auto" />
+                                )}
+                                <DialogFooter>
+                                     <Button type="button" variant="ghost" onClick={() => setDeclarationMode(null)} disabled={isAnalyzing}>Back</Button>
+                                    <Button onClick={handleAnalyzeResults} disabled={!screenshotFile || isAnalyzing}>
+                                        {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Wand2 className="mr-2 h-4 w-4"/>}
+                                        {isAnalyzing ? "Analyzing..." : "Analyze & Suggest Winners"}
+                                    </Button>
+                                </DialogFooter>
+                            </div>
+                        </>
+                    )}
+                </DialogContent>
             </Dialog>
 
             <Card>
