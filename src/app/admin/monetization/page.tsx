@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Loader2, DollarSign, Text, Square, GripHorizontal } from "lucide-react";
+import { Save, Loader2, DollarSign, Text, Square, GripHorizontal, KeyRound } from "lucide-react";
 import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -24,6 +24,7 @@ const monetizationSchema = z.object({
   adKeySquare: z.string().optional(),
   adKeySocialBar: z.string().optional(),
   adFrequencyInLists: z.coerce.number().min(0, "Frequency must be 0 or more.").optional(),
+  geminiApiKey: z.string().optional(),
 });
 
 
@@ -33,6 +34,7 @@ const defaultValues: Partial<SiteSettings> = {
     adKeySquare: "",
     adKeySocialBar: "",
     adFrequencyInLists: 4,
+    geminiApiKey: "",
 };
 
 function MonetizationPageContent() {
@@ -87,7 +89,24 @@ function MonetizationPageContent() {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-      <PageTitle title="Monetization" subtitle="Manage ads and other monetization features." />
+      <PageTitle title="Monetization" subtitle="Manage ads, API keys, and other monetization features." />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <KeyRound className="mr-2 h-5 w-5 text-primary" /> API Keys
+          </CardTitle>
+          <CardDescription>Manage third-party API keys for platform features.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+           <div className="space-y-2">
+            <Label htmlFor="geminiApiKey">Google Gemini API Key</Label>
+            <Input id="geminiApiKey" type="password" {...form.register("geminiApiKey")} placeholder="Enter your Gemini API key..." disabled={isSaving}/>
+            <p className="text-xs text-muted-foreground">Used for AI features like analyzing tournament results from screenshots.</p>
+          </div>
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader>

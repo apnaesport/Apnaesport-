@@ -14,7 +14,8 @@ import {
   Handshake,
   DollarSign,
   Star,
-  Crown, // Added
+  Crown,
+  KeyRound,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,7 +34,7 @@ const adminNavItems = [
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/games", label: "Games", icon: Gamepad2 },
   { href: "/admin/creators", label: "Creators", icon: Star },
-  { href: "/admin/premium", label: "Premium", icon: Crown }, // Added
+  { href: "/admin/premium", label: "Premium", icon: Crown },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/sponsorships", label: "Sponsorships", icon: Handshake },
   { href: "/admin/monetization", label: "Monetization", icon: DollarSign },

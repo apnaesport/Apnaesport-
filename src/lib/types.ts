@@ -182,6 +182,7 @@ export interface SiteSettings {
   adKeySquare?: string;
   adKeySocialBar?: string;
   adFrequencyInLists?: number;
+  geminiApiKey?: string;
   aeCoinLogoUrl?: string;
   navIndicators?: { [key: string]: NavIndicator };
 }
