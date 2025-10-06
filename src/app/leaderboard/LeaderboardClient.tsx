@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
 import type { UserProfile } from '@/lib/types';
 import { listenToTopPlayersByMonthlyWins } from '@/lib/tournamentStore';
-import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone, Loader2 } from "lucide-react";
+import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone, Loader2, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -74,9 +75,10 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 <div className={cn("rank-badge w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0", getRankClass(rank))}>
                                     #{rank}
                                 </div>
-                                <Avatar className="w-14 h-14 rounded-xl border-2 border-border flex-shrink-0">
+                                <Avatar className={cn("w-14 h-14 rounded-xl border-2 flex-shrink-0", player.isPremium ? "border-amber-400" : "border-border")}>
                                      <ImageWithFallback 
                                         as={AvatarImage}
+                                        user={player}
                                         src={player.photoURL || ""} 
                                         fallbackSrc={`https://placehold.co/56x56.png?text=${getInitials(player.displayName)}`}
                                         alt={player.displayName || 'Player'} 
@@ -87,6 +89,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 <div className="player-info flex-grow min-w-0">
                                     <div className="player-name flex items-center gap-2">
                                         <h3 className="text-base font-semibold text-foreground truncate">{player.displayName}</h3>
+                                        {player.isPremium && <Crown className="h-4 w-4 text-amber-400" />}
                                     </div>
                                     <div className="player-stats text-xs text-muted-foreground flex items-center gap-3 mt-1">
                                         <span className="stat flex items-center gap-1">🏆 {player.monthlyWins}</span>
@@ -114,9 +117,10 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                 {selectedPlayer && (
                     <>
                         <div className="profile-header flex gap-4 items-center mb-6">
-                             <Avatar className="w-20 h-20 rounded-2xl border-2 border-primary">
+                             <Avatar className={cn("w-20 h-20 rounded-2xl border-2", selectedPlayer.isPremium ? "border-amber-400" : "border-primary")}>
                                 <ImageWithFallback 
                                     as={AvatarImage}
+                                    user={selectedPlayer}
                                     src={selectedPlayer.photoURL || ""}
                                     fallbackSrc={`https://placehold.co/80x80.png?text=${getInitials(selectedPlayer.displayName)}`}
                                     alt={selectedPlayer.displayName || 'Player'}
@@ -125,7 +129,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 <AvatarFallback className="rounded-xl text-3xl">{getInitials(selectedPlayer.displayName)}</AvatarFallback>
                             </Avatar>
                             <div className="profile-info flex-1">
-                                <h3 className="text-xl font-bold truncate">{selectedPlayer.displayName}</h3>
+                                <h3 className="text-xl font-bold truncate flex items-center gap-2">{selectedPlayer.displayName} {selectedPlayer.isPremium && <Crown className="h-5 w-5 text-amber-400" />}</h3>
                                 <p className="text-sm text-muted-foreground">{selectedPlayer.apnaId}</p>
                                 <div className="text-lg font-bold text-primary mt-1">#{players.findIndex(p => p.uid === selectedPlayer.uid) + 1}</div>
                             </div>

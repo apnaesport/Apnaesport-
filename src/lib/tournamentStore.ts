@@ -640,6 +640,7 @@ const formatUserProfile = (doc: any): UserProfile => {
         displayName: data.displayName || "Unknown User",
         email: data.email || null,
         photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
+        premiumPhotoURL: data.premiumPhotoURL || null,
         isAdmin: data.isAdmin || false,
         isPremium: data.isPremium || false,
         premiumSince: data.premiumSince as Timestamp,
@@ -783,6 +784,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       displayName: data.displayName || "Unknown User",
       email: data.email || null,
       photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
+      premiumPhotoURL: data.premiumPhotoURL || null,
       isAdmin: data.isAdmin || false,
       isPremium: data.isPremium || false,
       premiumSince: data.premiumSince as Timestamp,
@@ -820,6 +822,8 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserPr
             uid: doc.id,
             displayName: data.displayName || "Anonymous",
             photoURL: data.photoURL || '',
+            premiumPhotoURL: data.premiumPhotoURL || null,
+            isPremium: data.isPremium || false,
             apnaId: data.apnaId || 'N/A',
             monthlyWins: data.monthlyWins || 0,
             points: data.points || 0,
@@ -847,6 +851,8 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
                 uid: doc.id,
                 displayName: data.displayName || "Anonymous",
                 photoURL: data.photoURL || `https://i.pravatar.cc/150?u=${doc.id}`,
+                premiumPhotoURL: data.premiumPhotoURL || null,
+                isPremium: data.isPremium || false,
                 apnaId: data.apnaId || 'N/A',
                 monthlyWins: data.monthlyWins || 0,
                 points: data.points || 0,
@@ -904,16 +910,23 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
 };
 
 // --- Premium User Functions ---
-export const updateUserPremiumStatus = async (userId: string, features: Partial<UserProfile['premiumFeatures']>): Promise<void> => {
+export const updateUserPremiumStatus = async (userId: string, features: Partial<UserProfile['premiumFeatures']>, premiumPhotoURL?: string | null): Promise<void> => {
     return runTransaction(db, async (transaction) => {
         const userRef = doc(db, USERS_COLLECTION, userId);
-        const userDoc = await transaction.get(userRef);
+        const settingsRef = doc(db, SETTINGS_COLLECTION, GLOBAL_SETTINGS_ID);
+
+        const [userDoc, settingsDoc] = await Promise.all([
+            transaction.get(userRef),
+            transaction.get(settingsRef)
+        ]);
         
         if (!userDoc.exists()) {
             throw new Error("User not found.");
         }
         
         const userData = userDoc.data() as UserProfile;
+        const settingsData = settingsDoc.exists() ? settingsDoc.data() as SiteSettings : null;
+        
         const isCurrentlyPremium = userData.isPremium;
         const isBecomingPremium = Object.values(features).some(v => v === true);
 
@@ -923,23 +936,38 @@ export const updateUserPremiumStatus = async (userId: string, features: Partial<
             updatedAt: serverTimestamp(),
         };
 
-        if (isBecomingPremium && !isCurrentlyPremium) {
-            updateData.premiumSince = serverTimestamp();
-            updateData.hasSeenPremiumPopup = false; 
+        if (isBecomingPremium) {
+            if (!isCurrentlyPremium) { // User is being newly promoted
+                updateData.premiumSince = serverTimestamp();
+                updateData.hasSeenPremiumPopup = false; 
 
-            if (!userData.hasReceivedPremiumBonus) {
-                updateData.points = increment(PREMIUM_POINT_BONUS);
-                updateData.hasReceivedPremiumBonus = true;
+                if (!userData.hasReceivedPremiumBonus) {
+                    updateData.points = increment(PREMIUM_POINT_BONUS);
+                    updateData.hasReceivedPremiumBonus = true;
 
-                const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
-                transaction.set(transactionRef, {
-                    amount: PREMIUM_POINT_BONUS,
-                    type: 'credit',
-                    reason: 'One-Time Premium Bonus',
-                    createdAt: serverTimestamp()
-                });
+                    const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+                    transaction.set(transactionRef, {
+                        amount: PREMIUM_POINT_BONUS,
+                        type: 'credit',
+                        reason: 'One-Time Premium Bonus',
+                        createdAt: serverTimestamp()
+                    });
+                }
             }
+             // Set or update the premium photo URL
+            if (premiumPhotoURL) {
+                updateData.premiumPhotoURL = premiumPhotoURL;
+            } else if (premiumPhotoURL === null) {
+                 updateData.premiumPhotoURL = null;
+            } else if (!userData.premiumPhotoURL) {
+                // If no URL is provided and none exists, set the default
+                updateData.premiumPhotoURL = settingsData?.defaultPremiumAvatarUrl || null;
+            }
+
+        } else { // Premium is being revoked
+            updateData.premiumPhotoURL = null; // Remove premium avatar
         }
+
         transaction.update(userRef, updateData);
     });
 };

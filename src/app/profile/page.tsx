@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -40,6 +41,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 
 
 const profileSchema = z.object({
@@ -241,7 +243,14 @@ export default function ProfilePage() {
           <Card className="text-center">
             <CardHeader>
               <Avatar className={cn("h-32 w-32 mx-auto mb-4 border-4 shadow-lg", isPremium ? "border-amber-500" : "border-primary")}>
-                <AvatarImage src={user.photoURL || ""} alt={user.displayName || "User"} data-ai-hint="user avatar" />
+                <ImageWithFallback 
+                  as={AvatarImage}
+                  user={user}
+                  src={user.photoURL || ""} 
+                  fallbackSrc={`https://placehold.co/128x128.png?text=${getInitials(user.displayName)}`}
+                  alt={user.displayName || "User"}
+                  data-ai-hint="user avatar large"
+                />
                 <AvatarFallback className={cn("text-4xl", isPremium ? "bg-amber-500 text-white" : "bg-primary text-primary-foreground")}>
                   {getInitials(user.displayName)}
                 </AvatarFallback>

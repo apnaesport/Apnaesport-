@@ -26,6 +26,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  premiumPhotoURL?: string | null; // The URL for the premium avatar
   uid: string;
   isAdmin?: boolean;
   isPremium?: boolean;
@@ -201,6 +202,7 @@ export interface SiteSettings {
   basePlayerCount?: number;
   defaultCommunityLogoUrl?: string;
   defaultCommunityBannerUrl?: string;
+  defaultPremiumAvatarUrl?: string;
   showVideoSectionOnLanding?: boolean;
   landingPageVideoUrl?: string;
   updatedAt?: Timestamp;

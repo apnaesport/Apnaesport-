@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import type { User as FirebaseUser } from "firebase/auth";
@@ -55,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             displayName: firebaseUser.displayName,
             email: firebaseUser.email,
             photoURL: firebaseUser.photoURL,
+            premiumPhotoURL: null,
             isAdmin: false,
             isPremium: false,
             emailVerified: firebaseUser.emailVerified,

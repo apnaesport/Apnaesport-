@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
@@ -230,6 +231,7 @@ export default function AdminUsersClient() {
                     <ImageWithFallback 
                       as={AvatarImage}
                       src={user.photoURL || ""}
+                      user={user}
                       fallbackSrc={`https://placehold.co/40x40.png?text=${getInitials(user.displayName)}`}
                       alt={user.displayName || "User"} 
                       data-ai-hint="user avatar"

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins, Tags } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins, Tags, Crown } from "lucide-react";
 import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -42,6 +43,7 @@ const settingsSchema = z.object({
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
   defaultCommunityLogoUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   defaultCommunityBannerUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  defaultPremiumAvatarUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   adsEnabled: z.boolean().optional(),
   adsterraNativeAdKey: z.string().optional(),
   aeCoinLogoUrl: z.string().url("Must be a valid URL for the coin logo.").or(z.literal('')).optional(),
@@ -60,6 +62,7 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   basePlayerCount: 0,
   defaultCommunityLogoUrl: "",
   defaultCommunityBannerUrl: "",
+  defaultPremiumAvatarUrl: "",
   adsEnabled: false,
   adsterraNativeAdKey: "",
   aeCoinLogoUrl: "",
@@ -243,6 +246,11 @@ function AdminSettingsPageContent() {
             <Label htmlFor="aeCoinLogoUrl" className="flex items-center gap-2"><Coins className="h-4 w-4"/>AE Coin Logo URL</Label>
             <Input id="aeCoinLogoUrl" {...form.register("aeCoinLogoUrl")} placeholder="https://example.com/coin.png" disabled={isSaving}/>
             {form.formState.errors.aeCoinLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.aeCoinLogoUrl.message as string}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="defaultPremiumAvatarUrl" className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500"/>Default Premium Avatar URL</Label>
+            <Input id="defaultPremiumAvatarUrl" {...form.register("defaultPremiumAvatarUrl")} placeholder="https://example.com/premium-avatar.png" disabled={isSaving}/>
+            {form.formState.errors.defaultPremiumAvatarUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.defaultPremiumAvatarUrl.message as string}</p>}
           </div>
           <Separator />
            <div className="space-y-2">

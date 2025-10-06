@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useCallback, useEffect } from 'react';
@@ -30,6 +31,19 @@ const findUserSchema = z.object({
 });
 type FindUserFormData = z.infer<typeof findUserSchema>;
 
+const premiumUpdateSchema = z.object({
+  premiumPhotoURL: z.string().url("Must be a valid image URL.").or(z.literal("")).optional(),
+  features: z.object({
+    verifiedBadge: z.boolean().optional(),
+    customBanners: z.boolean().optional(),
+    addSponsors: z.boolean().optional(),
+    customPrizes: z.boolean().optional(),
+    prioritySupport: z.boolean().optional(),
+  })
+});
+type PremiumUpdateFormData = z.infer<typeof premiumUpdateSchema>;
+
+
 const allPremiumFeatures: { id: keyof PremiumFeatures; label: string; icon: React.ElementType }[] = [
     { id: 'verifiedBadge', label: 'Verified Premium Badge', icon: CheckCircle },
     { id: 'customBanners', label: 'Custom Tournament Banners', icon: ImagePlus },
@@ -52,7 +66,10 @@ export default function AdminPremiumClient() {
     defaultValues: { identifier: '' },
   });
 
-  const premiumFeaturesForm = useForm<PremiumFeatures>();
+  const premiumUpdateForm = useForm<PremiumUpdateFormData>({
+    resolver: zodResolver(premiumUpdateSchema),
+    defaultValues: { premiumPhotoURL: "", features: {} },
+  });
 
   const invalidateQueries = () => {
       queryClient.invalidateQueries({ queryKey: ['users', 'premium'] });
@@ -62,12 +79,15 @@ export default function AdminPremiumClient() {
   const handleFindUser: SubmitHandler<FindUserFormData> = async (data) => {
     setIsSearching(true);
     setSelectedUser(null);
-    premiumFeaturesForm.reset({});
+    premiumUpdateForm.reset({ premiumPhotoURL: "", features: {} });
     try {
       const userProfile = await getUserProfileFromFirestore(data.identifier);
       if (userProfile) {
         setSelectedUser(userProfile);
-        premiumFeaturesForm.reset(userProfile.premiumFeatures || {});
+        premiumUpdateForm.reset({
+            premiumPhotoURL: userProfile.premiumPhotoURL || "",
+            features: userProfile.premiumFeatures || {},
+        });
       } else {
         toast({ title: 'User Not Found', description: 'No user found with that identifier.', variant: 'destructive' });
       }
@@ -87,25 +107,28 @@ export default function AdminPremiumClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
   
-  const handleUpdatePremiumFeatures = async (data: PremiumFeatures) => {
+  const handleUpdatePremiumFeatures: SubmitHandler<PremiumUpdateFormData> = async (data) => {
     if (!selectedUser) return;
     setIsUpdating(true);
 
     // Ensure all feature keys are present, defaulting to false if unchecked
     const allFeaturesData: PremiumFeatures = allPremiumFeatures.reduce((acc, feature) => {
-        acc[feature.id] = !!data[feature.id];
+        acc[feature.id] = !!data.features[feature.id];
         return acc;
     }, {} as PremiumFeatures);
 
     try {
-        await updateUserPremiumStatus(selectedUser.uid, allFeaturesData);
+        await updateUserPremiumStatus(selectedUser.uid, allFeaturesData, data.premiumPhotoURL);
         toast({ title: "Success!", description: `${selectedUser.displayName}'s premium features have been updated.` });
         invalidateQueries();
         // Refetch the user to update the form state
         const updatedUser = await getUserProfileFromFirestore(selectedUser.uid);
         if (updatedUser) {
             setSelectedUser(updatedUser);
-            premiumFeaturesForm.reset(updatedUser.premiumFeatures || {});
+            premiumUpdateForm.reset({
+                premiumPhotoURL: updatedUser.premiumPhotoURL || "",
+                features: updatedUser.premiumFeatures || {},
+            });
         }
 
     } catch (error: any) {
@@ -119,7 +142,7 @@ export default function AdminPremiumClient() {
       if (!selectedUser) return;
       setIsUpdating(true);
       try {
-          await updateUserPremiumStatus(selectedUser.uid, {}); // Empty object revokes all
+          await updateUserPremiumStatus(selectedUser.uid, {}, null); // Empty object and null URL revokes all
           toast({ title: "Premium Revoked", description: `${selectedUser.displayName} no longer has premium status.` });
           invalidateQueries();
           setSelectedUser(null); // Clear selection
@@ -167,14 +190,14 @@ export default function AdminPremiumClient() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={premiumFeaturesForm.handleSubmit(handleUpdatePremiumFeatures)} className="space-y-4">
-                        <div className="space-y-3">
+                    <form onSubmit={premiumUpdateForm.handleSubmit(handleUpdatePremiumFeatures)} className="space-y-4">
+                         <div className="space-y-3">
                             <Label className="font-semibold">Select Features</Label>
                             {allPremiumFeatures.map((feature) => (
                                 <div key={feature.id} className="flex items-center space-x-2">
                                      <Controller
-                                        name={feature.id}
-                                        control={premiumFeaturesForm.control}
+                                        name={`features.${feature.id}`}
+                                        control={premiumUpdateForm.control}
                                         render={({ field }) => (
                                             <Checkbox
                                                 id={feature.id}
@@ -189,6 +212,16 @@ export default function AdminPremiumClient() {
                                 </div>
                             ))}
                         </div>
+
+                         <Separator />
+
+                         <div>
+                            <Label htmlFor="premiumPhotoURL">Premium Avatar URL</Label>
+                            <Input {...premiumUpdateForm.register("premiumPhotoURL")} id="premiumPhotoURL" placeholder="https://example.com/avatar.png" />
+                             {premiumUpdateForm.formState.errors.premiumPhotoURL && <p className="text-destructive text-xs mt-1">{premiumUpdateForm.formState.errors.premiumPhotoURL.message}</p>}
+                            <p className="text-xs text-muted-foreground mt-1">Leave blank to use default premium avatar.</p>
+                         </div>
+
                         <Separator />
                         <div className="flex flex-col sm:flex-row gap-2">
                              <Button type="submit" disabled={isUpdating} className="w-full">
