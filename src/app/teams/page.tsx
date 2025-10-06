@@ -1,49 +1,80 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, LogIn, Loader2 } from "lucide-react";
+import { PlusCircle, LogIn, Loader2, Users, Send, Check, X, Copy, Share2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
-import type { Team } from "@/lib/types";
+import { useState, useEffect, useCallback } from "react";
+import type { Team, TeamInvite, UserProfile } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { createTeamInFirestore } from "@/lib/tournamentStore";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { 
+    createTeamInFirestore, 
+    getUserTeams,
+    sendTeamInvite,
+    getUserTeamInvites,
+    respondToTeamInvite,
+    removePlayerFromTeam
+} from "@/lib/tournamentStore";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-// Placeholder for now
-const TeamCard = ({ team }: { team: Team }) => (
-    <div className="border p-4 rounded-lg">
-        <h3 className="font-bold">{team.name}</h3>
-        <p>Owner: {team.members.find(m => m.role === 'Owner')?.name}</p>
-        <p>{team.members.length} / 4 members</p>
-    </div>
-);
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 export default function TeamsPage() {
     const { user, loading } = useAuth();
     const { toast } = useToast();
     const [teams, setTeams] = useState<Team[]>([]);
+    const [invites, setInvites] = useState<TeamInvite[]>([]);
+    const [isDataLoading, setIsDataLoading] = useState(true);
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+    const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+    const [selectedTeamForInvite, setSelectedTeamForInvite] = useState<Team | null>(null);
     const [teamName, setTeamName] = useState("");
-    
-    // In a real app, you would fetch teams here.
-    // For now, we'll just use a placeholder.
+    const [inviteeApnaId, setInviteeApnaId] = useState("");
+    const [isSendingInvite, setIsSendingInvite] = useState(false);
 
     const canCreateTeam = teams.length < 2;
 
+    const fetchTeamData = useCallback(async (uid: string) => {
+        setIsDataLoading(true);
+        try {
+            const [userTeams, userInvites] = await Promise.all([
+                getUserTeams(uid),
+                getUserTeamInvites(uid)
+            ]);
+            setTeams(userTeams);
+            setInvites(userInvites.filter(inv => inv.status === 'pending'));
+        } catch (error) {
+            console.error("Error fetching team data:", error);
+            toast({ title: "Error", description: "Could not fetch your team information.", variant: "destructive" });
+        } finally {
+            setIsDataLoading(false);
+        }
+    }, [toast]);
+
+    useEffect(() => {
+        if (user && !loading) {
+            fetchTeamData(user.uid);
+        } else if (!user && !loading) {
+            setIsDataLoading(false);
+        }
+    }, [user, loading, fetchTeamData]);
+
     const handleCreateTeam = async () => {
         if (!user || !teamName.trim() || !canCreateTeam) return;
-
         setIsCreatingTeam(true);
         try {
             await createTeamInFirestore(teamName, user);
             toast({ title: "Team Created!", description: `Your team "${teamName}" has been created.` });
-            // Here you would refetch the teams list
+            await fetchTeamData(user.uid);
             setIsCreateDialogOpen(false);
             setTeamName("");
         } catch (error: any) {
@@ -53,11 +84,54 @@ export default function TeamsPage() {
         }
     };
     
-    if(loading) {
-        return <Loader2 className="h-16 w-16 animate-spin text-primary" />
+    const handleSendInvite = async () => {
+        if (!user || !inviteeApnaId.trim() || !selectedTeamForInvite) return;
+        setIsSendingInvite(true);
+        try {
+            await sendTeamInvite(selectedTeamForInvite, inviteeApnaId, user);
+            toast({ title: "Invite Sent!", description: `Invitation sent to user ${inviteeApnaId}.` });
+            setIsInviteDialogOpen(false);
+            setInviteeApnaId("");
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Could not send invite.", variant: "destructive" });
+        } finally {
+            setIsSendingInvite(false);
+        }
+    };
+    
+    const handleInviteResponse = async (inviteId: string, response: 'accepted' | 'declined') => {
+        if (!user) return;
+        try {
+            await respondToTeamInvite(inviteId, response, user);
+            toast({ title: `Invite ${response}!`, description: `You have ${response} the team invitation.`});
+            await fetchTeamData(user.uid);
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Could not process your response.", variant: "destructive" });
+        }
+    }
+    
+    const handleRemovePlayer = async (teamId: string, player: UserProfile) => {
+        if (!user) return;
+        try {
+            await removePlayerFromTeam(teamId, player);
+            toast({ title: "Player Removed", description: `${player.displayName} has been removed from the team.` });
+            await fetchTeamData(user.uid);
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Could not remove player.", variant: "destructive" });
+        }
     }
 
-    if(!user) {
+    if (loading || isDataLoading) {
+        return (
+             <div className="space-y-8">
+                <PageTitle title="My Teams" subtitle="Create and manage your esports teams."/>
+                <Skeleton className="h-48 w-full" />
+                <Skeleton className="h-48 w-full" />
+            </div>
+        )
+    }
+
+    if (!user) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[calc(100vh-12rem)] text-center p-4">
                 <PageTitle title="Access Denied" subtitle="You need to be logged in to manage your teams." />
@@ -109,17 +183,110 @@ export default function TeamsPage() {
                 }
             />
 
+            <AdsterraBlock format="leaderboard" />
+
+            {invites.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Team Invitations</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {invites.map(invite => (
+                            <div key={invite.id} className="p-3 border rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div>
+                                    <p className="font-semibold">{invite.fromName}</p>
+                                    <p className="text-sm text-muted-foreground">has invited you to join <span className="font-medium text-primary">{invite.teamName}</span>.</p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                    <Button size="sm" variant="destructive" onClick={() => handleInviteResponse(invite.id, 'declined')}><X className="h-4 w-4"/> Decline</Button>
+                                    <Button size="sm" onClick={() => handleInviteResponse(invite.id, 'accepted')}><Check className="h-4 w-4"/> Accept</Button>
+                                </div>
+                            </div>
+                        ))}
+                    </CardContent>
+                </Card>
+            )}
+
             {teams.length > 0 ? (
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {teams.map(team => <TeamCard key={team.id} team={team} />)}
+                 <div className="space-y-6">
+                    {teams.map(team => (
+                        <Card key={team.id}>
+                            <CardHeader className="flex flex-row justify-between items-start">
+                                <div>
+                                    <CardTitle className="text-2xl">{team.name}</CardTitle>
+                                    <CardDescription>Owner: {team.members.find(m => m.role === 'Owner')?.name}</CardDescription>
+                                </div>
+                                {team.ownerId === user.uid && (
+                                     <Dialog open={isInviteDialogOpen && selectedTeamForInvite?.id === team.id} onOpenChange={(open) => { if (!open) setSelectedTeamForInvite(null); setIsInviteDialogOpen(open); }}>
+                                        <DialogTrigger asChild>
+                                            <Button onClick={() => setSelectedTeamForInvite(team)}>
+                                                <Send className="mr-2 h-4 w-4" /> Invite Player
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>Invite to {team.name}</DialogTitle>
+                                                <DialogDescription>Enter the Apna ID of the player you want to invite.</DialogDescription>
+                                            </DialogHeader>
+                                             <div className="py-4 space-y-2">
+                                                <Label htmlFor="apnaId">Player's Apna ID</Label>
+                                                <Input id="apnaId" value={inviteeApnaId} onChange={e => setInviteeApnaId(e.target.value)} placeholder="e.g., AE123456" disabled={isSendingInvite}/>
+                                            </div>
+                                            <DialogFooter>
+                                                <DialogClose asChild><Button variant="ghost" disabled={isSendingInvite}>Cancel</Button></DialogClose>
+                                                <Button onClick={handleSendInvite} disabled={isSendingInvite || !inviteeApnaId.trim()}>
+                                                     {isSendingInvite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                    Send Invite
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
+                                )}
+                            </CardHeader>
+                            <CardContent>
+                                <h4 className="font-semibold mb-2">Members ({team.members.length} / 4)</h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {team.members.map(member => (
+                                        <div key={member.uid} className="flex items-center justify-between p-3 border rounded-lg bg-secondary/30">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar>
+                                                    <AvatarImage src={member.avatarUrl} alt={member.name}/>
+                                                    <AvatarFallback>{member.name.substring(0,2)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <p className="font-medium">{member.name}</p>
+                                                    <p className="text-xs text-muted-foreground">{member.role}</p>
+                                                </div>
+                                            </div>
+                                            {team.ownerId === user.uid && member.role !== 'Owner' && (
+                                                <Button variant="destructive" size="icon" className="h-8 w-8" onClick={() => handleRemovePlayer(team.id, member as UserProfile)}>
+                                                    <X className="h-4 w-4"/>
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                            <CardFooter>
+                                 <Button variant="outline" onClick={() => {
+                                     navigator.clipboard.writeText(`${window.location.origin}/teams/join?teamId=${team.id}`);
+                                     toast({ title: 'Link Copied!', description: 'Invite link copied to clipboard.' });
+                                 }}>
+                                    <Share2 className="mr-2 h-4 w-4" /> Share Invite Link
+                                 </Button>
+                            </CardFooter>
+                        </Card>
+                    ))}
                 </div>
             ) : (
                 <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                    <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-semibold">No Teams Yet</h3>
                     <p className="text-muted-foreground mt-2">You haven't created or joined any teams. Create one to get started!</p>
                 </div>
             )}
+
+            <AdsterraBlock format="leaderboard" />
         </div>
     );
 }
-

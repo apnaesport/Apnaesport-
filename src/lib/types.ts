@@ -332,8 +332,18 @@ export interface Team {
   name: string;
   ownerId: string;
   members: TeamMember[];
-  inviteCode: string;
   createdAt: Timestamp;
+}
+
+export interface TeamInvite {
+    id: string;
+    teamId: string;
+    teamName: string;
+    fromId: string; // owner uid
+    fromName: string;
+    toId: string; // invited user uid
+    status: 'pending' | 'accepted' | 'declined';
+    createdAt: Timestamp;
 }
 
 
