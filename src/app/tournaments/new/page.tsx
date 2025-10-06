@@ -19,13 +19,14 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2 } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 
 const tournamentSchema = z.object({
@@ -33,6 +34,7 @@ const tournamentSchema = z.object({
   gameId: z.string().min(1, "Please select a game."),
   description: z.string().min(20, "Description must be at least 20 characters.").max(500, "Description must be 500 characters or less."),
   startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
+  status: z.enum(["Upcoming", "Live", "Ongoing", "Completed", "Cancelled"]),
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
   entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more.").max(40, "Entry fee cannot exceed 40."),
   matchType: z.string({ required_error: "Match type is required."}).min(1, "Match type is required."),
@@ -45,6 +47,8 @@ const tournamentSchema = z.object({
   bannerImageFile: z.custom<FileList>().optional(),
   sponsorName: z.string().optional(),
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
+  isMock: z.boolean().optional(),
+  mockParticipantCount: z.coerce.number().min(2).max(256).optional(),
 });
 
 
@@ -67,6 +71,7 @@ export default function CreateTournamentPage() {
       gameId: searchParams.get("gameId") || "",
       description: "",
       startDate: undefined,
+      status: "Upcoming",
       maxParticipants: 16,
       entryFee: 0,
       matchType: "",
@@ -78,10 +83,13 @@ export default function CreateTournamentPage() {
       bannerImageUrl: "",
       sponsorName: "",
       sponsorLogoUrl: "",
+      isMock: false,
+      mockParticipantCount: 16,
     },
   });
   
   const selectedGameId = form.watch("gameId");
+  const isMock = form.watch("isMock");
   const selectedGame = availableGames.find(g => g.id === selectedGameId);
   const entryFee = form.watch("entryFee");
   const maxParticipants = form.watch("maxParticipants");
@@ -125,8 +133,8 @@ export default function CreateTournamentPage() {
       toast({ title: "Authentication Error", description: "You must be logged in to create a tournament.", variant: "destructive" });
       return;
     }
-     if ((user.points || 0) < TOURNAMENT_CREATION_FEE) {
-        toast({ title: "Insufficient Points", description: `You need ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`, variant: "destructive" });
+     if (!data.isMock && (user.points || 0) < TOURNAMENT_CREATION_FEE) {
+        toast({ title: "Insufficient Points", description: `You need ${TOURNAMENT_CREATION_FEE} AE Points to create a real tournament.`, variant: "destructive" });
         return;
     }
 
@@ -144,8 +152,7 @@ export default function CreateTournamentPage() {
         finalBannerUrl = bannerPreview;
     }
 
-
-    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'prizePool'> & { startDate: Date } = {
+    const newTournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'prizePool'> & { status: TournamentStatus } = {
       name: data.name,
       gameId: data.gameId,
       gameName: selectedGame.name,
@@ -153,8 +160,9 @@ export default function CreateTournamentPage() {
       bannerImageUrl: finalBannerUrl,
       description: data.description,
       startDate: data.startDate, 
+      status: data.isMock ? data.status : "Upcoming",
       maxParticipants: data.maxParticipants,
-      entryFee: data.entryFee || 0,
+      entryFee: data.isMock ? 0 : (data.entryFee || 0),
       matchType: data.matchType,
       mapName: data.mapName === "any" ? "" : data.mapName,
       teamSize: data.teamSize,
@@ -167,14 +175,17 @@ export default function CreateTournamentPage() {
       featured: data.featured || false,
       sponsorName: isPremium ? data.sponsorName || undefined : undefined,
       sponsorLogoUrl: isPremium ? data.sponsorLogoUrl || undefined : undefined,
+      isMock: data.isMock,
     };
     
     try {
-      const createdTournamentId = await addTournamentToFirestore(newTournamentData, user.uid); 
-      await refreshUser();
+      const createdTournamentId = await addTournamentToFirestore(newTournamentData, user, data.mockParticipantCount);
+      if (!data.isMock) {
+        await refreshUser();
+      }
       toast({
         title: "Tournament Created!",
-        description: `"${data.name}" is live. ${TOURNAMENT_CREATION_FEE} AE Points were deducted.`,
+        description: `"${data.name}" is live. ${!data.isMock ? `${TOURNAMENT_CREATION_FEE} AE Points were deducted.` : ''}`,
       });
       router.push(`/tournaments/${createdTournamentId}`); 
     } catch (error: any) {
@@ -232,44 +243,111 @@ export default function CreateTournamentPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Alert>
-                <Coins className="h-4 w-4" />
-                <AlertTitle>Creation Fee: {TOURNAMENT_CREATION_FEE} AE Points</AlertTitle>
-                <AlertDescription>
-                    This amount will be deducted from your balance of {user.points} AE Points upon creation.
-                </AlertDescription>
-            </Alert>
+            {!isMock && (
+              <Alert>
+                  <Coins className="h-4 w-4" />
+                  <AlertTitle>Creation Fee: {TOURNAMENT_CREATION_FEE} AE Points</AlertTitle>
+                  <AlertDescription>
+                      This amount will be deducted from your balance of {user.points} AE Points upon creation.
+                  </AlertDescription>
+              </Alert>
+            )}
+
+            {isAdmin && (
+                 <Controller
+                    name="isMock"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Alert variant="default" className="border-amber-500/50 bg-amber-500/10">
+                        <TestTube2 className="h-4 w-4 text-amber-500" />
+                        <AlertTitle className="flex items-center justify-between">
+                            <Label htmlFor="isMockSwitch" className="font-semibold text-amber-500">
+                                Create as Mock Tournament (Admin Only)
+                            </Label>
+                            <Switch
+                                id="isMockSwitch"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmittingForm}
+                            />
+                        </AlertTitle>
+                        <AlertDescription>
+                            Mock tournaments are for visual purposes only. They will be auto-filled with fake participants and cannot be joined.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                 />
+            )}
+
+            {isMock && (
+              <div className="space-y-2">
+                <Label htmlFor="mockParticipantCount">Fake Participant Count</Label>
+                <Controller
+                  name="mockParticipantCount"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Slider
+                      id="mockParticipantCount"
+                      min={8} max={100} step={1}
+                      value={[field.value || 16]}
+                      onValueChange={(value) => field.onChange(value[0])}
+                      disabled={isSubmittingForm}
+                    />
+                  )}
+                />
+                <p className="text-sm text-muted-foreground text-center">{form.watch('mockParticipantCount') || 16} mock participants will be generated.</p>
+              </div>
+            )}
+
             <div>
               <Label htmlFor="name">Tournament Name</Label>
               <Input id="name" {...form.register("name")} disabled={isSubmittingForm} />
               {form.formState.errors.name && <p className="text-destructive text-xs mt-1">{form.formState.errors.name.message}</p>}
             </div>
 
-            <div>
-              <Label htmlFor="gameId">Game</Label>
-              <Controller
-                name="gameId"
-                control={form.control}
-                render={({ field }) => (
-                  <Select onValueChange={(value) => {
-                      field.onChange(value);
-                      const game = availableGames.find(g => g.id === value);
-                      form.setValue('matchType', game?.matchTypes?.[0] || "");
-                      form.setValue('mapName', 'any');
-                  }} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || isLoadingGames}>
-                    <SelectTrigger id="gameId">
-                      <SelectValue placeholder="Select a game..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableGames.length === 0 && isLoadingGames && <SelectItem value="loading" disabled>Loading games...</SelectItem>}
-                      {availableGames.map(game => (
-                        <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="gameId">Game</Label>
+                <Controller
+                  name="gameId"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        const game = availableGames.find(g => g.id === value);
+                        form.setValue('matchType', game?.matchTypes?.[0] || "");
+                        form.setValue('mapName', 'any');
+                    }} value={field.value} defaultValue={field.value} disabled={isSubmittingForm || isLoadingGames}>
+                      <SelectTrigger id="gameId">
+                        <SelectValue placeholder="Select a game..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableGames.length === 0 && isLoadingGames && <SelectItem value="loading" disabled>Loading games...</SelectItem>}
+                        {availableGames.map(game => (
+                          <SelectItem key={game.id} value={game.id}>{game.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
+              </div>
+              {isMock && (
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Controller name="status" control={form.control} render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Upcoming">Upcoming</SelectItem>
+                                <SelectItem value="Live">Live</SelectItem>
+                                <SelectItem value="Completed">Completed</SelectItem>
+                                <SelectItem value="Cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    )} />
+                </div>
+              )}
             </div>
             
             {selectedGame && (
@@ -399,7 +477,7 @@ export default function CreateTournamentPage() {
                                         step={5}
                                         value={[field.value]}
                                         onValueChange={(value) => field.onChange(value[0])}
-                                        disabled={isSubmittingForm}
+                                        disabled={isSubmittingForm || isMock}
                                     />
                                     <div className="flex justify-between text-xs text-muted-foreground">
                                         <span>Free</span>
@@ -417,7 +495,7 @@ export default function CreateTournamentPage() {
                          />
                         {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
                      </div>
-                     {entryFee > 0 && (
+                     {entryFee > 0 && !isMock && (
                         <Alert variant="default" className="border-primary/30">
                             <Trophy className="h-4 w-4" />
                             <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
@@ -504,7 +582,7 @@ export default function CreateTournamentPage() {
             </Card>
 
 
-            <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading || (user.points || 0) < TOURNAMENT_CREATION_FEE} className="w-full md:w-auto">
+            <Button type="submit" size="lg" disabled={isSubmittingForm || isLoadingGames || authLoading || (!isMock && (user.points || 0) < TOURNAMENT_CREATION_FEE)} className="w-full md:w-auto">
               {isSubmittingForm ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" /> }
               {isSubmittingForm ? "Creating..." : "Create Tournament"}
             </Button>

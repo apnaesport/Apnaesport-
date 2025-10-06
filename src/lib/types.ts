@@ -126,6 +126,7 @@ export type Tournament = {
   winners?: Winner[];
   isQuickTournament?: boolean;
   communityId?: string;
+  isMock?: boolean;
 };
 
 export type TournamentFormDataUI = {
@@ -133,6 +134,7 @@ export type TournamentFormDataUI = {
   gameId: string;
   description: string;
   startDate: Date;
+  status: TournamentStatus;
   maxParticipants: number;
   entryFee: number; 
   matchType: string;
@@ -145,6 +147,8 @@ export type TournamentFormDataUI = {
   bannerImageFile?: FileList; 
   sponsorName?: string;
   sponsorLogoUrl?: string;
+  isMock?: boolean;
+  mockParticipantCount?: number;
 };
 
 
