@@ -145,7 +145,7 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 // --- Tournament Functions ---
 
 export const addTournamentToFirestore = async (
-    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'startDate' | 'status' | 'prizePool'> & { startDate: Date }, 
+    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'prizePool'> & { startDate: Date }, 
     userId: string
 ): Promise<string> => {
   
@@ -243,49 +243,22 @@ export const getTournamentsFromFirestore = async (queryParams?: { status?: Tourn
 
 
 export const getTournamentByIdFromFirestore = async (tournamentId: string): Promise<Tournament | undefined> => {
-  if (!tournamentId) return undefined;
-  const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
-  const docSnap = await getDoc(docRef);
+    if (!tournamentId) return undefined;
+    const docRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+    const docSnap = await getDoc(docRef);
 
-  if (docSnap.exists()) {
-    const data = docSnap.data();
-    const startDate = (data.startDate as Timestamp).toDate();
-    const now = new Date();
-    let status = data.status;
-
-     if (status !== 'Completed' && status !== 'Cancelled') {
-        const twoHoursAfterStart = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
-        if (now >= twoHoursAfterStart) {
-            status = 'Completed';
-        } else if (now >= startDate) {
-            status = 'Live';
-        } else {
-            status = 'Upcoming';
-        }
+    if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+            id: docSnap.id,
+            ...data,
+            bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
+            gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0, 2)}`,
+        } as Tournament;
     }
-    
-    const tournament: Tournament = {
-      id: docSnap.id,
-      ...data,
-      status: status, // Use the dynamically calculated status
-      bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
-      gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0,2)}`,
-      startDate: startDate,
-      endDate: data.endDate ? (data.endDate as Timestamp).toDate() : undefined,
-      createdAt: data.createdAt as Timestamp,
-      updatedAt: data.updatedAt as Timestamp,
-      matches: data.matches || [],
-      entryFee: data.entryFee || 0,
-      prizePool: data.prizePool || 0,
-      sponsorName: data.sponsorName || undefined,
-      sponsorLogoUrl: data.sponsorLogoUrl || undefined,
-      isQuickTournament: data.isQuickTournament || false,
-    } as Tournament;
-
-    return tournament;
-  }
-  return undefined;
+    return undefined;
 };
+
 
 export const listenToTournamentById = (
   tournamentId: string,
@@ -425,9 +398,12 @@ export const awardTournamentWinners = async (
 
         if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
         const tournamentData = tournamentDoc.data() as Tournament;
-        if (tournamentData.status !== "Live" && tournamentData.status !== "Ongoing") {
-             throw new Error("Tournament is not live and cannot be ended.");
+
+        const startDate = (tournamentData.startDate as Timestamp).toDate();
+        if (new Date() < startDate) {
+             throw new Error("Tournament has not started yet.");
         }
+
         if (tournamentData.winners && tournamentData.winners.length > 0) {
             throw new Error("Winners have already been declared for this tournament.");
         }
