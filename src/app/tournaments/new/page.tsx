@@ -279,7 +279,7 @@ export default function CreateTournamentPage() {
                  />
             )}
 
-            {isMock && (
+            {isAdmin && isMock && (
               <div className="space-y-2">
                 <Label htmlFor="mockParticipantCount">Fake Participant Count</Label>
                 <Controller
@@ -332,7 +332,7 @@ export default function CreateTournamentPage() {
                 />
                 {form.formState.errors.gameId && <p className="text-destructive text-xs mt-1">{form.formState.errors.gameId.message}</p>}
               </div>
-              {isMock && (
+              {isAdmin && isMock && (
                   <div>
                     <Label htmlFor="status">Status</Label>
                     <Controller name="status" control={form.control} render={({ field }) => (

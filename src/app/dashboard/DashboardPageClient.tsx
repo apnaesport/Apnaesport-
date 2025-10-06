@@ -7,7 +7,7 @@ import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
 import type { Tournament, Game, StatItem, UserProfile, UnseenWin } from "@/lib/types";
-import { Heart, Megaphone, Coins, Gift, Trophy, Crown } from "lucide-react";
+import { Heart, Megaphone, Coins, Gift, Trophy, Crown, Swords } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -33,12 +33,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+
 
 interface DashboardPageClientProps {
     stats: StatItem[];
     featuredTournament?: Tournament;
     liveTournaments: Tournament[];
     allGames: Game[];
+    allTournaments: Tournament[];
     recentWinners?: Tournament | null;
 }
 
@@ -129,7 +132,7 @@ const WinnerShowcaseDialog = ({ win, open, onOpenChange }: { win: UnseenWin; ope
     );
 };
 
-export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames, recentWinners }: DashboardPageClientProps) {
+export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames, allTournaments, recentWinners }: DashboardPageClientProps) {
     const { user, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const [bonusAvailable, setBonusAvailable] = useState(false);
@@ -184,6 +187,10 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
         return [...initialStats, userRankStat];
     }, [initialStats, user]);
     
+    const joinedTournaments = useMemo(() => {
+        if (!user) return [];
+        return allTournaments.filter(t => t.participants.some(p => p.id === user.uid) && (t.status === 'Upcoming' || t.status === 'Live' || t.status === 'Ongoing'));
+    }, [allTournaments, user]);
     
     const recommendedTournaments: Tournament[] = [];
 
@@ -209,9 +216,7 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />
             
             <section className="flex justify-center">
-                <div className="w-full max-w-5xl">
-                    <AdsterraBlock format="leaderboard" key="dashboard-leaderboard-top" />
-                </div>
+                <AdsterraBlock format="leaderboard" key="dashboard-leaderboard-top" />
             </section>
             
             {featuredTournament && (
@@ -251,6 +256,25 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                             ))}
                         </CardContent>
                     </Card>
+                </section>
+            )}
+            
+            {joinedTournaments.length > 0 && (
+                <section>
+                    <h2 className="text-2xl font-semibold mb-4 text-foreground flex items-center gap-2">
+                        <Swords className="h-6 w-6 text-primary"/>
+                        My Active Tournaments
+                    </h2>
+                    <ScrollArea>
+                        <div className="flex space-x-4 pb-4">
+                            {joinedTournaments.map(t => (
+                                <div key={t.id} className="w-80 shrink-0">
+                                    <TournamentCard tournament={t} />
+                                </div>
+                            ))}
+                        </div>
+                        <ScrollBar orientation="horizontal" />
+                    </ScrollArea>
                 </section>
             )}
 

@@ -102,6 +102,7 @@ export default async function DashboardPage() {
   const serializableGames = games.map(g => serializeObjectWithTimestamps(g));
   const serializableFeaturedTournament = featuredTournament ? serializeObjectWithTimestamps(featuredTournament) : undefined;
   const serializableLiveTournaments = liveTournaments.map(t => serializeObjectWithTimestamps(t));
+  const serializableAllTournaments = tournaments.map(t => serializeObjectWithTimestamps(t));
   const serializableRecentWinners = recentWinners ? serializeObjectWithTimestamps(recentWinners) : null;
 
 
@@ -111,6 +112,7 @@ export default async function DashboardPage() {
         featuredTournament={serializableFeaturedTournament}
         liveTournaments={serializableLiveTournaments}
         allGames={serializableGames}
+        allTournaments={serializableAllTournaments}
         recentWinners={serializableRecentWinners}
      />
   );
