@@ -319,6 +319,24 @@ export interface CommunityPost {
     createdAt: Timestamp;
 }
 
+// --- Team Types ---
+export interface TeamMember {
+  uid: string;
+  name: string;
+  avatarUrl: string;
+  role: 'Owner' | 'Member';
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  ownerId: string;
+  members: TeamMember[];
+  inviteCode: string;
+  createdAt: Timestamp;
+}
+
+
 // --- Creator Hub Types ---
 export interface Creator {
     id: string;
