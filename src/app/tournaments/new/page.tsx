@@ -53,7 +53,7 @@ const tournamentSchema = z.object({
 
 
 export default function CreateTournamentPage() {
-  const { user, isAdmin, isPremium, loading: authLoading, refreshUser } = useAuth();
+  const { user, isAdmin, isPremium, premiumFeatures, loading: authLoading, refreshUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
@@ -389,7 +389,7 @@ export default function CreateTournamentPage() {
             <div className="space-y-2">
                 <Label>Tournament Banner</Label>
                 <div className="relative p-4 border-2 border-dashed rounded-lg">
-                    {!isPremium && (
+                    {(!isPremium || !premiumFeatures?.customBanners) && (
                         <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
                             <Lock className="h-8 w-8 text-primary mb-2"/>
                             <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
@@ -397,11 +397,11 @@ export default function CreateTournamentPage() {
                              <Button variant="link" asChild><Link href="/premium">Learn More</Link></Button>
                         </div>
                     )}
-                    <div className={!isPremium ? 'blur-sm select-none pointer-events-none' : ''}>
+                    <div className={(!isPremium || !premiumFeatures?.customBanners) ? 'blur-sm select-none pointer-events-none' : ''}>
                         <p className="text-sm text-muted-foreground mb-2">Upload a custom banner (1200x400 recommended). If none is provided, the game's default banner will be used.</p>
-                        <Input id="bannerImageFile" type="file" {...form.register("bannerImageFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={handleFileChange} disabled={!isPremium || isSubmittingForm}/>
+                        <Input id="bannerImageFile" type="file" {...form.register("bannerImageFile")} className="file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-xs file:bg-primary file:text-primary-foreground hover:file:bg-primary/90" accept="image/*" onChange={handleFileChange} disabled={!isPremium || !premiumFeatures?.customBanners || isSubmittingForm}/>
                         {bannerPreview && <Image src={bannerPreview} alt="Banner preview" width={400} height={200} className="rounded-md border object-cover aspect-video mt-2" data-ai-hint='custom banner preview' unoptimized />}
-                        <Input {...form.register("bannerImageUrl")} placeholder="Or enter Banner URL" className="mt-2" disabled={!isPremium || isSubmittingForm}/>
+                        <Input {...form.register("bannerImageUrl")} placeholder="Or enter Banner URL" className="mt-2" disabled={!isPremium || !premiumFeatures?.customBanners || isSubmittingForm}/>
                         {form.formState.errors.bannerImageUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.bannerImageUrl.message}</p>}
                     </div>
                 </div>
@@ -453,65 +453,74 @@ export default function CreateTournamentPage() {
               {form.formState.errors.startDate && <p className="text-destructive text-xs mt-1">{form.formState.errors.startDate.message}</p>}
             </div>
             
-            <Card>
-                <CardHeader>
-                    <CardTitle className="text-lg">Entry Fee & Prize Pool</CardTitle>
-                    <CardDescription>Set the entry fee. The prize pool is calculated automatically.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                     <div>
-                        <Label htmlFor="entryFee">Entry Fee</Label>
-                         <Controller
-                            name="entryFee"
-                            control={form.control}
-                            render={({ field }) => (
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm font-medium">{field.value === 0 ? "Free Entry" : `${field.value} AE Coins`}</span>
-                                        <Button type="button" variant="outline" size="sm" onClick={() => field.onChange(0)}>Set as Free</Button>
+            <Card className="mt-6 border-dashed border-primary/50 relative bg-muted/30">
+                 {(!isPremium || !premiumFeatures?.customPrizes) && (
+                    <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
+                        <Lock className="h-8 w-8 text-primary mb-2"/>
+                        <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
+                        <p className="text-sm text-muted-foreground">Set custom entry fees and prize pools with Premium.</p>
+                        <Button variant="link" asChild><Link href="/premium">Learn More</Link></Button>
+                    </div>
+                )}
+                 <div className={(!isPremium || !premiumFeatures?.customPrizes) ? 'blur-sm select-none pointer-events-none' : ''}>
+                    <CardHeader>
+                        <CardTitle className="text-lg flex items-center gap-2">
+                        <Trophy className="h-5 w-5 text-primary" /> Entry Fee & Prize Pool
+                        </CardTitle>
+                        <CardDescription>Set a custom entry fee. The prize pool is calculated automatically.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="entryFee">Entry Fee</Label>
+                            <Controller
+                                name="entryFee"
+                                control={form.control}
+                                render={({ field }) => (
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium">{field.value === 0 ? "Free Entry" : `${field.value} AE Coins`}</span>
+                                            <Button type="button" variant="outline" size="sm" onClick={() => field.onChange(0)}>Set as Free</Button>
+                                        </div>
+                                        <Slider
+                                            id="entryFee"
+                                            min={0} max={40} step={5}
+                                            value={[field.value]}
+                                            onValueChange={(value) => field.onChange(value[0])}
+                                            disabled={isSubmittingForm || isMock}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Free</span>
+                                            <span>5</span>
+                                            <span>10</span>
+                                            <span>15</span>
+                                            <span>20</span>
+                                            <span>25</span>
+                                            <span>30</span>
+                                            <span>35</span>
+                                            <span>40</span>
+                                        </div>
                                     </div>
-                                    <Slider
-                                        id="entryFee"
-                                        min={0}
-                                        max={40}
-                                        step={5}
-                                        value={[field.value]}
-                                        onValueChange={(value) => field.onChange(value[0])}
-                                        disabled={isSubmittingForm || isMock}
-                                    />
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                        <span>Free</span>
-                                        <span>5</span>
-                                        <span>10</span>
-                                        <span>15</span>
-                                        <span>20</span>
-                                        <span>25</span>
-                                        <span>30</span>
-                                        <span>35</span>
-                                        <span>40</span>
-                                    </div>
-                                </div>
-                            )}
-                         />
-                        {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
-                     </div>
-                     {entryFee > 0 && !isMock && (
-                        <Alert variant="default" className="border-primary/30">
-                            <Trophy className="h-4 w-4" />
-                            <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
-                            <AlertDescription>
-                                Based on a full tournament ({maxParticipants} players). Prizes are:
-                                <ul className="list-disc pl-5 mt-2">
-                                    <li>1st Place: {firstPrize} AE Coins</li>
-                                    <li>2nd Place: {secondPrize} AE Coins</li>
-                                    <li>3rd Place: {thirdPrize} AE Coins</li>
-                                </ul>
-                            </AlertDescription>
-                        </Alert>
-                     )}
-                </CardContent>
+                                )}
+                            />
+                            {form.formState.errors.entryFee && <p className="text-destructive text-xs mt-1">{form.formState.errors.entryFee.message}</p>}
+                        </div>
+                        {entryFee > 0 && !isMock && (
+                            <Alert variant="default" className="border-primary/30">
+                                <Trophy className="h-4 w-4" />
+                                <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
+                                <AlertDescription>
+                                    Based on a full tournament ({maxParticipants} players). Prizes are:
+                                    <ul className="list-disc pl-5 mt-2">
+                                        <li>1st Place: {firstPrize} AE Coins</li>
+                                        <li>2nd Place: {secondPrize} AE Coins</li>
+                                        <li>3rd Place: {thirdPrize} AE Coins</li>
+                                    </ul>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                    </CardContent>
+                </div>
             </Card>
-
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -553,7 +562,7 @@ export default function CreateTournamentPage() {
             </div>
             
             <Card className="mt-6 border-dashed border-primary/50 relative bg-muted/30">
-              {!isPremium && (
+              {(!isPremium || !premiumFeatures?.addSponsors) && (
                   <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-4 text-center">
                       <Lock className="h-8 w-8 text-primary mb-2"/>
                       <h3 className="font-bold text-lg text-foreground">Premium Feature</h3>
@@ -561,7 +570,7 @@ export default function CreateTournamentPage() {
                       <Button variant="link" asChild><Link href="/premium">Learn More</Link></Button>
                   </div>
               )}
-              <div className={!isPremium ? 'blur-sm select-none pointer-events-none' : ''}>
+              <div className={(!isPremium || !premiumFeatures?.addSponsors) ? 'blur-sm select-none pointer-events-none' : ''}>
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                     <Handshake className="h-5 w-5 text-primary" /> Sponsorship (Optional)
@@ -571,11 +580,11 @@ export default function CreateTournamentPage() {
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="sponsorName">Sponsor Name</Label>
-                        <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={!isPremium || isSubmittingForm} />
+                        <Input id="sponsorName" {...form.register("sponsorName")} placeholder="e.g., Awesome Corp" disabled={!isPremium || !premiumFeatures?.addSponsors || isSubmittingForm} />
                     </div>
                     <div>
                         <Label htmlFor="sponsorLogoUrl">Sponsor Logo URL</Label>
-                        <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={!isPremium || isSubmittingForm} />
+                        <Input id="sponsorLogoUrl" {...form.register("sponsorLogoUrl")} placeholder="https://example.com/sponsor-logo.png" disabled={!isPremium || !premiumFeatures?.addSponsors || isSubmittingForm} />
                     </div>
                 </CardContent>
               </div>
@@ -592,3 +601,4 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
