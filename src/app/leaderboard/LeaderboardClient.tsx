@@ -73,13 +73,13 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && openProfile(player)}
                             >
                                 <div className={cn("rank-badge w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0", getRankClass(rank))}>
-                                    #{rank}
+                                    #${rank}
                                 </div>
                                 <Avatar className={cn("w-14 h-14 rounded-xl border-2 flex-shrink-0", player.isPremium ? "border-amber-400" : "border-border")}>
                                      <ImageWithFallback 
                                         as={AvatarImage}
                                         user={player}
-                                        src={player.photoURL || ""} 
+                                        src={player.photoURL} 
                                         fallbackSrc={`https://placehold.co/56x56.png?text=${getInitials(player.displayName)}`}
                                         alt={player.displayName || 'Player'} 
                                         data-ai-hint="player avatar"
@@ -121,7 +121,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 <ImageWithFallback 
                                     as={AvatarImage}
                                     user={selectedPlayer}
-                                    src={selectedPlayer.photoURL || ""}
+                                    src={selectedPlayer.photoURL}
                                     fallbackSrc={`https://placehold.co/80x80.png?text=${getInitials(selectedPlayer.displayName)}`}
                                     alt={selectedPlayer.displayName || 'Player'}
                                     data-ai-hint="player avatar large"

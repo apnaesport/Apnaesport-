@@ -815,22 +815,13 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserPr
     );
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => {
-        const data = doc.data();
-        const kills = data.kills || 0;
-        const deaths = data.deaths || 0;
+        const user = formatUserProfile(doc);
+        const kills = user.kills || 0;
+        const deaths = user.deaths || 0;
         return {
-            uid: doc.id,
-            displayName: data.displayName || "Anonymous",
-            photoURL: data.photoURL || '',
-            premiumPhotoURL: data.premiumPhotoURL || null,
-            isPremium: data.isPremium || false,
-            apnaId: data.apnaId || 'N/A',
-            monthlyWins: data.monthlyWins || 0,
-            points: data.points || 0,
-            kills: kills,
-            deaths: deaths,
+            ...user,
             kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2), // Calculate KDA
-        } as UserProfile & { kda: string };
+        };
     });
 };
 
@@ -844,22 +835,13 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const players = snapshot.docs.map(doc => {
-            const data = doc.data();
-            const kills = data.kills || 0;
-            const deaths = data.deaths || 0;
+            const user = formatUserProfile(doc);
+            const kills = user.kills || 0;
+            const deaths = user.deaths || 0;
             return {
-                uid: doc.id,
-                displayName: data.displayName || "Anonymous",
-                photoURL: data.photoURL || `https://i.pravatar.cc/150?u=${doc.id}`,
-                premiumPhotoURL: data.premiumPhotoURL || null,
-                isPremium: data.isPremium || false,
-                apnaId: data.apnaId || 'N/A',
-                monthlyWins: data.monthlyWins || 0,
-                points: data.points || 0,
-                kills: kills,
-                deaths: deaths,
+                ...user,
                 kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2),
-            } as UserProfile & { kda: string };
+            };
         });
         callback(players);
     });
@@ -1278,7 +1260,7 @@ export const updateAnnouncement = async (communityId: string, announcementId: st
 };
 
 export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
-    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
+    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
     await deleteDoc(announcementRef);
 };
 
