@@ -16,7 +16,8 @@ import {
   isDailyBonusAvailable,
   getTopPlayersByMonthlyWins,
   getCommunityMembers,
-  getGameDetails
+  getGameDetails,
+  getPremiumRequestsFromFirestore
 } from "./tournamentStore";
 
 // --- React Query Hooks for Firestore ---
@@ -93,6 +94,13 @@ export function useSponsorshipRequests() {
     return useQuery({
         queryKey: ['sponsorshipRequests'],
         queryFn: () => getSponsorshipRequestsFromFirestore(),
+    });
+}
+
+export function usePremiumRequests() {
+    return useQuery({
+        queryKey: ['premiumRequests'],
+        queryFn: () => getPremiumRequestsFromFirestore(),
     });
 }
 

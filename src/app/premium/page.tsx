@@ -3,13 +3,19 @@
 
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins, LogIn, UserCheck, Swords } from "lucide-react";
-import type { PremiumFeatures } from '@/lib/types';
+import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins, LogIn, UserCheck, Swords, Send, Loader2, Trophy } from "lucide-react";
+import type { PremiumFeatures, PremiumRequest } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter, DialogClose } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
+import { addPremiumRequestToFirestore } from "@/lib/tournamentStore";
 
 const allPremiumFeatures: { id: keyof PremiumFeatures, icon: React.ElementType, title: string, description: string }[] = [
     {
@@ -30,6 +36,12 @@ const allPremiumFeatures: { id: keyof PremiumFeatures, icon: React.ElementType, 
         title: "Add Tournament Sponsors",
         description: "Feature your own sponsors in the tournaments you create, including their name and logo."
     },
+     {
+        id: "customPrizes",
+        icon: Trophy,
+        title: "Custom Entry Fees & Prizes",
+        description: "Set your own entry fees and define the exact prize pool distribution for 1st, 2nd, and 3rd place."
+    },
     {
         id: "prioritySupport",
         icon: ShieldCheck,
@@ -37,6 +49,84 @@ const allPremiumFeatures: { id: keyof PremiumFeatures, icon: React.ElementType, 
         description: "Get faster response times and priority assistance from our support team for any issues."
     },
 ];
+
+
+function PremiumRequestDialog() {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [message, setMessage] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!user || !message.trim()) return;
+        setIsSubmitting(true);
+        try {
+            await addPremiumRequestToFirestore({
+                userId: user.uid,
+                userName: user.displayName || 'N/A',
+                userApnaId: user.apnaId || 'N/A',
+                message: message
+            });
+            toast({
+                title: "Request Sent!",
+                description: "Your request for premium has been submitted for review."
+            });
+            setIsDialogOpen(false);
+            setMessage('');
+        } catch (error: any) {
+            toast({
+                title: "Error",
+                description: error.message || "Could not submit your request.",
+                variant: "destructive"
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+    
+    if(!user) return null;
+
+    return (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+                <Button size="lg">
+                    <MessageSquarePlus className="mr-2 h-5 w-5" />
+                    Request Premium
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Request Premium Status</DialogTitle>
+                    <DialogDescription>
+                        Tell us why you would be a great premium member. Our team will review your request.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                     <div>
+                        <Label htmlFor="message">Your Message</Label>
+                        <Textarea 
+                            id="message" 
+                            value={message} 
+                            onChange={(e) => setMessage(e.target.value)} 
+                            placeholder="I believe I should be a premium member because..."
+                            rows={5}
+                            disabled={isSubmitting}
+                        />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost" disabled={isSubmitting}>Cancel</Button></DialogClose>
+                    <Button onClick={handleSubmit} disabled={isSubmitting || !message.trim()}>
+                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4" />}
+                        Submit Request
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+
+}
 
 export default function PremiumPage() {
   const { user, loading, isPremium, premiumFeatures } = useAuth();
@@ -91,32 +181,24 @@ export default function PremiumPage() {
                 <CardHeader>
                     <CardTitle>How to Get Premium?</CardTitle>
                     <CardDescription>
-                        Premium status is currently granted by our team to engaged and positive members of the Apna Esport community.
+                        Premium status is granted by our admin team. Actively contribute to our community to get noticed, or send a request.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <p className="text-muted-foreground">
-                        Our administrators are continuously looking for users who contribute to the platform. Here’s what we look for:
+                        Our administrators are continuously looking for users who contribute positively to the platform. Here’s what we look for:
                     </p>
                     <ul className="list-disc pl-5 space-y-2 text-muted-foreground">
-                        <li>Consistently hosting popular and well-managed tournaments for the community.</li>
-                        <li>Being an active and positive leader within your own community or on the platform.</li>
+                        <li>Consistently hosting popular and well-managed tournaments.</li>
+                        <li>Being an active and positive leader within your community.</li>
                         <li>Actively participating in tournaments and demonstrating fair play.</li>
-                        <li>Becoming a verified content creator and building a strong, positive following.</li>
+                        <li>Becoming a verified content creator and building a positive following.</li>
                     </ul>
                     <p className="text-muted-foreground pt-2">
-                       The best way to get noticed is to be an active part of Apna Esport. Get started today!
+                      Think you're a good fit? Send us a request!
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center items-center gap-4 pt-4">
-                        <Button asChild size="lg">
-                            <Link href="/tournaments/new">
-                                <Swords className="mr-2 h-5 w-5" />
-                                Create a Tournament
-                            </Link>
-                        </Button>
-                        <Button asChild variant="outline" size="lg">
-                             <Link href="/tournaments">Join a Tournament</Link>
-                        </Button>
+                        <PremiumRequestDialog />
                     </div>
                 </CardContent>
             </Card>
@@ -134,7 +216,7 @@ export default function PremiumPage() {
                     {allPremiumFeatures.map(feature => {
                         const hasFeature = isPremium && premiumFeatures?.[feature.id];
                         return (
-                            <div key={feature.title} className={cn(
+                            <div key={feature.id} className={cn(
                                 "flex items-start gap-4 p-4 rounded-lg border",
                                 hasFeature ? "bg-secondary border-primary/50" : "bg-secondary/30 border-border"
                             )}>
@@ -172,4 +254,3 @@ export default function PremiumPage() {
     </div>
   );
 }
-

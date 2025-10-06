@@ -26,7 +26,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -40,6 +40,7 @@ const COMMUNITIES_COLLECTION = "communities";
 const CREATORS_COLLECTION = "creators";
 const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 const UNSEEN_WINS_COLLECTION = "unseenWins";
+const PREMIUM_REQUESTS_COLLECTION = "premiumRequests";
 
 const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
@@ -146,15 +147,19 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 
 export const addTournamentToFirestore = async (
     tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'prizePool'> & { startDate: Date }, 
-    userId: string
+    user: UserProfile,
+    mockParticipantCount: number = 0,
 ): Promise<string> => {
   
-  const userRef = doc(db, USERS_COLLECTION, userId);
+  const userRef = doc(db, USERS_COLLECTION, user.uid);
+  const isMock = tournamentData.isMock || false;
 
   return runTransaction(db, async (transaction) => {
-    const userDoc = await transaction.get(userRef);
-    if (!userDoc.exists() || (userDoc.data().points || 0) < TOURNAMENT_CREATION_FEE) {
-      throw new Error(`You need at least ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`);
+    if (!isMock) {
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists() || (userDoc.data().points || 0) < TOURNAMENT_CREATION_FEE) {
+            throw new Error(`You need at least ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`);
+        }
     }
 
     const { startDate, ...restData } = tournamentData;
@@ -162,31 +167,60 @@ export const addTournamentToFirestore = async (
     if (!game) throw new Error("Selected game not found.");
 
     const newTournamentDocRef = doc(collection(db, TOURNAMENTS_COLLECTION));
+    
+    let mockParticipants: Participant[] = [];
+    if (isMock && mockParticipantCount > 0) {
+        for (let i = 0; i < mockParticipantCount; i++) {
+            mockParticipants.push({
+                id: `mock_user_${i}`,
+                name: `Player ${1000 + i}`,
+                avatarUrl: `https://i.pravatar.cc/150?u=player${i}`,
+                gameUsername: `player${1000 + i}`,
+                inGameId: `123456789${i}`,
+            });
+        }
+    }
+
+    let winners: Winner[] = [];
+    if(isMock && tournamentData.status === 'Completed' && mockParticipants.length >= 3) {
+        const prizePool = (tournamentData.entryFee || 10) * mockParticipants.length;
+        winners = [
+            { rank: 1, participant: mockParticipants[0], prize: Math.floor(prizePool * 0.5) },
+            { rank: 2, participant: mockParticipants[1], prize: Math.floor(prizePool * 0.3) },
+            { rank: 3, participant: mockParticipants[2], prize: Math.floor(prizePool * 0.2) },
+        ];
+    }
+
     const newTournamentData = {
       ...restData,
       startDate: Timestamp.fromDate(startDate),
-      status: "Upcoming", // Always start as upcoming
-      prizePool: 0, // Prize pool starts at 0 and is funded by entry fees
+      status: tournamentData.status,
+      prizePool: (isMock && winners.length > 0) ? winners.reduce((acc, w) => acc + w.prize, 0) : 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      participants: isMock ? mockParticipants : [],
       matches: tournamentData.matches || [],
       featured: tournamentData.featured || false,
       entryFee: tournamentData.entryFee || 0,
       sponsorName: tournamentData.sponsorName || null,
       sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
+      winners: isMock ? winners : [],
     };
 
     transaction.set(newTournamentDocRef, newTournamentData);
-    transaction.update(userRef, { points: increment(-TOURNAMENT_CREATION_FEE) });
     
-    const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
-    transaction.set(transactionRef, { 
-        amount: TOURNAMENT_CREATION_FEE, 
-        type: 'debit', 
-        reason: `Fee for creating tournament: ${tournamentData.name}`,
-        tournamentId: newTournamentDocRef.id,
-        createdAt: serverTimestamp() 
-    });
+    if (!isMock) {
+        transaction.update(userRef, { points: increment(-TOURNAMENT_CREATION_FEE) });
+        
+        const transactionRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
+        transaction.set(transactionRef, { 
+            amount: TOURNAMENT_CREATION_FEE, 
+            type: 'debit', 
+            reason: `Fee for creating tournament: ${tournamentData.name}`,
+            tournamentId: newTournamentDocRef.id,
+            createdAt: serverTimestamp() 
+        });
+    }
 
     return newTournamentDocRef.id;
   });
@@ -425,13 +459,14 @@ export const awardTournamentWinners = async (
             throw new Error("Winners have already been declared for this tournament.");
         }
 
-        const totalPrizePool = (tournamentData.entryFee || 0) * tournamentData.participants.length;
+        const totalPrizePool = tournamentData.prizePool || ((tournamentData.entryFee || 0) * tournamentData.participants.length);
 
         const prizeDistribution = {
-            first: Math.floor(totalPrizePool * 0.5),
-            second: Math.floor(totalPrizePool * 0.3),
-            third: Math.floor(totalPrizePool * 0.2)
+            first: tournamentData.prizeDistribution?.first ?? Math.floor(totalPrizePool * 0.5),
+            second: tournamentData.prizeDistribution?.second ?? Math.floor(totalPrizePool * 0.3),
+            third: tournamentData.prizeDistribution?.third ?? Math.floor(totalPrizePool * 0.2)
         };
+
         const finalWinners: Winner[] = [];
 
         const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, prize: number) => {
@@ -462,7 +497,7 @@ export const awardTournamentWinners = async (
                 });
             }
             transaction.update(winnerRef, updatePayload);
-            finalWinners.push({ rank, participant, prize, kills, deaths });
+            finalWinners.push({ rank, participant, prize, kills: kills || 0, deaths: deaths || 0 });
         };
         
         processWinner(winners.first, 1, prizeDistribution.first);
@@ -580,6 +615,7 @@ export const getUserProfileFromFirestore = async (userId: string): Promise<UserP
       isAdmin: data.isAdmin || false,
       isPremium: data.isPremium || false,
       premiumSince: data.premiumSince as Timestamp,
+      premiumFeatures: data.premiumFeatures || {},
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
@@ -697,6 +733,7 @@ export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
       isAdmin: data.isAdmin || false,
       isPremium: data.isPremium || false,
       premiumSince: data.premiumSince as Timestamp,
+      premiumFeatures: data.premiumFeatures || {},
       createdAt: data.createdAt as Timestamp,
       lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
       hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
@@ -814,34 +851,29 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
 };
 
 // --- Premium User Functions ---
-export const updateUserPremiumStatus = async (identifier: string, isPremium: boolean): Promise<void> => {
+export const updateUserPremiumStatus = async (userId: string, features: Partial<UserProfile['premiumFeatures']>): Promise<void> => {
     return runTransaction(db, async (transaction) => {
-        let userQuery;
-        if (identifier.includes('@')) {
-            userQuery = query(collection(db, USERS_COLLECTION), where("email", "==", identifier), limit(1));
-        } else if (identifier.startsWith('AE')) {
-            userQuery = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier), limit(1));
-        } else {
-             userQuery = query(collection(db, USERS_COLLECTION), where("uid", "==", identifier), limit(1));
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const userDoc = await transaction.get(userRef);
+        
+        if (!userDoc.exists()) {
+            throw new Error("User not found.");
         }
         
-        const querySnapshot = await getDocs(userQuery);
-        if (querySnapshot.empty) {
-            throw new Error("User not found with that identifier.");
-        }
-        const userDoc = querySnapshot.docs[0];
-        const userId = userDoc.id;
-        const userRef = doc(db, USERS_COLLECTION, userId);
         const userData = userDoc.data() as UserProfile;
+        const isCurrentlyPremium = userData.isPremium;
+        const isBecomingPremium = Object.values(features).some(v => v === true);
 
         const updateData: any = {
-            isPremium: isPremium,
+            premiumFeatures: features,
+            isPremium: isBecomingPremium,
             updatedAt: serverTimestamp(),
         };
 
-        if (isPremium) {
+        if (isBecomingPremium && !isCurrentlyPremium) {
             updateData.premiumSince = serverTimestamp();
-            updateData.hasSeenPremiumPopup = false; // Set to false so user sees the popup
+            updateData.hasSeenPremiumPopup = false; 
+
             if (!userData.hasReceivedPremiumBonus) {
                 updateData.points = increment(PREMIUM_POINT_BONUS);
                 updateData.hasReceivedPremiumBonus = true;
@@ -857,6 +889,41 @@ export const updateUserPremiumStatus = async (identifier: string, isPremium: boo
         }
         transaction.update(userRef, updateData);
     });
+};
+
+// --- Premium Request Functions ---
+
+export const addPremiumRequestToFirestore = async (requestData: Omit<PremiumRequest, 'id' | 'createdAt' | 'status'>): Promise<string> => {
+    const q = query(
+        collection(db, PREMIUM_REQUESTS_COLLECTION),
+        where("userId", "==", requestData.userId),
+        where("status", "==", "Pending")
+    );
+    const existingRequests = await getDocs(q);
+    if (!existingRequests.empty) {
+        throw new Error("You already have a pending premium request.");
+    }
+    
+    const docRef = await addDoc(collection(db, PREMIUM_REQUESTS_COLLECTION), {
+        ...requestData,
+        status: "Pending",
+        createdAt: serverTimestamp(),
+    });
+    return docRef.id;
+};
+
+export const getPremiumRequestsFromFirestore = async (): Promise<PremiumRequest[]> => {
+    const snapshot = await getDocs(query(collection(db, PREMIUM_REQUESTS_COLLECTION), orderBy("createdAt", "desc")));
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt as Timestamp,
+    } as PremiumRequest));
+};
+
+export const updatePremiumRequestStatusInFirestore = async (requestId: string, status: PremiumRequest['status']): Promise<void> => {
+    const requestRef = doc(db, PREMIUM_REQUESTS_COLLECTION, requestId);
+    await updateDoc(requestRef, { status });
 };
 
 
