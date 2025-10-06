@@ -1,32 +1,43 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { UserProfile } from '@/lib/types';
 import { listenToTopPlayersByMonthlyWins } from '@/lib/tournamentStore';
-import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone } from "lucide-react";
+import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 
 interface LeaderboardClientProps {
     initialPlayers: (UserProfile & { kda: string })[];
 }
+
+const getInitials = (name?: string | null) => {
+    if (!name) return "??";
+    return name.split(" ").map((n) => n[0]).join("").toUpperCase();
+};
+
 
 export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
     const [players, setPlayers] = useState(initialPlayers);
     const [loading, setLoading] = useState(initialPlayers.length === 0);
     const [selectedPlayer, setSelectedPlayer] = useState<(UserProfile & { kda: string }) | null>(null);
 
-    useEffect(() => {
+    const fetchPlayers = useCallback(() => {
         setLoading(true);
         const unsubscribe = listenToTopPlayersByMonthlyWins(20, (updatedPlayers) => {
             setPlayers(updatedPlayers);
             setLoading(false);
         });
-
-        // Cleanup subscription on component unmount
-        return () => unsubscribe();
+        return unsubscribe;
     }, []);
+
+    useEffect(() => {
+        const unsubscribe = fetchPlayers();
+        return () => unsubscribe();
+    }, [fetchPlayers]);
 
     const openProfile = (player: UserProfile & { kda: string }) => {
         setSelectedPlayer(player);
@@ -45,17 +56,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
 
 
     return (
-        <div className="container mx-auto max-w-lg relative" role="region" aria-label="Apna Esports leaderboard">
-            <div className="header text-center mb-6">
-                <div className="inline-block mx-auto">
-                    <div className="logo mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent flex items-center justify-center font-extrabold text-2xl text-white shadow-lg shadow-primary/30">
-                        AE
-                    </div>
-                </div>
-                <h1 className="text-3xl font-bold mt-4 bg-gradient-to-r from-foreground to-muted-foreground text-transparent bg-clip-text">Elite Leaderboard</h1>
-                <p className="text-muted-foreground">Monthly Rankings</p>
-            </div>
-
+        <div className="container mx-auto max-w-2xl relative" role="region" aria-label="Apna Esports leaderboard">
             <div className="leaderboard space-y-3" id="leaderboard">
                 {loading ? (
                     Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)
@@ -73,9 +74,16 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                 <div className={cn("rank-badge w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0", getRankClass(rank))}>
                                     #{rank}
                                 </div>
-                                <div className="player-avatar w-14 h-14 rounded-xl overflow-hidden border-2 border-border flex-shrink-0">
-                                    <img src={player.photoURL || `https://i.pravatar.cc/150?u=${player.uid}`} alt={player.displayName || 'Player'} className="w-full h-full object-cover" />
-                                </div>
+                                <Avatar className="w-14 h-14 rounded-xl border-2 border-border flex-shrink-0">
+                                     <ImageWithFallback 
+                                        as={AvatarImage}
+                                        src={player.photoURL || ""} 
+                                        fallbackSrc={`https://placehold.co/56x56.png?text=${getInitials(player.displayName)}`}
+                                        alt={player.displayName || 'Player'} 
+                                        data-ai-hint="player avatar"
+                                    />
+                                    <AvatarFallback className="rounded-lg">{getInitials(player.displayName)}</AvatarFallback>
+                                </Avatar>
                                 <div className="player-info flex-grow min-w-0">
                                     <div className="player-name flex items-center gap-2">
                                         <h3 className="text-base font-semibold text-foreground truncate">{player.displayName}</h3>
@@ -86,7 +94,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                                     </div>
                                 </div>
                                 <div className="player-score text-right font-bold text-lg text-primary min-w-[60px]">
-                                    {player.points.toLocaleString()}
+                                    {(player.points || 0).toLocaleString()}
                                 </div>
                             </div>
                         );
@@ -106,9 +114,16 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                 {selectedPlayer && (
                     <>
                         <div className="profile-header flex gap-4 items-center mb-6">
-                            <div className="profile-avatar w-20 h-20 rounded-2xl overflow-hidden border-2 border-primary">
-                                <img src={selectedPlayer.photoURL || `https://i.pravatar.cc/150?u=${selectedPlayer.uid}`} alt={selectedPlayer.displayName || 'Player'} className="w-full h-full object-cover" />
-                            </div>
+                             <Avatar className="w-20 h-20 rounded-2xl border-2 border-primary">
+                                <ImageWithFallback 
+                                    as={AvatarImage}
+                                    src={selectedPlayer.photoURL || ""}
+                                    fallbackSrc={`https://placehold.co/80x80.png?text=${getInitials(selectedPlayer.displayName)}`}
+                                    alt={selectedPlayer.displayName || 'Player'}
+                                    data-ai-hint="player avatar large"
+                                />
+                                <AvatarFallback className="rounded-xl text-3xl">{getInitials(selectedPlayer.displayName)}</AvatarFallback>
+                            </Avatar>
                             <div className="profile-info flex-1">
                                 <h3 className="text-xl font-bold truncate">{selectedPlayer.displayName}</h3>
                                 <p className="text-sm text-muted-foreground">{selectedPlayer.apnaId}</p>
@@ -127,7 +142,7 @@ export function LeaderboardClient({ initialPlayers }: LeaderboardClientProps) {
                             </div>
                              <div className="stat-card text-center bg-card p-3 rounded-lg">
                                 <div className="stat-label text-xs text-muted-foreground uppercase">Points</div>
-                                <div className="stat-value text-xl font-bold">{selectedPlayer.points.toLocaleString()}</div>
+                                <div className="stat-value text-xl font-bold">{(selectedPlayer.points || 0).toLocaleString()}</div>
                             </div>
                         </div>
                         
