@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { updateUserPremiumStatus, getUserProfileFromFirestore } from '@/lib/tournamentStore';
-import { Loader2, Crown, Trash2, BadgeInfo, CheckCircle, ImagePlus, Handshake, ShieldCheck } from 'lucide-react';
+import { Loader2, Crown, Trash2, BadgeInfo, CheckCircle, ImagePlus, Handshake, ShieldCheck, Trophy } from 'lucide-react';
 import { useForm, type SubmitHandler, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -30,10 +30,11 @@ const findUserSchema = z.object({
 });
 type FindUserFormData = z.infer<typeof findUserSchema>;
 
-const premiumFeaturesList: { id: keyof PremiumFeatures; label: string; icon: React.ElementType }[] = [
+const allPremiumFeatures: { id: keyof PremiumFeatures; label: string; icon: React.ElementType }[] = [
     { id: 'verifiedBadge', label: 'Verified Premium Badge', icon: CheckCircle },
     { id: 'customBanners', label: 'Custom Tournament Banners', icon: ImagePlus },
     { id: 'addSponsors', label: 'Add Sponsors to Tournaments', icon: Handshake },
+    { id: 'customPrizes', label: 'Custom Entry Fees & Prizes', icon: Trophy },
     { id: 'prioritySupport', label: 'Priority Support', icon: ShieldCheck },
 ];
 
@@ -89,8 +90,15 @@ export default function AdminPremiumClient() {
   const handleUpdatePremiumFeatures = async (data: PremiumFeatures) => {
     if (!selectedUser) return;
     setIsUpdating(true);
+
+    // Ensure all feature keys are present, defaulting to false if unchecked
+    const allFeaturesData: PremiumFeatures = allPremiumFeatures.reduce((acc, feature) => {
+        acc[feature.id] = !!data[feature.id];
+        return acc;
+    }, {} as PremiumFeatures);
+
     try {
-        await updateUserPremiumStatus(selectedUser.uid, data);
+        await updateUserPremiumStatus(selectedUser.uid, allFeaturesData);
         toast({ title: "Success!", description: `${selectedUser.displayName}'s premium features have been updated.` });
         invalidateQueries();
         // Refetch the user to update the form state
@@ -162,7 +170,7 @@ export default function AdminPremiumClient() {
                     <form onSubmit={premiumFeaturesForm.handleSubmit(handleUpdatePremiumFeatures)} className="space-y-4">
                         <div className="space-y-3">
                             <Label className="font-semibold">Select Features</Label>
-                            {premiumFeaturesList.map((feature) => (
+                            {allPremiumFeatures.map((feature) => (
                                 <div key={feature.id} className="flex items-center space-x-2">
                                      <Controller
                                         name={feature.id}
@@ -290,3 +298,5 @@ export default function AdminPremiumClient() {
     </div>
   );
 }
+
+    
