@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -17,6 +18,7 @@ export interface PremiumFeatures {
   verifiedBadge?: boolean;
   customBanners?: boolean;
   addSponsors?: boolean;
+  customPrizes?: boolean;
   prioritySupport?: boolean;
 }
 
@@ -101,6 +103,12 @@ export type Winner = {
     deaths?: number;
 };
 
+export type PrizeDistribution = {
+    first: number;
+    second: number;
+    third: number;
+};
+
 export type Tournament = {
   id: string;
   name: string;
@@ -116,6 +124,7 @@ export type Tournament = {
   maxParticipants: number;
   prizePool: number; // This will now be the calculated total
   entryFee: number; 
+  prizeDistribution?: PrizeDistribution;
   rules?: string;
   registrationInstructions?: string;
   matchType: string;
@@ -145,6 +154,7 @@ export type TournamentFormDataUI = {
   status: TournamentStatus;
   maxParticipants: number;
   entryFee: number; 
+  prizeDistribution?: PrizeDistribution;
   matchType: string;
   mapName?: string;
   teamSize: TeamSize;
@@ -330,9 +340,22 @@ export interface CreatorApplication {
     email: string;
     photoURL?: string;
     channelUrl: string;
-  tags: string;
+    tags: string;
     message?: string;
     status: CreatorApplicationStatus;
     createdAt: Timestamp;
     communityId?: string;
+}
+
+// --- Premium Request Types ---
+export type PremiumRequestStatus = "Pending" | "Approved" | "Rejected";
+
+export interface PremiumRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userApnaId: string;
+  message: string;
+  status: PremiumRequestStatus;
+  createdAt: Timestamp;
 }
