@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { UserProfile, PremiumFeatures } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,7 @@ const premiumFeaturesList: { id: keyof PremiumFeatures; label: string; icon: Rea
 
 export default function AdminPremiumClient() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const { data: premiumUsers = [], isLoading } = usePremiumUsers();
   const [isSearching, setIsSearching] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -74,6 +76,15 @@ export default function AdminPremiumClient() {
       setIsSearching(false);
     }
   };
+
+  useEffect(() => {
+    const userIdentifier = searchParams.get('identifier');
+    if (userIdentifier) {
+        findUserForm.setValue('identifier', userIdentifier);
+        handleFindUser({ identifier: userIdentifier });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
   
   const handleUpdatePremiumFeatures = async (data: PremiumFeatures) => {
     if (!selectedUser) return;

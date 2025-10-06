@@ -1,6 +1,7 @@
 
 "use client";
 
+import { Suspense } from 'react';
 import { PageTitle } from "@/components/shared/PageTitle";
 import dynamic from 'next/dynamic';
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,7 +11,7 @@ const AdminPremiumClient = dynamic(() => import("./AdminPremiumClient"), {
   loading: () => <Skeleton className="h-96 w-full" />,
 });
 
-export default function AdminPremiumPage() {
+function AdminPremiumPageContent() {
   return (
     <div className="space-y-8">
       <PageTitle
@@ -20,4 +21,12 @@ export default function AdminPremiumPage() {
       <AdminPremiumClient />
     </div>
   );
+}
+
+export default function AdminPremiumPage() {
+    return (
+        <Suspense fallback={<Skeleton className="h-96 w-full" />}>
+            <AdminPremiumPageContent />
+        </Suspense>
+    );
 }

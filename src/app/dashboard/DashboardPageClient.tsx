@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -72,7 +73,7 @@ const WelcomePremiumDialog = ({ open, onOpenChange }: { open: boolean, onOpenCha
     const { width, height } = useWindowSize();
     
     return (
-        <>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 100 }}>
             <Confetti width={width} height={height} recycle={false} numberOfPieces={open ? 400 : 0} />
             <AlertDialog open={open} onOpenChange={onOpenChange}>
                 <AlertDialogContent className="text-center">
@@ -91,7 +92,7 @@ const WelcomePremiumDialog = ({ open, onOpenChange }: { open: boolean, onOpenCha
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </div>
     );
 };
 
@@ -104,7 +105,7 @@ const WinnerShowcaseDialog = ({ win, open, onOpenChange }: { win: UnseenWin; ope
     const rankText = win.rank === 1 ? '1st' : win.rank === 2 ? '2nd' : '3rd';
 
     return (
-        <>
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 100 }}>
             <Confetti width={width} height={height} recycle={false} numberOfPieces={open ? 400 : 0} />
             <AlertDialog open={open} onOpenChange={onOpenChange}>
                 <AlertDialogContent className="text-center">
@@ -128,7 +129,7 @@ const WinnerShowcaseDialog = ({ win, open, onOpenChange }: { win: UnseenWin; ope
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </>
+        </div>
     );
 };
 

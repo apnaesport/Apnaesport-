@@ -601,38 +601,59 @@ export const generateApnaId = async (): Promise<string> => {
     return newId;
 };
 
-export const getUserProfileFromFirestore = async (userId: string): Promise<UserProfile | null> => {
-  if (!userId) return null;
-  const userRef = doc(db, USERS_COLLECTION, userId);
+const formatUserProfile = (doc: any): UserProfile => {
+    const data = doc.data();
+    return {
+        uid: doc.id,
+        displayName: data.displayName || "Unknown User",
+        email: data.email || null,
+        photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
+        isAdmin: data.isAdmin || false,
+        isPremium: data.isPremium || false,
+        premiumSince: data.premiumSince as Timestamp,
+        premiumFeatures: data.premiumFeatures || {},
+        createdAt: data.createdAt as Timestamp,
+        lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
+        hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
+        hasSeenPremiumPopup: data.hasSeenPremiumPopup,
+        bio: data.bio || "",
+        favoriteGameIds: data.favoriteGameIds || [],
+        streamingChannelUrl: data.streamingChannelUrl || "",
+        communityId: data.communityId || null,
+        points: data.points || 0,
+        wins: data.wins || 0,
+        monthlyWins: data.monthlyWins || 0,
+        kills: data.kills || 0,
+        deaths: data.deaths || 0,
+        apnaId: data.apnaId,
+        unseenWins: data.unseenWins || [],
+    } as UserProfile;
+}
+
+export const getUserProfileFromFirestore = async (identifier: string): Promise<UserProfile | null> => {
+  if (!identifier) return null;
+
+  // 1. Try to get by UID directly
+  const userRef = doc(db, USERS_COLLECTION, identifier);
   const docSnap = await getDoc(userRef);
   if (docSnap.exists()) {
-    const data = docSnap.data();
-    return {
-      uid: docSnap.id,
-      displayName: data.displayName || "Unknown User",
-      email: data.email || null,
-      photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
-      isAdmin: data.isAdmin || false,
-      isPremium: data.isPremium || false,
-      premiumSince: data.premiumSince as Timestamp,
-      premiumFeatures: data.premiumFeatures || {},
-      createdAt: data.createdAt as Timestamp,
-      lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
-      hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
-      hasSeenPremiumPopup: data.hasSeenPremiumPopup,
-      bio: data.bio || "",
-      favoriteGameIds: data.favoriteGameIds || [],
-      streamingChannelUrl: data.streamingChannelUrl || "",
-      communityId: data.communityId || null,
-      points: data.points || 0,
-      wins: data.wins || 0,
-      monthlyWins: data.monthlyWins || 0,
-      kills: data.kills || 0,
-      deaths: data.deaths || 0,
-      apnaId: data.apnaId,
-      unseenWins: data.unseenWins || [],
-    } as UserProfile;
+    return formatUserProfile(docSnap);
   }
+
+  // 2. If not found by UID, try to find by email
+  let q = query(collection(db, USERS_COLLECTION), where("email", "==", identifier));
+  let querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    return formatUserProfile(querySnapshot.docs[0]);
+  }
+
+  // 3. If not found by email, try to find by ApnaId
+  q = query(collection(db, USERS_COLLECTION), where("apnaId", "==", identifier));
+  querySnapshot = await getDocs(q);
+  if (!querySnapshot.empty) {
+    return formatUserProfile(querySnapshot.docs[0]);
+  }
+
   return null;
 };
 

@@ -61,8 +61,8 @@ export default function AdminPremiumRequestsClient() {
     }
   };
 
-  const handleGrantPremium = (userId: string) => {
-    router.push(`/admin/premium?userId=${userId}`);
+  const handleGrantPremium = (identifier: string) => {
+    router.push(`/admin/premium?identifier=${encodeURIComponent(identifier)}`);
   }
 
   return (
@@ -130,7 +130,7 @@ export default function AdminPremiumRequestsClient() {
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                 <AlertDialogAction onClick={() => {
                                                     handleStatusChange(request.id, 'Approved');
-                                                    handleGrantPremium(request.userId);
+                                                    handleGrantPremium(request.userApnaId || request.userId);
                                                 }}>
                                                     Continue
                                                 </AlertDialogAction>
@@ -169,4 +169,5 @@ export default function AdminPremiumRequestsClient() {
     </Card>
   );
 }
+
 
