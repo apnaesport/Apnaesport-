@@ -13,6 +13,13 @@ export interface UnseenWin {
     prize: number;
 }
 
+export interface PremiumFeatures {
+  verifiedBadge?: boolean;
+  customBanners?: boolean;
+  addSponsors?: boolean;
+  prioritySupport?: boolean;
+}
+
 export interface UserProfile extends Partial<FirebaseUser> {
   displayName: string | null;
   email: string | null;
@@ -21,6 +28,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   isAdmin?: boolean;
   isPremium?: boolean;
   premiumSince?: Timestamp;
+  premiumFeatures?: PremiumFeatures;
   hasReceivedPremiumBonus?: boolean;
   hasSeenPremiumPopup?: boolean; // New field for one-time welcome
   emailVerified: boolean;

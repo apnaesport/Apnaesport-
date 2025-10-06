@@ -6,7 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp, type Timestamp } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { auth, db, setAuthPersistence } from "@/lib/firebase";
-import type { UserProfile } from "@/lib/types";
+import type { UserProfile, PremiumFeatures } from "@/lib/types";
 import { useRouter } from "next/navigation";
 import { generateApnaId } from "@/lib/tournamentStore";
 
@@ -15,6 +15,7 @@ interface AuthContextType {
   loading: boolean;
   isAdmin: boolean;
   isPremium: boolean;
+  premiumFeatures: PremiumFeatures | null;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -98,9 +99,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const isAdmin = user?.isAdmin || false;
   const isPremium = user?.isPremium || false;
+  const premiumFeatures = user?.premiumFeatures || null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isPremium, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isPremium, premiumFeatures, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

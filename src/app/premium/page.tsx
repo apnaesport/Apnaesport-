@@ -4,48 +4,42 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle, Star, ImagePlus, ShieldCheck, Crown, MessageSquarePlus, Handshake, Coins, LogIn, UserCheck, Swords } from "lucide-react";
-import type { Metadata } from 'next';
+import type { PremiumFeatures } from '@/lib/types';
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-const premiumFeatures = [
+const allPremiumFeatures: { id: keyof PremiumFeatures, icon: React.ElementType, title: string, description: string }[] = [
     {
+        id: "verifiedBadge",
         icon: Crown,
         title: "Verified Premium Badge",
         description: "Show off your premium status with an exclusive badge next to your name across the platform."
     },
     {
+        id: "customBanners",
         icon: ImagePlus,
         title: "Custom Tournament Banners",
         description: "As a tournament creator, upload your own custom banner images to make your event stand out."
     },
     {
+        id: "addSponsors",
         icon: Handshake,
         title: "Add Tournament Sponsors",
         description: "Feature your own sponsors in the tournaments you create, including their name and logo."
     },
     {
-        icon: Coins,
-        title: "200 AE Points Bonus",
-        description: "Receive a one-time bonus of 200 AE Points instantly when you're granted Premium status."
-    },
-    {
+        id: "prioritySupport",
         icon: ShieldCheck,
         title: "Priority Support",
         description: "Get faster response times and priority assistance from our support team for any issues."
     },
-    {
-        icon: MessageSquarePlus,
-        title: "More Features Coming Soon",
-        description: "We are constantly working on new and exciting features exclusively for our premium members."
-    }
-]
+];
 
 export default function PremiumPage() {
-  const { user, loading, isPremium } = useAuth();
+  const { user, loading, isPremium, premiumFeatures } = useAuth();
   
   if (loading) {
     return (
@@ -89,7 +83,7 @@ export default function PremiumPage() {
                 <CardHeader className="text-center">
                     <UserCheck className="mx-auto h-12 w-12 text-green-500 mb-4" />
                     <CardTitle className="text-2xl text-green-500">You are a Premium Member!</CardTitle>
-                    <CardDescription>You have full access to all exclusive benefits. Thank you for being a valued part of our community.</CardDescription>
+                    <CardDescription>You have access to exclusive benefits. Thank you for being a valued part of our community.</CardDescription>
                 </CardHeader>
             </Card>
         ) : (
@@ -132,29 +126,50 @@ export default function PremiumPage() {
             <CardHeader>
                 <CardTitle>Premium Benefits</CardTitle>
                 <CardDescription>
-                   Here's what you get as an Apna Esport Premium member.
+                   Here are the perks available to Apna Esport Premium members.
                 </CardDescription>
             </CardHeader>
             <CardContent>
                 <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {premiumFeatures.map(feature => (
-                        <div key={feature.title} className={cn(
-                            "flex items-start gap-4 p-4 rounded-lg",
-                            isPremium ? "bg-secondary" : "bg-secondary/30"
-                        )}>
-                            <feature.icon className={cn(
-                                "h-8 w-8 mt-1 shrink-0",
-                                isPremium ? "text-amber-400" : "text-primary"
-                            )}/>
-                            <div>
-                                <h3 className="font-semibold text-lg text-foreground">{feature.title}</h3>
-                                <p className="text-sm text-muted-foreground">{feature.description}</p>
+                    {allPremiumFeatures.map(feature => {
+                        const hasFeature = isPremium && premiumFeatures?.[feature.id];
+                        return (
+                            <div key={feature.title} className={cn(
+                                "flex items-start gap-4 p-4 rounded-lg border",
+                                hasFeature ? "bg-secondary border-primary/50" : "bg-secondary/30 border-border"
+                            )}>
+                                <feature.icon className={cn(
+                                    "h-8 w-8 mt-1 shrink-0",
+                                    hasFeature ? "text-amber-400" : "text-muted-foreground"
+                                )}/>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-semibold text-lg text-foreground">{feature.title}</h3>
+                                        {hasFeature && <CheckCircle className="h-5 w-5 text-green-500" />}
+                                    </div>
+                                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                                </div>
                             </div>
+                        )
+                    })}
+                     <div className={cn("flex items-start gap-4 p-4 rounded-lg border", "bg-secondary/30 border-border")}>
+                        <Coins className="h-8 w-8 mt-1 shrink-0 text-muted-foreground"/>
+                        <div>
+                            <h3 className="font-semibold text-lg text-foreground">200 AE Points Bonus</h3>
+                            <p className="text-sm text-muted-foreground">Receive a one-time bonus of 200 AE Points instantly when you're first granted Premium status.</p>
                         </div>
-                    ))}
+                    </div>
+                     <div className={cn("flex items-start gap-4 p-4 rounded-lg border", "bg-secondary/30 border-border")}>
+                        <MessageSquarePlus className="h-8 w-8 mt-1 shrink-0 text-muted-foreground"/>
+                        <div>
+                            <h3 className="font-semibold text-lg text-foreground">More Features Coming Soon</h3>
+                            <p className="text-sm text-muted-foreground">We are constantly working on new and exciting features exclusively for our premium members.</p>
+                        </div>
+                    </div>
                 </div>
             </CardContent>
         </Card>
     </div>
   );
 }
+
