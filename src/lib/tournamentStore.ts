@@ -20,13 +20,13 @@ import {
   arrayUnion,
   arrayRemove,
   onSnapshot, 
-  Query,
+  type Query,
   increment,
   runTransaction
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -146,13 +146,12 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 // --- Tournament Functions ---
 
 export const addTournamentToFirestore = async (
-    tournamentData: Omit<Tournament, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'prizePool'> & { startDate: Date }, 
+    tournamentUiData: TournamentFormDataUI, 
     user: UserProfile,
-    mockParticipantCount: number = 0,
 ): Promise<string> => {
   
   const userRef = doc(db, USERS_COLLECTION, user.uid);
-  const isMock = tournamentData.isMock || false;
+  const isMock = tournamentUiData.isMock || false;
 
   return runTransaction(db, async (transaction) => {
     if (!isMock) {
@@ -162,15 +161,14 @@ export const addTournamentToFirestore = async (
         }
     }
 
-    const { startDate, ...restData } = tournamentData;
-    const game = await getGameByIdFromFirestore(tournamentData.gameId);
+    const game = await getGameByIdFromFirestore(tournamentUiData.gameId);
     if (!game) throw new Error("Selected game not found.");
 
     const newTournamentDocRef = doc(collection(db, TOURNAMENTS_COLLECTION));
     
     let mockParticipants: Participant[] = [];
-    if (isMock && mockParticipantCount > 0) {
-        for (let i = 0; i < mockParticipantCount; i++) {
+    if (isMock && tournamentUiData.mockParticipantCount && tournamentUiData.mockParticipantCount > 0) {
+        for (let i = 0; i < tournamentUiData.mockParticipantCount; i++) {
             mockParticipants.push({
                 id: `mock_user_${i}`,
                 name: `Player ${1000 + i}`,
@@ -180,30 +178,64 @@ export const addTournamentToFirestore = async (
             });
         }
     }
+    
+    let prizeDistribution: PrizeDistribution | undefined = undefined;
+    let entryFee = 0;
+    let prizePool = 0;
 
+    if (tournamentUiData.prizeMode === 'custom' && tournamentUiData.prizeDistribution) {
+        prizeDistribution = tournamentUiData.prizeDistribution;
+        const totalCustomPrize = prizeDistribution.first + prizeDistribution.second + prizeDistribution.third;
+        // Calculate entry fee based on custom prize pool
+        entryFee = Math.ceil(totalCustomPrize / tournamentUiData.maxParticipants);
+        prizePool = totalCustomPrize;
+    } else { // Automatic mode
+        entryFee = tournamentUiData.entryFee;
+        prizePool = entryFee * tournamentUiData.maxParticipants;
+        prizeDistribution = {
+            first: Math.floor(prizePool * 0.5),
+            second: Math.floor(prizePool * 0.3),
+            third: Math.floor(prizePool * 0.2),
+        };
+    }
+    
     let winners: Winner[] = [];
-    if(isMock && tournamentData.status === 'Completed' && mockParticipants.length >= 3) {
-        const prizePool = (tournamentData.entryFee || 10) * mockParticipants.length;
+    if(isMock && tournamentUiData.status === 'Completed' && mockParticipants.length >= 3 && prizeDistribution) {
         winners = [
-            { rank: 1, participant: mockParticipants[0], prize: Math.floor(prizePool * 0.5) },
-            { rank: 2, participant: mockParticipants[1], prize: Math.floor(prizePool * 0.3) },
-            { rank: 3, participant: mockParticipants[2], prize: Math.floor(prizePool * 0.2) },
+            { rank: 1, participant: mockParticipants[0], prize: prizeDistribution.first },
+            { rank: 2, participant: mockParticipants[1], prize: prizeDistribution.second },
+            { rank: 3, participant: mockParticipants[2], prize: prizeDistribution.third },
         ];
     }
 
-    const newTournamentData = {
-      ...restData,
-      startDate: Timestamp.fromDate(startDate),
-      status: tournamentData.status,
-      prizePool: (isMock && winners.length > 0) ? winners.reduce((acc, w) => acc + w.prize, 0) : 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      participants: isMock ? mockParticipants : [],
-      matches: tournamentData.matches || [],
-      featured: tournamentData.featured || false,
-      entryFee: tournamentData.entryFee || 0,
-      sponsorName: tournamentData.sponsorName || null,
-      sponsorLogoUrl: tournamentData.sponsorLogoUrl || null,
+    const newTournamentData: Omit<Tournament, 'id'> = {
+      name: tournamentUiData.name,
+      gameId: tournamentUiData.gameId,
+      gameName: game.name,
+      gameIconUrl: game.iconUrl,
+      bannerImageUrl: tournamentUiData.bannerImageUrl || game.bannerUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(tournamentUiData.name)}`,
+      description: tournamentUiData.description,
+      startDate: Timestamp.fromDate(tournamentUiData.startDate), 
+      status: tournamentUiData.status,
+      maxParticipants: tournamentUiData.maxParticipants,
+      entryFee: isMock ? 0 : entryFee,
+      prizePool: isMock ? (prizeDistribution ? prizeDistribution.first + prizeDistribution.second + prizeDistribution.third : 0) : 0,
+      prizeDistribution,
+      matchType: tournamentUiData.matchType,
+      mapName: tournamentUiData.mapName === "any" ? "" : tournamentUiData.mapName,
+      teamSize: tournamentUiData.teamSize,
+      rules: tournamentUiData.rules,
+      registrationInstructions: tournamentUiData.registrationInstructions,
+      organizerId: user.uid,
+      organizer: user.displayName || user.email || "Unknown Organizer",
+      participants: isMock ? mockParticipants : [], 
+      matches: [], 
+      featured: tournamentUiData.featured || false,
+      sponsorName: tournamentUiData.sponsorName || undefined,
+      sponsorLogoUrl: tournamentUiData.sponsorLogoUrl || undefined,
+      isMock: tournamentUiData.isMock,
+      createdAt: serverTimestamp() as Timestamp,
+      updatedAt: serverTimestamp() as Timestamp,
       winners: isMock ? winners : [],
     };
 
@@ -216,7 +248,7 @@ export const addTournamentToFirestore = async (
         transaction.set(transactionRef, { 
             amount: TOURNAMENT_CREATION_FEE, 
             type: 'debit', 
-            reason: `Fee for creating tournament: ${tournamentData.name}`,
+            reason: `Fee for creating tournament: ${tournamentUiData.name}`,
             tournamentId: newTournamentDocRef.id,
             createdAt: serverTimestamp() 
         });
@@ -461,10 +493,10 @@ export const awardTournamentWinners = async (
 
         const totalPrizePool = tournamentData.prizePool || ((tournamentData.entryFee || 0) * tournamentData.participants.length);
 
-        const prizeDistribution = {
-            first: tournamentData.prizeDistribution?.first ?? Math.floor(totalPrizePool * 0.5),
-            second: tournamentData.prizeDistribution?.second ?? Math.floor(totalPrizePool * 0.3),
-            third: tournamentData.prizeDistribution?.third ?? Math.floor(totalPrizePool * 0.2)
+        const prizeDistribution = tournamentData.prizeDistribution || {
+            first: Math.floor(totalPrizePool * 0.5),
+            second: Math.floor(totalPrizePool * 0.3),
+            third: Math.floor(totalPrizePool * 0.2)
         };
 
         const finalWinners: Winner[] = [];
@@ -546,7 +578,7 @@ export const sendNotificationToFirestore = async (notificationData: Notification
 };
 
 export const getNotificationsFromFirestore = async (target?: NotificationTarget, userId?: string): Promise<NotificationMessage[]> => {
-  let q;
+  let q: Query;
   const notificationsRef = collection(db, NOTIFICATIONS_COLLECTION);
   
   if (userId) {
@@ -1218,7 +1250,7 @@ export const updateAnnouncement = async (communityId: string, announcementId: st
 };
 
 export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
-    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
+    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
     await deleteDoc(announcementRef);
 };
 
@@ -1276,7 +1308,7 @@ export const addQuickTournamentToFirestore = async (
 }
 
 
-// --- Creator Functions ---
+// --- Creator Hub Functions ---
 
 export const submitCreatorApplicationInFirestore = async (applicationData: Omit<CreatorApplication, 'id' | 'createdAt' | 'status'>): Promise<string> => {
     // Check if user already has a pending or approved application

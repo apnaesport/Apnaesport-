@@ -84,7 +84,7 @@ export type Participant = {
 };
 
 export type Match = {
-  id: string;
+  id:string;
   round: number;
   participants: [Participant | null, Participant | null];
   winner?: Participant | null;
@@ -153,8 +153,13 @@ export type TournamentFormDataUI = {
   startDate: Date;
   status: TournamentStatus;
   maxParticipants: number;
-  entryFee: number; 
-  prizeDistribution?: PrizeDistribution;
+  entryFee: number;
+  prizeDistribution?: {
+      first: number;
+      second: number;
+      third: number;
+  };
+  prizeMode: "automatic" | "custom";
   matchType: string;
   mapName?: string;
   teamSize: TeamSize;
