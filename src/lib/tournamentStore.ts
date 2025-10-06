@@ -1498,12 +1498,9 @@ export const createTeamInFirestore = async (teamName: string, owner: UserProfile
 };
 
 export const getUserTeams = async (userId: string): Promise<Team[]> => {
-    const q = query(collection(db, TEAMS_COLLECTION), where("members", "array-contains", {
-        uid: userId, // This simple query might not work for nested objects.
-    }));
+    if (!userId) return [];
+    const q = query(collection(db, TEAMS_COLLECTION), where("members", "array-contains-any", [{uid: userId}, {id: userId}]));
     
-    // A more reliable way is to filter on the client after fetching all teams a user *could* be in
-    // Or, better, store a `memberIds` array on the team document.
     const allTeamsSnap = await getDocs(collection(db, TEAMS_COLLECTION));
     const userTeams: Team[] = [];
     allTeamsSnap.forEach(doc => {
@@ -1543,6 +1540,7 @@ export const sendTeamInvite = async (team: Team, inviteeApnaId: string, owner: U
 };
 
 export const getUserTeamInvites = async (userId: string): Promise<TeamInvite[]> => {
+    if (!userId) return [];
     const q = query(collection(db, INVITES_COLLECTION), where("toId", "==", userId), where("status", "==", "pending"));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamInvite));
@@ -1553,35 +1551,60 @@ export const respondToTeamInvite = async (inviteId: string, response: 'accepted'
     
     if (response === 'accepted') {
         const inviteSnap = await getDoc(inviteRef);
+        if (!inviteSnap.exists()) throw new Error("Invite not found or has been revoked.");
+        
         const inviteData = inviteSnap.data() as TeamInvite;
         const teamRef = doc(db, TEAMS_COLLECTION, inviteData.teamId);
 
-        const newMember: TeamMember = {
-            uid: user.uid,
-            name: user.displayName || 'New Member',
-            avatarUrl: user.photoURL || '',
-            role: 'Member'
-        };
+        await runTransaction(db, async (transaction) => {
+            const teamDoc = await transaction.get(teamRef);
+            if (!teamDoc.exists()) throw new Error("The team no longer exists.");
 
-        await updateDoc(teamRef, {
-            members: arrayUnion(newMember)
+            const teamData = teamDoc.data() as Team;
+            if (teamData.members.length >= 4) throw new Error("This team is now full.");
+
+            const newMember: TeamMember = {
+                uid: user.uid,
+                name: user.displayName || 'New Member',
+                avatarUrl: user.photoURL || '',
+                role: 'Member'
+            };
+
+            transaction.update(teamRef, {
+                members: arrayUnion(newMember)
+            });
+            transaction.delete(inviteRef); // Delete invite after handling
         });
-    }
 
-    await deleteDoc(inviteRef); // Delete invite after handling
+    } else {
+        await deleteDoc(inviteRef); // Just delete if declined
+    }
 };
 
 export const removePlayerFromTeam = async (teamId: string, player: UserProfile): Promise<void> => {
     const teamRef = doc(db, TEAMS_COLLECTION, teamId);
     const teamSnap = await getDoc(teamRef);
-    const teamData = teamSnap.data() as Team;
+    if (!teamSnap.exists()) throw new Error("Team not found.");
 
+    const teamData = teamSnap.data() as Team;
     const memberToRemove = teamData.members.find(m => m.uid === player.uid);
-    if (!memberToRemove) return;
+    if (!memberToRemove) throw new Error("Player not found in team.");
 
     await updateDoc(teamRef, {
         members: arrayRemove(memberToRemove)
     });
+};
+
+export const updateTeamNameInFirestore = async (teamId: string, newName: string): Promise<void> => {
+    if (!newName.trim()) throw new Error("Team name cannot be empty.");
+    const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+    await updateDoc(teamRef, { name: newName });
+};
+
+export const deleteTeamFromFirestore = async (teamId: string): Promise<void> => {
+    const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+    await deleteDoc(teamRef);
+    // Optional: also delete all pending invites for this team
 };
 
 

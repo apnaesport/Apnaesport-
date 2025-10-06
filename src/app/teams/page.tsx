@@ -5,7 +5,7 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, LogIn, Loader2, Users, Send, Check, X, Copy, Share2 } from "lucide-react";
+import { PlusCircle, LogIn, Loader2, Users, Send, Check, X, Copy, Share2, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import type { Team, TeamInvite, UserProfile } from "@/lib/types";
@@ -16,9 +16,13 @@ import {
     sendTeamInvite,
     getUserTeamInvites,
     respondToTeamInvite,
-    removePlayerFromTeam
+    removePlayerFromTeam,
+    updateTeamNameInFirestore,
+    deleteTeamFromFirestore
 } from "@/lib/tournamentStore";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,10 +40,14 @@ export default function TeamsPage() {
     const [isCreatingTeam, setIsCreatingTeam] = useState(false);
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
     const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-    const [selectedTeamForInvite, setSelectedTeamForInvite] = useState<Team | null>(null);
+    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [selectedTeamForAction, setSelectedTeamForAction] = useState<Team | null>(null);
     const [teamName, setTeamName] = useState("");
     const [inviteeApnaId, setInviteeApnaId] = useState("");
     const [isSendingInvite, setIsSendingInvite] = useState(false);
+    const [isUpdatingTeam, setIsUpdatingTeam] = useState(false);
+    const [isDeletingTeam, setIsDeletingTeam] = useState(false);
+
 
     const canCreateTeam = teams.length < 2;
 
@@ -85,10 +93,10 @@ export default function TeamsPage() {
     };
     
     const handleSendInvite = async () => {
-        if (!user || !inviteeApnaId.trim() || !selectedTeamForInvite) return;
+        if (!user || !inviteeApnaId.trim() || !selectedTeamForAction) return;
         setIsSendingInvite(true);
         try {
-            await sendTeamInvite(selectedTeamForInvite, inviteeApnaId, user);
+            await sendTeamInvite(selectedTeamForAction, inviteeApnaId, user);
             toast({ title: "Invite Sent!", description: `Invitation sent to user ${inviteeApnaId}.` });
             setIsInviteDialogOpen(false);
             setInviteeApnaId("");
@@ -111,7 +119,7 @@ export default function TeamsPage() {
     }
     
     const handleRemovePlayer = async (teamId: string, player: UserProfile) => {
-        if (!user) return;
+        if (!user || !confirm(`Are you sure you want to remove ${player.displayName} from the team?`)) return;
         try {
             await removePlayerFromTeam(teamId, player);
             toast({ title: "Player Removed", description: `${player.displayName} has been removed from the team.` });
@@ -120,6 +128,36 @@ export default function TeamsPage() {
             toast({ title: "Error", description: error.message || "Could not remove player.", variant: "destructive" });
         }
     }
+    
+    const handleUpdateTeamName = async () => {
+        if (!selectedTeamForAction || !teamName.trim()) return;
+        setIsUpdatingTeam(true);
+        try {
+            await updateTeamNameInFirestore(selectedTeamForAction.id, teamName);
+            toast({ title: "Team Updated", description: "Team name has been changed." });
+            await fetchTeamData(user.uid);
+            setIsEditDialogOpen(false);
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "Could not update team name.", variant: "destructive" });
+        } finally {
+            setIsUpdatingTeam(false);
+        }
+    }
+
+    const handleDeleteTeam = async () => {
+        if (!selectedTeamForAction) return;
+        setIsDeletingTeam(true);
+        try {
+            await deleteTeamFromFirestore(selectedTeamForAction.id);
+            toast({ title: "Team Deleted", description: `Team "${selectedTeamForAction.name}" has been deleted.` });
+            await fetchTeamData(user.uid);
+        } catch(error: any) {
+            toast({ title: "Error", description: error.message || "Could not delete team.", variant: "destructive" });
+        } finally {
+            setIsDeletingTeam(false);
+        }
+    }
+
 
     if (loading || isDataLoading) {
         return (
@@ -211,36 +249,77 @@ export default function TeamsPage() {
                  <div className="space-y-6">
                     {teams.map(team => (
                         <Card key={team.id}>
-                            <CardHeader className="flex flex-row justify-between items-start">
+                            <CardHeader className="flex flex-col sm:flex-row justify-between items-start gap-2">
                                 <div>
                                     <CardTitle className="text-2xl">{team.name}</CardTitle>
                                     <CardDescription>Owner: {team.members.find(m => m.role === 'Owner')?.name}</CardDescription>
                                 </div>
                                 {team.ownerId === user.uid && (
-                                     <Dialog open={isInviteDialogOpen && selectedTeamForInvite?.id === team.id} onOpenChange={(open) => { if (!open) setSelectedTeamForInvite(null); setIsInviteDialogOpen(open); }}>
-                                        <DialogTrigger asChild>
-                                            <Button onClick={() => setSelectedTeamForInvite(team)}>
-                                                <Send className="mr-2 h-4 w-4" /> Invite Player
-                                            </Button>
-                                        </DialogTrigger>
-                                        <DialogContent>
-                                            <DialogHeader>
-                                                <DialogTitle>Invite to {team.name}</DialogTitle>
-                                                <DialogDescription>Enter the Apna ID of the player you want to invite.</DialogDescription>
-                                            </DialogHeader>
-                                             <div className="py-4 space-y-2">
-                                                <Label htmlFor="apnaId">Player's Apna ID</Label>
-                                                <Input id="apnaId" value={inviteeApnaId} onChange={e => setInviteeApnaId(e.target.value)} placeholder="e.g., AE123456" disabled={isSendingInvite}/>
-                                            </div>
-                                            <DialogFooter>
-                                                <DialogClose asChild><Button variant="ghost" disabled={isSendingInvite}>Cancel</Button></DialogClose>
-                                                <Button onClick={handleSendInvite} disabled={isSendingInvite || !inviteeApnaId.trim()}>
-                                                     {isSendingInvite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                                    Send Invite
+                                     <div className="flex gap-2">
+                                        <Dialog open={isInviteDialogOpen && selectedTeamForAction?.id === team.id} onOpenChange={(open) => { if (!open) setSelectedTeamForAction(null); setIsInviteDialogOpen(open); }}>
+                                            <DialogTrigger asChild>
+                                                <Button onClick={() => setSelectedTeamForAction(team)}>
+                                                    <Send className="mr-2 h-4 w-4" /> Invite
                                                 </Button>
-                                            </DialogFooter>
-                                        </DialogContent>
-                                    </Dialog>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Invite to {team.name}</DialogTitle>
+                                                    <DialogDescription>Enter the Apna ID of the player you want to invite.</DialogDescription>
+                                                </DialogHeader>
+                                                <div className="py-4 space-y-2">
+                                                    <Label htmlFor="apnaId">Player's Apna ID</Label>
+                                                    <Input id="apnaId" value={inviteeApnaId} onChange={e => setInviteeApnaId(e.target.value)} placeholder="e.g., AE123456" disabled={isSendingInvite}/>
+                                                </div>
+                                                <DialogFooter>
+                                                    <DialogClose asChild><Button variant="ghost" disabled={isSendingInvite}>Cancel</Button></DialogClose>
+                                                    <Button onClick={handleSendInvite} disabled={isSendingInvite || !inviteeApnaId.trim()}>
+                                                        {isSendingInvite && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                        Send Invite
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+
+                                        <Dialog open={isEditDialogOpen && selectedTeamForAction?.id === team.id} onOpenChange={(open) => { if (!open) setSelectedTeamForAction(null); setIsEditDialogOpen(open); }}>
+                                            <DialogTrigger asChild>
+                                                <Button variant="outline" onClick={() => { setSelectedTeamForAction(team); setTeamName(team.name); }}>
+                                                    <Edit className="mr-2 h-4 w-4"/> Manage
+                                                </Button>
+                                            </DialogTrigger>
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>Manage {team.name}</DialogTitle>
+                                                </DialogHeader>
+                                                <div className="py-4 space-y-4">
+                                                    <div>
+                                                        <Label htmlFor="editTeamName">Team Name</Label>
+                                                        <Input id="editTeamName" value={teamName} onChange={e => setTeamName(e.target.value)} disabled={isUpdatingTeam}/>
+                                                    </div>
+                                                     <Button onClick={handleUpdateTeamName} disabled={isUpdatingTeam || !teamName.trim()}>
+                                                        {isUpdatingTeam && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Save Name
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="destructive" className="w-full">
+                                                                <Trash2 className="mr-2 h-4 w-4"/> Delete Team
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                                <AlertDialogDescription>This will permanently delete the team "{team.name}". This action cannot be undone.</AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction onClick={handleDeleteTeam}>Delete Team</AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
+                                            </DialogContent>
+                                        </Dialog>
+                                     </div>
                                 )}
                             </CardHeader>
                             <CardContent>
@@ -290,3 +369,4 @@ export default function TeamsPage() {
         </div>
     );
 }
+
