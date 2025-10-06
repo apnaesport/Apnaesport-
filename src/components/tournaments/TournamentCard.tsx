@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Users, Gamepad2, Eye, Coins } from "lucide-react";
+import { CalendarDays, Users, Gamepad2, Eye, Coins, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
@@ -35,7 +35,10 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
   const isFreeEntry = !tournament.entryFee || tournament.entryFee <= 0;
 
   return (
-    <Card className="overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full">
+    <Card className={cn(
+        "overflow-hidden shadow-lg hover:shadow-accent/20 transition-all duration-300 group flex flex-col h-full",
+        tournament.featured && "border-primary shadow-primary/20 hover:shadow-primary/40"
+    )}>
       <CardHeader className="relative p-0 h-48">
         <ImageWithFallback
           src={tournament.bannerImageUrl || ''}
@@ -48,6 +51,11 @@ export function TournamentCard({ tournament }: TournamentCardProps) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
         <div className="absolute top-3 right-3 flex flex-col items-end gap-1">
+            {tournament.featured && (
+                <Badge variant="secondary" className="bg-yellow-400 text-yellow-900 border-yellow-500 font-bold">
+                    <Star className="h-3 w-3 mr-1" /> Featured
+                </Badge>
+            )}
             <Badge 
             variant={getStatusBadgeVariant(tournament.status)} 
             className="uppercase tracking-wider"
