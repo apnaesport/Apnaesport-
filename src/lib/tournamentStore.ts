@@ -26,7 +26,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -41,6 +41,8 @@ const CREATORS_COLLECTION = "creators";
 const CREATOR_APPLICATIONS_COLLECTION = "creatorApplications";
 const UNSEEN_WINS_COLLECTION = "unseenWins";
 const PREMIUM_REQUESTS_COLLECTION = "premiumRequests";
+const TEAMS_COLLECTION = "teams";
+const INVITES_COLLECTION = "invites";
 
 const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
@@ -1473,6 +1475,114 @@ export const voteForCreatorInFirestore = async (creatorId: string, userId: strin
     });
 };
 
+// --- Team Functions ---
+export const createTeamInFirestore = async (teamName: string, owner: UserProfile): Promise<string> => {
+    const userTeams = await getUserTeams(owner.uid);
+    if (userTeams.length >= 2) {
+        throw new Error("You can only create a maximum of two teams.");
+    }
+
+    const docRef = await addDoc(collection(db, TEAMS_COLLECTION), {
+        name: teamName,
+        ownerId: owner.uid,
+        members: [{
+            uid: owner.uid,
+            name: owner.displayName,
+            avatarUrl: owner.photoURL,
+            role: "Owner",
+        }],
+        createdAt: serverTimestamp(),
+    });
+
+    return docRef.id;
+};
+
+export const getUserTeams = async (userId: string): Promise<Team[]> => {
+    const q = query(collection(db, TEAMS_COLLECTION), where("members", "array-contains", {
+        uid: userId, // This simple query might not work for nested objects.
+    }));
+    
+    // A more reliable way is to filter on the client after fetching all teams a user *could* be in
+    // Or, better, store a `memberIds` array on the team document.
+    const allTeamsSnap = await getDocs(collection(db, TEAMS_COLLECTION));
+    const userTeams: Team[] = [];
+    allTeamsSnap.forEach(doc => {
+        const team = { id: doc.id, ...doc.data() } as Team;
+        if (team.members.some(member => member.uid === userId)) {
+            userTeams.push(team);
+        }
+    });
+
+    return userTeams.sort((a,b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis());
+};
+
+export const sendTeamInvite = async (team: Team, inviteeApnaId: string, owner: UserProfile): Promise<void> => {
+    const inviteeProfile = await getUserProfileFromFirestore(inviteeApnaId);
+    if (!inviteeProfile) {
+        throw new Error(`User with Apna ID "${inviteeApnaId}" not found.`);
+    }
+
+    if (team.members.some(m => m.uid === inviteeProfile.uid)) {
+        throw new Error(`${inviteeProfile.displayName} is already in this team.`);
+    }
+
+    if (team.members.length >= 4) {
+        throw new Error("This team is already full.");
+    }
+    
+    const inviteRef = collection(db, INVITES_COLLECTION);
+    await addDoc(inviteRef, {
+        teamId: team.id,
+        teamName: team.name,
+        fromId: owner.uid,
+        fromName: owner.displayName,
+        toId: inviteeProfile.uid,
+        status: 'pending',
+        createdAt: serverTimestamp(),
+    });
+};
+
+export const getUserTeamInvites = async (userId: string): Promise<TeamInvite[]> => {
+    const q = query(collection(db, INVITES_COLLECTION), where("toId", "==", userId), where("status", "==", "pending"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeamInvite));
+};
+
+export const respondToTeamInvite = async (inviteId: string, response: 'accepted' | 'declined', user: UserProfile): Promise<void> => {
+    const inviteRef = doc(db, INVITES_COLLECTION, inviteId);
+    
+    if (response === 'accepted') {
+        const inviteSnap = await getDoc(inviteRef);
+        const inviteData = inviteSnap.data() as TeamInvite;
+        const teamRef = doc(db, TEAMS_COLLECTION, inviteData.teamId);
+
+        const newMember: TeamMember = {
+            uid: user.uid,
+            name: user.displayName || 'New Member',
+            avatarUrl: user.photoURL || '',
+            role: 'Member'
+        };
+
+        await updateDoc(teamRef, {
+            members: arrayUnion(newMember)
+        });
+    }
+
+    await deleteDoc(inviteRef); // Delete invite after handling
+};
+
+export const removePlayerFromTeam = async (teamId: string, player: UserProfile): Promise<void> => {
+    const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+    const teamSnap = await getDoc(teamRef);
+    const teamData = teamSnap.data() as Team;
+
+    const memberToRemove = teamData.members.find(m => m.uid === player.uid);
+    if (!memberToRemove) return;
+
+    await updateDoc(teamRef, {
+        members: arrayRemove(memberToRemove)
+    });
+};
 
 
 // Aliases for easier use
