@@ -1,3 +1,4 @@
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -49,6 +50,11 @@ service cloud.firestore {
       let communityPath = /databases/$(database)/documents/communities/$(communityId);
       // Ensure the community doc exists and the ownerId matches.
       return docExists(communityPath) && getDoc(communityPath).data.ownerId == request.auth.uid;
+    }
+
+    function isTeamOwner(teamId) {
+      let teamPath = /databases/$(database)/documents/teams/$(teamId);
+      return docExists(teamPath) && getDoc(teamPath).data.ownerId == request.auth.uid;
     }
 
 
@@ -236,6 +242,19 @@ service cloud.firestore {
       allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
       allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
+    }
+
+    // --- Teams (`teams` and `invites`) ---
+    match /teams/{teamId} {
+      allow read: if isVerified();
+      allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
+      allow update, delete: if isVerified() && isTeamOwner(teamId);
+    }
+
+    match /invites/{inviteId} {
+      allow create: if isVerified() && isTeamOwner(request.resource.data.teamId);
+      allow read: if isVerified() && request.auth.uid == resource.data.toId;
+      allow delete: if isVerified() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
     }
   }
 }
