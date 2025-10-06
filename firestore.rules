@@ -248,7 +248,24 @@ service cloud.firestore {
     match /teams/{teamId} {
       allow read: if isVerified();
       allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
-      allow update, delete: if isVerified() && isTeamOwner(teamId);
+      
+      allow update: if isVerified() && (
+        // Allow owner to update name or remove members
+        (isTeamOwner(teamId) && 
+          (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) || 
+            request.resource.data.members.size() < resource.data.members.size()
+          )
+        ) ||
+        // Allow a user to add themselves to the team (accepting an invite)
+        (
+          request.resource.data.members.size() == resource.data.members.size() + 1 &&
+          request.resource.data.members.hasAny([request.auth.uid]) &&
+          !resource.data.members.hasAny([request.auth.uid])
+        )
+      );
+      
+      allow delete: if isVerified() && isTeamOwner(teamId);
     }
 
     match /invites/{inviteId} {
