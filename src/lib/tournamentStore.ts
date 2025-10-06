@@ -72,7 +72,7 @@ const getTournamentStatus = (tournament: Omit<Tournament, 'id'>): TournamentStat
         return tournament.status;
     }
     
-    if (now.getTime() > twoHoursAfterStart && (tournament.status === 'Live' || tournament.status === 'Ongoing')) {
+    if (now.getTime() > twoHoursAfterStart && (tournament.status === 'Live' || 'Ongoing')) {
         return "Completed";
     }
 
@@ -249,15 +249,32 @@ export const getTournamentByIdFromFirestore = async (tournamentId: string): Prom
 
     if (docSnap.exists()) {
         const data = docSnap.data();
+        let status = data.status;
+        const startDate = (data.startDate as Timestamp).toDate();
+        const now = new Date();
+
+        if (status !== 'Completed' && status !== 'Cancelled') {
+            const twoHoursAfterStart = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+            if (now >= twoHoursAfterStart) {
+                status = 'Completed';
+            } else if (now >= startDate) {
+                status = 'Live';
+            } else {
+                status = 'Upcoming';
+            }
+        }
+        
         return {
             id: docSnap.id,
             ...data,
+            status,
             bannerImageUrl: data.bannerImageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(data.name)}`,
             gameIconUrl: data.gameIconUrl || `https://placehold.co/40x40.png?text=${data.gameName.substring(0, 2)}`,
         } as Tournament;
     }
     return undefined;
 };
+
 
 
 export const listenToTournamentById = (
@@ -418,13 +435,13 @@ export const awardTournamentWinners = async (
         const finalWinners: Winner[] = [];
 
         const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, prize: number) => {
-            const { participant, kills, deaths } = winnerData;
+            const { participant, kills = 0, deaths = 0 } = winnerData;
             
             const winnerRef = doc(db, USERS_COLLECTION, participant.id);
             const updatePayload: any = {
                 monthlyWins: increment(1),
-                kills: increment(kills || 0),
-                deaths: increment(deaths || 0),
+                kills: increment(kills),
+                deaths: increment(deaths),
                 unseenWins: arrayUnion({
                     id: `${tournamentId}-${rank}`,
                     tournamentId,
@@ -1333,3 +1350,6 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+
+
+    
