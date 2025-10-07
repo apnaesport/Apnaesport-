@@ -51,6 +51,12 @@ const DAILY_LOGIN_BONUS = 20;
 const PREMIUM_POINT_BONUS = 200;
 const CAPTAIN_BONUS_PERCENTAGE = 0.10; // 10% of platform fee
 
+// --- Pro Board Point Constants ---
+const PRO_POINTS_WIN = 20;
+const PRO_POINTS_RUNNERUP = 10;
+const PRO_POINTS_PARTICIPATION = 3;
+
+
 // Initialize Firebase Storage
 const storage = getStorage();
 
@@ -555,6 +561,17 @@ export const awardTournamentWinners = async (
             };
 
         const finalWinners: Winner[] = [];
+        
+        const winnerIds = new Set([winners.first.participant.id, winners.second.participant.id, winners.third.participant.id]);
+
+        // Award participation points to non-winners
+        for (const participant of tournamentData.participants) {
+            if (!winnerIds.has(participant.id)) {
+                const participantRef = doc(db, USERS_COLLECTION, participant.id);
+                transaction.update(participantRef, { proPoints: increment(PRO_POINTS_PARTICIPATION) });
+            }
+        }
+
 
         if (organizerPayout > 0 && tournamentData.organizerId) {
             const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
@@ -579,7 +596,7 @@ export const awardTournamentWinners = async (
             }
         }
         
-        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
+        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number, proPoints: number) => {
             const teamId = winnerData.participant.teamId;
             if (isTeamEvent && teamId) {
                 const team = (await getDoc(doc(db, TEAMS_COLLECTION, teamId))).data() as Team;
@@ -588,7 +605,7 @@ export const awardTournamentWinners = async (
                 
                 for (const member of members) {
                      const winnerRef = doc(db, USERS_COLLECTION, member.uid);
-                     transaction.update(winnerRef, { points: increment(prizePerMember) });
+                     transaction.update(winnerRef, { points: increment(prizePerMember), proPoints: increment(proPoints) });
                      
                      const prizeTxRef = doc(collection(db, USERS_COLLECTION, member.uid, TRANSACTIONS_COLLECTION));
                      transaction.set(prizeTxRef, {
@@ -602,7 +619,7 @@ export const awardTournamentWinners = async (
             } else { // Solo winner
                 const { participant } = winnerData;
                 const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-                const updatePayload: any = { monthlyWins: increment(1) };
+                const updatePayload: any = { monthlyWins: increment(1), proPoints: increment(proPoints) };
                 if (totalPrize > 0) {
                     updatePayload.points = increment(totalPrize);
                     const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
@@ -616,9 +633,9 @@ export const awardTournamentWinners = async (
             }
         };
         
-        await processWinner(winners.first, 1, prizeDistribution.first);
-        await processWinner(winners.second, 2, prizeDistribution.second);
-        await processWinner(winners.third, 3, prizeDistribution.third);
+        await processWinner(winners.first, 1, prizeDistribution.first, PRO_POINTS_WIN);
+        await processWinner(winners.second, 2, prizeDistribution.second, PRO_POINTS_RUNNERUP);
+        await processWinner(winners.third, 3, prizeDistribution.third, PRO_POINTS_RUNNERUP); // Runner up points for 3rd as well
         
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
@@ -737,6 +754,7 @@ const formatUserProfile = (doc: any): UserProfile => {
         streamingChannelUrl: data.streamingChannelUrl || "",
         communityId: data.communityId || null,
         points: data.points || 0,
+        proPoints: data.proPoints || 0,
         wins: data.wins || 0,
         monthlyWins: data.monthlyWins || 0,
         kills: data.kills || 0,
@@ -928,6 +946,46 @@ export const listenToTopPlayersByMonthlyWins = (count: number, callback: (player
         callback(players);
     });
 
+    return unsubscribe;
+};
+
+export const getTopPlayersByProPoints = async (count: number): Promise<(UserProfile & { kda: string })[]> => {
+    const q = query(
+        collection(db, USERS_COLLECTION),
+        where("proPoints", ">", 0),
+        orderBy("proPoints", "desc"),
+        limit(count)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => {
+        const user = formatUserProfile(doc);
+        const kills = user.kills || 0;
+        const deaths = user.deaths || 0;
+        return {
+            ...user,
+            kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2),
+        };
+    });
+};
+
+export const listenToTopPlayersByProPoints = (count: number, callback: (players: (UserProfile & { kda: string })[]) => void): (() => void) => {
+    const q = query(
+        collection(db, USERS_COLLECTION),
+        orderBy("proPoints", "desc"),
+        limit(count)
+    );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+        const players = snapshot.docs.map(doc => {
+            const user = formatUserProfile(doc);
+            const kills = user.kills || 0;
+            const deaths = user.deaths || 0;
+            return {
+                ...user,
+                kda: deaths > 0 ? (kills / deaths).toFixed(2) : kills.toFixed(2),
+            };
+        });
+        callback(players);
+    });
     return unsubscribe;
 };
 

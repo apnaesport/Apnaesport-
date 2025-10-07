@@ -16,8 +16,9 @@ import {
   Download,
   Star,
   Home,
-  Coins, // Added
-  Users2, // For teams
+  Coins,
+  Users2,
+  Trophy, // Added
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,7 +39,8 @@ export const mainNavItemsForAdmin = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
   { href: "/teams", label: "Teams", icon: Users2 },
-  { href: "/leaderboard", label: "Leaderboard", icon: TrendingUp },
+  { href: "/pro-board", label: "Pro Board", icon: Trophy },
+  { href: "/leaderboard", label: "Hall of Fame", icon: TrendingUp },
   { href: "/community", label: "Communities", icon: Users },
   { href: "/creators", label: "Creators", icon: Star },
   { href: "/games", label: "Games", icon: Gamepad2 },
