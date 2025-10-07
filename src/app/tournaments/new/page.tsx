@@ -106,6 +106,7 @@ export default function CreateTournamentPage() {
   });
   
   const selectedGameId = form.watch("gameId");
+  const teamSize = form.watch("teamSize");
   const isMock = form.watch("isMock");
   const selectedGame = availableGames.find(g => g.id === selectedGameId);
   const customPrizes = form.watch("prizeDistribution");
@@ -171,7 +172,9 @@ export default function CreateTournamentPage() {
       const createdTournamentId = await addTournamentToFirestore({
           ...data,
           bannerImageUrl: finalBannerUrl,
-          mockParticipantCount: data.isMock ? data.mockParticipantCount : 0
+          mockParticipantCount: data.isMock ? data.mockParticipantCount : 0,
+          sponsorName: data.sponsorName || '',
+          sponsorLogoUrl: data.sponsorLogoUrl || '',
       }, user);
       if (!data.isMock) {
         await refreshUser();
@@ -455,7 +458,7 @@ export default function CreateTournamentPage() {
                 <CardContent className="space-y-6">
                     <div className="space-y-4">
                         <div>
-                            <Label htmlFor="entryFee">Entry Fee</Label>
+                            <Label htmlFor="entryFee">Entry Fee Per Player</Label>
                             <Controller
                                 name="entryFee"
                                 control={form.control}
@@ -487,15 +490,15 @@ export default function CreateTournamentPage() {
                         </div>
                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                              <div>
-                                <Label htmlFor="prizeFirst">1st Place Prize</Label>
+                                <Label htmlFor="prizeFirst">{teamSize === 'Solo' ? '1st Place Prize' : '1st Place Team Prize'}</Label>
                                 <Input id="prizeFirst" type="number" {...form.register("prizeDistribution.first")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
                              </div>
                               <div>
-                                <Label htmlFor="prizeSecond">2nd Place Prize</Label>
+                                <Label htmlFor="prizeSecond">{teamSize === 'Solo' ? '2nd Place Prize' : '2nd Place Team Prize'}</Label>
                                 <Input id="prizeSecond" type="number" {...form.register("prizeDistribution.second")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
                              </div>
                               <div>
-                                <Label htmlFor="prizeThird">3rd Place Prize</Label>
+                                <Label htmlFor="prizeThird">{teamSize === 'Solo' ? '3rd Place Prize' : '3rd Place Team Prize'}</Label>
                                 <Input id="prizeThird" type="number" {...form.register("prizeDistribution.third")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
                              </div>
                         </div>
@@ -590,5 +593,3 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
-
-    

@@ -49,6 +49,7 @@ const TOURNAMENT_DELETION_PENALTY = 5;
 const PLATFORM_FEE_PERCENTAGE = 0.20; // 20%
 const DAILY_LOGIN_BONUS = 5;
 const PREMIUM_POINT_BONUS = 200;
+const CAPTAIN_BONUS_PERCENTAGE = 0.10; // 10% of platform fee
 
 // Initialize Firebase Storage
 const storage = getStorage();
@@ -455,7 +456,7 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   });
 };
 
-export const addTeamToTournamentFirestore = async (tournament: Tournament, team: Team, owner: UserProfile): Promise<void> => {
+export const addTeamToTournamentFirestore = async (tournament: Tournament, team: Team, captain: UserProfile): Promise<void> => {
     const requiredTeamSize = tournament.teamSize === 'Duo' ? 2 : tournament.teamSize === 'Squad' ? 4 : 1;
     if (team.members.length < requiredTeamSize) {
         throw new Error(`Your team has ${team.members.length} members but this is a ${tournament.teamSize} tournament.`);
@@ -463,61 +464,57 @@ export const addTeamToTournamentFirestore = async (tournament: Tournament, team:
 
     return runTransaction(db, async (transaction) => {
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
-        const ownerRef = doc(db, USERS_COLLECTION, owner.uid);
-
         const tournamentDoc = await transaction.get(tournamentRef);
-        const ownerDoc = await transaction.get(ownerRef);
         if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
-        if (!ownerDoc.exists()) throw new Error("Team owner not found.");
-
         const tournamentData = tournamentDoc.data() as Tournament;
-        const ownerData = ownerDoc.data() as UserProfile;
 
-        // Check if any team member is already registered
-        const participantIds = new Set(tournamentData.participants.map(p => p.id));
-        const alreadyRegisteredMember = team.members.find(member => participantIds.has(member.uid));
-        if (alreadyRegisteredMember) {
-            throw new Error(`${alreadyRegisteredMember.name} is already registered in this tournament.`);
+        const feePerPlayer = tournamentData.entryFee || 0;
+        if (feePerPlayer <= 0) { // If it's a free tournament, just add everyone.
+            const newParticipants = team.members.map(member => ({
+                id: member.uid, name: member.name, avatarUrl: member.avatarUrl,
+                gameUsername: member.name, inGameId: 'N/A', teamId: team.id, teamName: team.name
+            }));
+            transaction.update(tournamentRef, { participants: arrayUnion(...newParticipants) });
+            return;
         }
-        
-        // Check for space
+
+        const participantIds = new Set(tournamentData.participants.map(p => p.id));
+        const memberRefs = team.members.map(m => doc(db, USERS_COLLECTION, m.uid));
+        const memberDocs = await Promise.all(memberRefs.map(ref => transaction.get(ref)));
+
+        for (const memberDoc of memberDocs) {
+            if (!memberDoc.exists()) throw new Error(`Team member ${memberDoc.id} not found.`);
+            const memberData = memberDoc.data() as UserProfile;
+            if (participantIds.has(memberData.uid)) throw new Error(`${memberData.displayName} is already registered.`);
+            if ((memberData.points || 0) < feePerPlayer) throw new Error(`${memberData.displayName} has insufficient AE Points.`);
+        }
+
         if (tournamentData.participants.length + team.members.length > tournamentData.maxParticipants) {
             throw new Error("Not enough slots available in the tournament for your team.");
         }
-
-        const totalFee = (tournamentData.entryFee || 0) * team.members.length;
-        if ((ownerData.points || 0) < totalFee) {
-            throw new Error(`You need ${totalFee} AE Points to register your team, but you only have ${ownerData.points || 0}.`);
-        }
         
-        // Deduct points from team owner
-        if (totalFee > 0) {
-            transaction.update(ownerRef, { points: increment(-totalFee) });
-            const feeTransactionRef = doc(collection(db, USERS_COLLECTION, owner.uid, TRANSACTIONS_COLLECTION));
+        let totalFeeCollected = 0;
+        for (const memberDoc of memberDocs) {
+            const memberData = memberDoc.data() as UserProfile;
+            transaction.update(memberDoc.ref, { points: increment(-feePerPlayer) });
+            
+            const feeTransactionRef = doc(collection(db, USERS_COLLECTION, memberData.uid, TRANSACTIONS_COLLECTION));
             transaction.set(feeTransactionRef, {
-                amount: totalFee,
-                type: 'debit',
+                amount: feePerPlayer, type: 'debit',
                 reason: `Team entry fee for: ${tournament.name}`,
-                tournamentId: tournament.id,
-                createdAt: serverTimestamp()
+                tournamentId: tournament.id, createdAt: serverTimestamp()
             });
+            totalFeeCollected += feePerPlayer;
         }
-        
-        // Create new participants from team members
+
         const newParticipants: Participant[] = team.members.map(member => ({
-            id: member.uid,
-            name: member.name,
-            avatarUrl: member.avatarUrl,
-            gameUsername: member.name, // Use team name as default, user can edit profile later
-            inGameId: 'N/A', // User needs to fill this in their profile
-            teamId: team.id,
-            teamName: team.name,
+            id: member.uid, name: member.name, avatarUrl: member.avatarUrl,
+            gameUsername: member.name, inGameId: 'N/A', teamId: team.id, teamName: team.name,
         }));
         
-        // Add all team members to tournament
         transaction.update(tournamentRef, {
             participants: arrayUnion(...newParticipants),
-            prizePool: increment(totalFee),
+            prizePool: increment(totalFeeCollected),
             updatedAt: serverTimestamp()
         });
     });
@@ -533,83 +530,92 @@ export const awardTournamentWinners = async (
 
         if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
         const tournamentData = tournamentDoc.data() as Tournament;
-
-        const startDate = (tournamentData.startDate as Timestamp).toDate();
-        if (new Date() < startDate) {
-             throw new Error("Tournament has not started yet.");
-        }
+        
+        const isTeamEvent = tournamentData.teamSize !== 'Solo';
 
         if (tournamentData.winners && tournamentData.winners.length > 0) {
             throw new Error("Winners have already been declared for this tournament.");
         }
 
-        // Calculate total prize pool and fees
-        const totalEntryFees = (tournamentData.entryFee || 0) * tournamentData.participants.length;
+        const totalEntryFees = tournamentData.prizePool;
         const platformFee = totalEntryFees * PLATFORM_FEE_PERCENTAGE;
-        const organizerPayout = platformFee; // 50/50 split of the fee
-        const prizePool = totalEntryFees - platformFee;
+        const organizerPayout = platformFee; // 50% of the fee goes to organizer
+        const prizePoolAfterFees = totalEntryFees - platformFee;
 
-        // Use custom prize distribution if set, otherwise calculate automatically
         const prizeDistribution = tournamentData.prizeDistribution && (tournamentData.prizeDistribution.first + tournamentData.prizeDistribution.second + tournamentData.prizeDistribution.third > 0)
             ? tournamentData.prizeDistribution
             : {
-                first: Math.floor(prizePool * 0.5),
-                second: Math.floor(prizePool * 0.3),
-                third: Math.floor(prizePool * 0.2)
+                first: Math.floor(prizePoolAfterFees * 0.5),
+                second: Math.floor(prizePoolAfterFees * 0.3),
+                third: Math.floor(prizePoolAfterFees * 0.2)
             };
 
         const finalWinners: Winner[] = [];
 
-        // Payout Organizer
         if (organizerPayout > 0 && tournamentData.organizerId) {
             const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
             transaction.update(organizerRef, { points: increment(organizerPayout) });
             const organizerTxRef = doc(collection(db, USERS_COLLECTION, tournamentData.organizerId, TRANSACTIONS_COLLECTION));
             transaction.set(organizerTxRef, {
-                amount: organizerPayout,
-                type: 'credit',
-                reason: `Organizer payout for: ${tournamentData.name}`,
-                tournamentId: tournamentId,
-                createdAt: serverTimestamp()
+                amount: organizerPayout, type: 'credit', reason: `Organizer payout for: ${tournamentData.name}`,
+                tournamentId: tournamentId, createdAt: serverTimestamp()
             });
+            
+             if (isTeamEvent) {
+                // Captain's bonus
+                const captainBonus = platformFee * CAPTAIN_BONUS_PERCENTAGE;
+                if(captainBonus > 0) {
+                    transaction.update(organizerRef, { points: increment(captainBonus) });
+                     const captainTxRef = doc(collection(db, USERS_COLLECTION, tournamentData.organizerId, TRANSACTIONS_COLLECTION));
+                     transaction.set(captainTxRef, {
+                        amount: captainBonus, type: 'credit', reason: `Captain's bonus for: ${tournamentData.name}`,
+                        tournamentId: tournamentId, createdAt: serverTimestamp()
+                    });
+                }
+            }
         }
         
-        const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, prize: number) => {
-            const { participant, kills = 0, deaths = 0 } = winnerData;
-            
-            const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-            const updatePayload: any = {
-                monthlyWins: increment(1),
-                kills: increment(kills),
-                deaths: increment(deaths),
-                unseenWins: arrayUnion({
-                    id: `${tournamentId}-${rank}`,
-                    tournamentId,
-                    tournamentName: tournamentData.name,
-                    rank,
-                    prize,
-                })
-            };
-            if (prize > 0) {
-                updatePayload.points = increment(prize);
-                const prizeTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
-                transaction.set(prizeTransactionRef, {
-                    amount: prize,
-                    type: 'credit',
-                    reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? 'nd' : '3rd'} place in ${tournamentData.name}`,
-                    tournamentId: tournamentId,
-                    createdAt: serverTimestamp()
-                });
+        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
+            const teamId = winnerData.participant.teamId;
+            if (isTeamEvent && teamId) {
+                const team = (await getDoc(doc(db, TEAMS_COLLECTION, teamId))).data() as Team;
+                const members = team.members;
+                const prizePerMember = Math.floor(totalPrize / members.length);
+                
+                for (const member of members) {
+                     const winnerRef = doc(db, USERS_COLLECTION, member.uid);
+                     transaction.update(winnerRef, { points: increment(prizePerMember) });
+                     
+                     const prizeTxRef = doc(collection(db, USERS_COLLECTION, member.uid, TRANSACTIONS_COLLECTION));
+                     transaction.set(prizeTxRef, {
+                         amount: prizePerMember, type: 'credit', 
+                         reason: `Team prize for ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} place in ${tournamentData.name}`,
+                         tournamentId, createdAt: serverTimestamp()
+                     });
+                }
+                 finalWinners.push({ ...winnerData, prize: totalPrize, rank, teamId: team.id, teamName: team.name });
+
+            } else { // Solo winner
+                const { participant } = winnerData;
+                const winnerRef = doc(db, USERS_COLLECTION, participant.id);
+                const updatePayload: any = { monthlyWins: increment(1) };
+                if (totalPrize > 0) {
+                    updatePayload.points = increment(totalPrize);
+                    const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+                    transaction.set(prizeTxRef, {
+                        amount: totalPrize, type: 'credit', reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} place in ${tournamentData.name}`,
+                        tournamentId, createdAt: serverTimestamp()
+                    });
+                }
+                transaction.update(winnerRef, updatePayload);
+                finalWinners.push({ ...winnerData, prize: totalPrize, rank });
             }
-            transaction.update(winnerRef, updatePayload);
-            finalWinners.push({ rank, participant, prize, kills: kills || 0, deaths: deaths || 0 });
         };
         
-        processWinner(winners.first, 1, prizeDistribution.first);
-        processWinner(winners.second, 2, prizeDistribution.second);
-        processWinner(winners.third, 3, prizeDistribution.third);
+        await processWinner(winners.first, 1, prizeDistribution.first);
+        await processWinner(winners.second, 2, prizeDistribution.second);
+        await processWinner(winners.third, 3, prizeDistribution.third);
         
-        // Update tournament doc
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
 };
@@ -1683,8 +1689,3 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
-
-
-    
-
-    

@@ -75,14 +75,14 @@ export type Game = {
 export type TournamentStatus = "Upcoming" | "Live" | "Ongoing" | "Completed" | "Cancelled";
 export type TeamSize = "Solo" | "Duo" | "Squad";
 
-export type Participant = {
+export interface Participant {
   id: string;
   name: string;
   avatarUrl?: string;
   gameUsername: string;
   inGameId: string;
-  teamId?: string; // New: to link participant to a team
-  teamName?: string; // New: to display team name
+  teamId?: string; 
+  teamName?: string;
 };
 
 export type Match = {
@@ -101,6 +101,8 @@ export type Winner = {
     rank: 1 | 2 | 3;
     participant: Participant;
     prize: number;
+    teamId?: string;
+    teamName?: string;
     kills?: number;
     deaths?: number;
 };
@@ -394,7 +396,3 @@ export interface PremiumRequest {
   status: PremiumRequestStatus;
   createdAt: Timestamp;
 }
-
-    
-
-    
