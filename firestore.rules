@@ -242,32 +242,52 @@ service cloud.firestore {
       allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
-
+    
     // --- Teams (`teams` and `invites`) ---
     match /teams/{teamId} {
       allow read: if isVerified();
+      
+      // Allow creation if the user is the owner in the request.
       allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
-
+      
+      // Allow deletion if the user is the owner of the team.
+      allow delete: if isVerified() && isTeamOwner(teamId);
+      
+      // Allow updates under specific conditions.
       allow update: if isVerified() && (
-        // Team owner can update name or remove members
-        (isTeamOwner(teamId) && (
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'updatedAt']) ||
-          request.resource.data.members.size() == resource.data.members.size() - 1
-        )) ||
-        // A user can join a team (accept an invite)
+        // Case 1: The user is the owner, they can update the name or remove members.
         (
+          isTeamOwner(teamId) &&
+          (
+            // Only name can be changed.
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) ||
+            // Or members list can be changed (removing players).
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members'])
+          )
+        ) ||
+        // Case 2: A new player is accepting an invite.
+        (
+          // Only the members list should be changing.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+          // The team must not be full.
+          resource.data.members.size() < 4 &&
+          // The new members list must be exactly one larger than the old one.
           request.resource.data.members.size() == resource.data.members.size() + 1 &&
-          // The new member must be the one making the request
-          request.resource.data.members.diff(resource.data.members).added_values()[0].uid == request.auth.uid
+          // The current user must be the one being added.
+          request.resource.data.members.hasAny([request.auth.uid]) &&
+          !resource.data.members.hasAny([request.auth.uid])
         )
       );
-
-      allow delete: if isVerified() && isTeamOwner(teamId);
     }
 
     match /invites/{inviteId} {
+      // Allow team owners to create invites.
       allow create: if isVerified() && isTeamOwner(request.resource.data.teamId);
+      
+      // Only the invited user can read their own invite.
       allow read: if isVerified() && request.auth.uid == resource.data.toId;
+      
+      // The invite can be deleted by the sender (owner) or receiver.
       allow delete: if isVerified() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
     }
   }
