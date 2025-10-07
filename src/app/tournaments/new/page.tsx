@@ -38,7 +38,7 @@ const tournamentSchema = z.object({
   startDate: z.date({ required_error: "Start date is required."}).min(new Date(new Date().setHours(0,0,0,0)), "Start date cannot be in the past."), 
   status: z.enum(["Upcoming", "Live", "Ongoing", "Completed", "Cancelled"]),
   maxParticipants: z.coerce.number().min(2, "Max participants must be at least 2.").max(256, "Max participants cannot exceed 256."),
-  entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more.").max(40, "Entry fee cannot exceed 40."),
+  entryFee: z.coerce.number().min(0, "Entry fee must be 0 or more.").max(100, "Entry fee cannot exceed 100."),
   matchType: z.string({ required_error: "Match type is required."}).min(1, "Match type is required."),
   mapName: z.string().optional(),
   teamSize: z.enum(["Solo", "Duo", "Squad"], { required_error: "Team size is required." }),
@@ -57,6 +57,15 @@ const tournamentSchema = z.object({
     second: z.coerce.number().min(0),
     third: z.coerce.number().min(0),
   }).optional(),
+}).refine(data => {
+    if (data.prizeMode === 'custom' && data.prizeDistribution) {
+        const total = data.prizeDistribution.first + data.prizeDistribution.second + data.prizeDistribution.third;
+        return total <= 200;
+    }
+    return true;
+}, {
+    message: "Total prize pool cannot exceed 200 AE Coins.",
+    path: ["prizeDistribution.first"],
 }).refine(data => {
     if (data.prizeMode === 'custom') {
         return data.prizeDistribution && data.prizeDistribution.first > 0;
@@ -114,13 +123,19 @@ export default function CreateTournamentPage() {
   const prizeMode = form.watch("prizeMode");
   const customPrizes = form.watch("prizeDistribution");
 
-  const totalPrizePool = prizeMode === 'automatic'
-    ? entryFee * maxParticipants
-    : (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0);
+  const totalPrizePool = useMemo(() => {
+    if (isMock) {
+        return (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0) || (entryFee * maxParticipants);
+    }
+    if (prizeMode === 'custom') {
+        return (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0);
+    }
+    return entryFee * maxParticipants;
+  }, [entryFee, maxParticipants, prizeMode, customPrizes, isMock]);
 
-  const firstPrize = prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.5) : customPrizes?.first || 0;
-  const secondPrize = prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.3) : customPrizes?.second || 0;
-  const thirdPrize = prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.2) : customPrizes?.third || 0;
+  const firstPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.5) : (customPrizes?.first || 0), [prizeMode, totalPrizePool, customPrizes]);
+  const secondPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.3) : (customPrizes?.second || 0), [prizeMode, totalPrizePool, customPrizes]);
+  const thirdPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.2) : (customPrizes?.third || 0), [prizeMode, totalPrizePool, customPrizes]);
   
   useEffect(() => {
     if (prizeMode === 'custom' && totalPrizePool > 0) {
@@ -504,13 +519,13 @@ export default function CreateTournamentPage() {
                                                 </div>
                                                 <Slider
                                                     id="entryFee"
-                                                    min={0} max={40} step={5}
+                                                    min={0} max={100} step={5}
                                                     value={[field.value]}
                                                     onValueChange={(value) => field.onChange(value[0])}
                                                     disabled={isSubmittingForm || isMock || prizeMode === 'custom'}
                                                 />
                                                 <div className="flex justify-between text-xs text-muted-foreground">
-                                                    <span>Free</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span><span>30</span><span>35</span><span>40</span>
+                                                    <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
                                                 </div>
                                             </div>
                                         )}
@@ -520,7 +535,11 @@ export default function CreateTournamentPage() {
                                     <Trophy className="h-4 w-4" />
                                     <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
                                     <AlertDescription>
-                                        Prizes are automatically calculated based on entry fees.
+                                        <ul className="text-xs list-disc pl-4">
+                                            <li>1st Place: {firstPrize} AE Coins</li>
+                                            <li>2nd Place: {secondPrize} AE Coins</li>
+                                            <li>3rd Place: {thirdPrize} AE Coins</li>
+                                        </ul>
                                     </AlertDescription>
                                 </Alert>
                             </div>
@@ -531,7 +550,7 @@ export default function CreateTournamentPage() {
                                     <AlertTriangle className="h-4 w-4" />
                                     <AlertTitle>You're in Control</AlertTitle>
                                     <AlertDescription>
-                                        The entry fee will be automatically calculated based on the total prize pool you set.
+                                        Set your custom prize pool (max 200 AE Coins total). The entry fee will be calculated automatically.
                                     </AlertDescription>
                                 </Alert>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -553,7 +572,7 @@ export default function CreateTournamentPage() {
                                     <Trophy className="h-4 w-4" />
                                     <AlertTitle>Total Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
                                     <AlertDescription>
-                                        Calculated Entry Fee: {Math.ceil(totalPrizePool / maxParticipants)} AE Coins per player.
+                                        Calculated Entry Fee: {maxParticipants > 0 ? Math.ceil(totalPrizePool / maxParticipants) : 0} AE Coins per player.
                                     </AlertDescription>
                                 </Alert>
                             </div>
@@ -641,5 +660,6 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
 
 
