@@ -17,7 +17,7 @@ import * as z from "zod";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize, PrizeDistribution } from "@/lib/types";
 import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
@@ -660,6 +660,7 @@ export default function CreateTournamentPage() {
     </div>
   );
 }
+
 
 
 
