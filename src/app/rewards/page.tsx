@@ -50,7 +50,7 @@ const DailyBonusCard = ({ isAvailable, onClaim, isClaiming }: { isAvailable: boo
                 {isAvailable ? (
                      <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
                         <CheckCircle className="h-4 w-4"/>
-                        <p>Your daily 5 AE Points bonus is ready to be claimed!</p>
+                        <p>Your daily 20 AE Points bonus is ready to be claimed!</p>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">

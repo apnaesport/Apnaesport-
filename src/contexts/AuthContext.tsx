@@ -60,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isAdmin: false,
             isPremium: false,
             emailVerified: firebaseUser.emailVerified,
-            points: 10,
+            points: 15,
             createdAt: serverTimestamp() as Timestamp,
             updatedAt: serverTimestamp() as Timestamp,
             apnaId: newApnaId,

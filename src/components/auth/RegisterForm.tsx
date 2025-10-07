@@ -77,7 +77,7 @@ export function RegisterForm() {
           <div className="space-y-2">
             <p>Registration successful. We've sent a secure verification link to your email.</p>
             <p className="font-bold">Important: Please check your spam folder.</p>
-            <p>You have been awarded 10 AE Points, which will be available after you log in.</p>
+            <p>You have been awarded 15 AE Points, which will be available after you log in.</p>
           </div>
         ),
         duration: 15000, // Keep toast on screen longer
