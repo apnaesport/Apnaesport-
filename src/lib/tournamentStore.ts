@@ -473,6 +473,74 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   });
 };
 
+export const addTeamToTournamentFirestore = async (tournament: Tournament, team: Team, owner: UserProfile): Promise<void> => {
+    const requiredTeamSize = tournament.teamSize === 'Duo' ? 2 : tournament.teamSize === 'Squad' ? 4 : 1;
+    if (team.members.length < requiredTeamSize) {
+        throw new Error(`Your team has ${team.members.length} members but this is a ${tournament.teamSize} tournament.`);
+    }
+
+    return runTransaction(db, async (transaction) => {
+        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournament.id);
+        const ownerRef = doc(db, USERS_COLLECTION, owner.uid);
+
+        const tournamentDoc = await transaction.get(tournamentRef);
+        const ownerDoc = await transaction.get(ownerRef);
+        if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
+        if (!ownerDoc.exists()) throw new Error("Team owner not found.");
+
+        const tournamentData = tournamentDoc.data() as Tournament;
+        const ownerData = ownerDoc.data() as UserProfile;
+
+        // Check if any team member is already registered
+        const participantIds = new Set(tournamentData.participants.map(p => p.id));
+        const alreadyRegisteredMember = team.members.find(member => participantIds.has(member.uid));
+        if (alreadyRegisteredMember) {
+            throw new Error(`${alreadyRegisteredMember.name} is already registered in this tournament.`);
+        }
+        
+        // Check for space
+        if (tournamentData.participants.length + team.members.length > tournamentData.maxParticipants) {
+            throw new Error("Not enough slots available in the tournament for your team.");
+        }
+
+        const totalFee = (tournamentData.entryFee || 0) * team.members.length;
+        if ((ownerData.points || 0) < totalFee) {
+            throw new Error(`You need ${totalFee} AE Points to register your team, but you only have ${ownerData.points || 0}.`);
+        }
+        
+        // Deduct points from team owner
+        if (totalFee > 0) {
+            transaction.update(ownerRef, { points: increment(-totalFee) });
+            const feeTransactionRef = doc(collection(db, USERS_COLLECTION, owner.uid, TRANSACTIONS_COLLECTION));
+            transaction.set(feeTransactionRef, {
+                amount: totalFee,
+                type: 'debit',
+                reason: `Team entry fee for: ${tournament.name}`,
+                tournamentId: tournament.id,
+                createdAt: serverTimestamp()
+            });
+        }
+        
+        // Create new participants from team members
+        const newParticipants: Participant[] = team.members.map(member => ({
+            id: member.uid,
+            name: member.name,
+            avatarUrl: member.avatarUrl,
+            gameUsername: member.name, // Use team name as default, user can edit profile later
+            inGameId: 'N/A', // User needs to fill this in their profile
+            teamId: team.id,
+            teamName: team.name,
+        }));
+        
+        // Add all team members to tournament
+        transaction.update(tournamentRef, {
+            participants: arrayUnion(...newParticipants),
+            prizePool: increment(totalFee),
+            updatedAt: serverTimestamp()
+        });
+    });
+};
+
 export const awardTournamentWinners = async (
     tournamentId: string, 
     winners: { first: Winner, second: Winner, third: Winner }
@@ -1499,18 +1567,18 @@ export const createTeamInFirestore = async (teamName: string, owner: UserProfile
 
 export const getUserTeams = async (userId: string): Promise<Team[]> => {
     if (!userId) return [];
-    const q = query(collection(db, TEAMS_COLLECTION), where("members", "array-contains-any", [{uid: userId}, {id: userId}]));
     
-    const allTeamsSnap = await getDocs(collection(db, TEAMS_COLLECTION));
+    const allTeamsSnap = await getDocs(query(collection(db, TEAMS_COLLECTION), orderBy("createdAt", "desc")));
+    
     const userTeams: Team[] = [];
     allTeamsSnap.forEach(doc => {
         const team = { id: doc.id, ...doc.data() } as Team;
-        if (team.members.some(member => member.uid === userId)) {
+        if (team.members && Array.isArray(team.members) && team.members.some(member => member && member.uid === userId)) {
             userTeams.push(team);
         }
     });
 
-    return userTeams.sort((a,b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis());
+    return userTeams;
 };
 
 export const sendTeamInvite = async (team: Team, inviteeApnaId: string, owner: UserProfile): Promise<void> => {

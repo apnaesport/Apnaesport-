@@ -82,6 +82,8 @@ export type Participant = {
   avatarUrl?: string;
   gameUsername: string;
   inGameId: string;
+  teamId?: string; // New: to link participant to a team
+  teamName?: string; // New: to display team name
 };
 
 export type Match = {

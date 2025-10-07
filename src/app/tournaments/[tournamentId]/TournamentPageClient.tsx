@@ -2,7 +2,7 @@
 
 "use client"; 
 
-import type { Tournament, Participant, Winner, TeamSize } from "@/lib/types";
+import type { Tournament, Participant, Winner, TeamSize, Team } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useState, useEffect, useCallback, useMemo } from "react"; 
 import { useAuth } from "@/contexts/AuthContext"; 
 import { useRouter } from "next/navigation"; 
-import { listenToTournamentById, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction, addParticipantToTournamentFirestore, awardTournamentWinners } from "@/lib/tournamentStore"; 
+import { listenToTournamentById, updateTournamentInFirestore, deleteTournamentFromFirestore as deleteTournamentAction, addParticipantToTournamentFirestore, awardTournamentWinners, getUserTeams, addTeamToTournamentFirestore } from "@/lib/tournamentStore"; 
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -111,6 +111,10 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  // Team Registration State
+  const [userTeams, setUserTeams] = useState<Team[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+
   useEffect(() => {
     if (!tournamentId) {
         setIsLoading(false);
@@ -164,6 +168,9 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
     if(user && tournament) {
         setIsRegistered(tournament.participants.some(p => p.id === user.uid));
         registrationForm.reset({ gameUsername: user.displayName || "", inGameId: "" });
+        if (tournament.teamSize !== "Solo") {
+            getUserTeams(user.uid).then(setUserTeams);
+        }
     } else {
         setIsRegistered(false);
     }
@@ -221,6 +228,30 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
       toast({ title: "Join Failed", description: error.message || "Could not join tournament.", variant: "destructive" });
     } finally {
       setIsJoining(false);
+    }
+  };
+
+  const handleTeamRegistration = async () => {
+    if (!user || !selectedTeam || !tournament) {
+        toast({ title: "Error", description: "User, team, or tournament not found.", variant: "destructive" });
+        return;
+    }
+    if (isRegistered) {
+      toast({ title: "Already Registered", description: "You or a team member are already registered." });
+      return;
+    }
+    
+    setIsJoining(true);
+    try {
+        await addTeamToTournamentFirestore(tournament, selectedTeam, user);
+        await refreshUser();
+        toast({ title: "Team Registered!", description: `Your team "${selectedTeam.name}" has joined the tournament.` });
+        setIsRegistrationOpen(false);
+        setSelectedTeam(null);
+    } catch (error: any) {
+        toast({ title: "Team Registration Failed", description: error.message, variant: "destructive" });
+    } finally {
+        setIsJoining(false);
     }
   };
 
@@ -409,9 +440,12 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
 
 
   const canShowParticipantDetails = isAdmin || isTournamentCreator;
-  const prizePool = tournament.entryFee * tournament.participants.length;
+  const prizePool = tournament.prizePool > 0 ? tournament.prizePool : tournament.entryFee * tournament.participants.length;
 
   const TeamIcon = tournament.teamSize ? teamSizeIcons[tournament.teamSize] : Users;
+  
+  const isTeamTournament = tournament.teamSize !== 'Solo';
+
 
   return (
     <>
@@ -626,14 +660,14 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 </CardHeader>
                 <CardContent>
                 {tournament.participants.length > 0 ? (
-                    canShowParticipantDetails ? (
                     <div className="overflow-x-auto">
                         <Table>
                         <TableHeader>
                             <TableRow>
                             <TableHead>Player</TableHead>
                             <TableHead>In-Game Name</TableHead>
-                            <TableHead>In-Game ID</TableHead>
+                            {isTeamTournament && <TableHead>Team</TableHead>}
+                            {(canShowParticipantDetails || isTournamentCreator) && <TableHead>In-Game ID</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -649,32 +683,15 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                                 </div>
                                 </TableCell>
                                 <TableCell>{p.gameUsername}</TableCell>
-                                <TableCell>{p.inGameId}</TableCell>
+                                {isTeamTournament && <TableCell>{p.teamName || 'N/A'}</TableCell>}
+                                {(canShowParticipantDetails || isTournamentCreator) && <TableCell>{p.inGameId}</TableCell>}
                             </TableRow>
                             ))}
                         </TableBody>
                         </Table>
                     </div>
-                    ) : (
-                    <ul className="space-y-2 max-h-96 overflow-y-auto">
-                        {tournament.participants.map(p => (
-                            <li key={p.id} className="flex items-center space-x-3 p-2 border rounded-md bg-secondary/30">
-                                <ImageWithFallback 
-                                    src={p.avatarUrl || `https://placehold.co/40x40.png`} 
-                                    fallbackSrc={`https://placehold.co/32x32.png?text=${p.name.substring(0,2)}`}
-                                    alt={p.name} 
-                                    width={32} height={32} 
-                                    className="rounded-full object-cover" 
-                                    data-ai-hint="player avatar"
-                                    unoptimized={p.avatarUrl?.startsWith('data:image')}
-                                />
-                                <span>{p.name}</span>
-                            </li>
-                        ))}
-                    </ul>
-                    )
                 ): (
-                    <p className="text-muted-foreground">No participants registered yet, or participant list is private.</p>
+                    <p className="text-muted-foreground">No participants registered yet.</p>
                 )}
                 </CardContent>
                 </Card>
@@ -799,7 +816,7 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
                 </CardTitle>
                 {!isFreeEntry && (
                 <CardDescription className="text-primary-foreground/90 flex items-center gap-1">
-                    Entry Fee: {tournament.entryFee} <Coins className="h-4 w-4" />
+                    Entry Fee: {tournament.entryFee} <Coins className="h-4 w-4" /> per player
                 </CardDescription>
                 )}
             </CardHeader>
@@ -844,30 +861,80 @@ export default function TournamentPageClient({ tournamentId }: TournamentPageCli
             <DialogContent>
                 <DialogHeader>
                 <DialogTitle>Register for {tournament.name}</DialogTitle>
-                <DialogDescription>Enter your in-game details to complete your registration. An entry fee of {tournament.entryFee} AE points will be deducted.</DialogDescription>
+                <DialogDescription>
+                    {isTeamTournament ? 'Select your team to register.' : `Enter your in-game details to register. An entry fee of ${tournament.entryFee} AE points will be deducted.`}
+                </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
-                
-                <div>
-                    <Label htmlFor="gameUsername">In-Game Username *</Label>
-                    <Input id="gameUsername" {...registrationForm.register("gameUsername")} disabled={isJoining}/>
-                    {registrationForm.formState.errors.gameUsername && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.gameUsername.message}</p>}
-                </div>
-                <div>
-                    <Label htmlFor="inGameId">In-Game ID *</Label>
-                    <Input id="inGameId" {...registrationForm.register("inGameId")} disabled={isJoining}/>
-                    {registrationForm.formState.errors.inGameId && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.inGameId.message}</p>}
-                </div>
-                <DialogFooter>
-                    <DialogClose asChild>
-                    <Button type="button" variant="outline" disabled={isJoining}>Cancel</Button>
-                    </DialogClose>
-                    <Button type="submit" disabled={isJoining}>
-                        {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        {isJoining ? "Submitting..." : "Confirm Registration"}
-                    </Button>
-                </DialogFooter>
-                </form>
+                {isTeamTournament ? (
+                     <div className="space-y-4">
+                        {!selectedTeam ? (
+                            <>
+                                <Label>Select Your Team</Label>
+                                <Select onValueChange={(teamId) => setSelectedTeam(userTeams.find(t => t.id === teamId) || null)}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Choose a team..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {userTeams.length > 0 ? userTeams.map(team => (
+                                            <SelectItem key={team.id} value={team.id}>{team.name} ({team.members.length} members)</SelectItem>
+                                        )) : <p className="p-2 text-sm text-muted-foreground">No teams found.</p>}
+                                    </SelectContent>
+                                </Select>
+                                 <p className="text-xs text-muted-foreground">Don't have a team? <Link href="/teams" className="text-primary underline">Create one now.</Link></p>
+                            </>
+                        ) : (
+                             <>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Confirm Registration for "{selectedTeam.name}"</CardTitle>
+                                        <CardDescription>
+                                            The following members will be registered. The total entry fee of {tournament.entryFee * selectedTeam.members.length} AE Points will be deducted from your account.
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ul className="space-y-2">
+                                            {selectedTeam.members.map(member => (
+                                                <li key={member.uid} className="flex items-center gap-2 text-sm">
+                                                    <Avatar className="h-6 w-6"><AvatarImage src={member.avatarUrl}/><AvatarFallback>{member.name.substring(0,1)}</AvatarFallback></Avatar>
+                                                    {member.name}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+                                <DialogFooter className="mt-4">
+                                    <Button variant="ghost" onClick={() => setSelectedTeam(null)} disabled={isJoining}>Back</Button>
+                                    <Button onClick={handleTeamRegistration} disabled={isJoining}>
+                                        {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                                        Confirm & Join
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <form onSubmit={registrationForm.handleSubmit(handleJoinTournament)} className="space-y-4">
+                        <div>
+                            <Label htmlFor="gameUsername">In-Game Username *</Label>
+                            <Input id="gameUsername" {...registrationForm.register("gameUsername")} disabled={isJoining}/>
+                            {registrationForm.formState.errors.gameUsername && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.gameUsername.message}</p>}
+                        </div>
+                        <div>
+                            <Label htmlFor="inGameId">In-Game ID *</Label>
+                            <Input id="inGameId" {...registrationForm.register("inGameId")} disabled={isJoining}/>
+                            {registrationForm.formState.errors.inGameId && <p className="text-destructive text-xs mt-1">{registrationForm.formState.errors.inGameId.message}</p>}
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                            <Button type="button" variant="outline" disabled={isJoining}>Cancel</Button>
+                            </DialogClose>
+                            <Button type="submit" disabled={isJoining}>
+                                {isJoining && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {isJoining ? "Submitting..." : "Confirm Registration"}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                )}
             </DialogContent>
             </Dialog>
 
