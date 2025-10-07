@@ -27,7 +27,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
 const DailyBonusCard = ({ isAvailable, onClaim, isClaiming }: { isAvailable: boolean, onClaim: () => void, isClaiming: boolean }) => {
@@ -75,22 +74,38 @@ export default function RewardsPage() {
     const [showAdDialog, setShowAdDialog] = useState(false);
 
     const showInterstitialAd = useCallback(() => {
-        const adScriptSrc = '//pl27497499.revenuecpmgate.com/81/b8/c7/81b8c797da849cfed0ffcaa619935968.js';
+        const adKey = "81b8c797da849cfed0ffcaa619935968";
+        const adScriptSrc = `//pl27497499.revenuecpmgate.com/${adKey}/invoke.js`;
         
         // Remove any existing script to ensure it can be re-triggered
-        const existingScript = document.querySelector(`script[src="${adScriptSrc}"]`);
+        const existingScript = document.querySelector(`script[src*="${adKey}"]`);
         existingScript?.remove();
         
         const script = document.createElement('script');
         script.type = 'text/javascript';
-        script.src = adScriptSrc;
-        script.async = true;
+        const adOptions = `
+            atOptions = {
+                'key' : '${adKey}',
+                'format' : 'iframe',
+                'height' : 250,
+                'width' : 300,
+                'params' : {}
+            };
+        `;
+        script.innerHTML = adOptions;
+
+        const invokeScript = document.createElement('script');
+        invokeScript.async = true;
+        invokeScript.type = 'text/javascript';
+        invokeScript.src = adScriptSrc;
+
         document.body.appendChild(script);
+        document.body.appendChild(invokeScript);
         
         // Clean up the script tag after it has likely run
         setTimeout(() => {
-            const scriptToRemove = document.querySelector(`script[src="${adScriptSrc}"]`);
-            scriptToRemove?.remove();
+            script.remove();
+            invokeScript.remove();
         }, 10000);
 
     }, []);
