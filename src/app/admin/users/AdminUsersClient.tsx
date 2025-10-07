@@ -5,7 +5,7 @@
 import { useState, useCallback, useEffect } from "react";
 import type { UserProfile } from "@/lib/types"; 
 import { Button } from "@/components/ui/button";
-import { Edit, Ban, ShieldCheck, Users, Loader2, ShieldAlert, Coins } from "lucide-react"; 
+import { Edit, Ban, ShieldCheck, Users, Loader2, ShieldAlert, Coins, Trophy } from "lucide-react"; 
 import {
   Table,
   TableBody,
@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ADMIN_EMAIL } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { updateUserAdminStatusInFirestore, adjustUserPoints } from "@/lib/tournamentStore";
+import { updateUserAdminStatusInFirestore, adjustUserPoints, adjustUserProPoints } from "@/lib/tournamentStore";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,6 +81,7 @@ export default function AdminUsersClient() {
   const [isAdjustingPoints, setIsAdjustingPoints] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [isPointsDialogOpen, setIsPointsDialogOpen] = useState(false);
+  const [isProPointsDialogOpen, setIsProPointsDialogOpen] = useState(false);
 
   const pointsForm = useForm<PointsFormData>({
     resolver: zodResolver(pointsSchema),
@@ -124,10 +125,14 @@ export default function AdminUsersClient() {
     toast({ title: "Ban Action (Simulated)", description: `Banning ${displayName || userId} would typically involve backend actions.`});
   };
 
-  const openPointsDialog = (user: UserProfile) => {
+  const openPointsDialog = (user: UserProfile, isPro: boolean) => {
     setSelectedUser(user);
     pointsForm.reset();
-    setIsPointsDialogOpen(true);
+    if (isPro) {
+        setIsProPointsDialogOpen(true);
+    } else {
+        setIsPointsDialogOpen(true);
+    }
   };
   
   const handleAdjustPoints: SubmitHandler<PointsFormData> = async (data) => {
@@ -148,15 +153,34 @@ export default function AdminUsersClient() {
     }
   }
 
+  const handleAdjustProPoints: SubmitHandler<PointsFormData> = async (data) => {
+    if (!selectedUser) return;
+    setIsAdjustingPoints(true);
+    try {
+        await adjustUserProPoints(selectedUser.uid, data.amount, data.type, data.reason);
+        toast({
+            title: "Pro Points Adjusted!",
+            description: `${data.amount} Pro Points have been ${data.type === 'credit' ? 'added to' : 'removed from'} ${selectedUser.displayName}.`
+        });
+        invalidateUsersQuery();
+        setIsProPointsDialogOpen(false);
+    } catch(error: any) {
+        toast({ title: "Error Adjusting Pro Points", description: error.message || "An unknown error occurred.", variant: "destructive" });
+    } finally {
+        setIsAdjustingPoints(false);
+    }
+  }
+
 
   return (
     <>
+    {/* Dialog for regular AE Points */}
     <Dialog open={isPointsDialogOpen} onOpenChange={setIsPointsDialogOpen}>
         <DialogContent>
             <DialogHeader>
-                <DialogTitle>Adjust Points for {selectedUser?.displayName}</DialogTitle>
+                <DialogTitle>Adjust AE Points for {selectedUser?.displayName}</DialogTitle>
                 <DialogDescription>
-                    Manually add or remove AE points from this user's account. This action will be recorded in their transaction history.
+                    Manually add or remove AE points from this user's account. This action will be recorded.
                 </DialogDescription>
             </DialogHeader>
             <form onSubmit={pointsForm.handleSubmit(handleAdjustPoints)} className="space-y-4">
@@ -164,9 +188,7 @@ export default function AdminUsersClient() {
                     <div>
                         <Label htmlFor="type">Action</Label>
                         <Select onValueChange={(value) => pointsForm.setValue('type', value as "credit" | "debit")} defaultValue="credit">
-                            <SelectTrigger id="type">
-                                <SelectValue placeholder="Select action..." />
-                            </SelectTrigger>
+                            <SelectTrigger id="type"><SelectValue placeholder="Select action..." /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="credit">Add Points</SelectItem>
                                 <SelectItem value="debit">Remove Points</SelectItem>
@@ -194,13 +216,57 @@ export default function AdminUsersClient() {
             </form>
         </DialogContent>
     </Dialog>
+    
+    {/* Dialog for Pro Points */}
+    <Dialog open={isProPointsDialogOpen} onOpenChange={setIsProPointsDialogOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Adjust Pro Points for {selectedUser?.displayName}</DialogTitle>
+                <DialogDescription>
+                    Manually grant or deduct Pro Points. This will affect their Pro Board ranking and tier.
+                </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={pointsForm.handleSubmit(handleAdjustProPoints)} className="space-y-4">
+                 <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="type-pro">Action</Label>
+                        <Select onValueChange={(value) => pointsForm.setValue('type', value as "credit" | "debit")} defaultValue="credit">
+                            <SelectTrigger id="type-pro"><SelectValue placeholder="Select action..." /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="credit">Add Points</SelectItem>
+                                <SelectItem value="debit">Remove Points</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div>
+                        <Label htmlFor="amount-pro">Amount</Label>
+                        <Input id="amount-pro" type="number" {...pointsForm.register("amount")} disabled={isAdjustingPoints}/>
+                    </div>
+                </div>
+                 {pointsForm.formState.errors.amount && <p className="text-destructive text-xs mt-1">{pointsForm.formState.errors.amount.message}</p>}
+                <div>
+                    <Label htmlFor="reason-pro">Reason</Label>
+                    <Input id="reason-pro" {...pointsForm.register("reason")} placeholder="e.g., Manual rank adjustment" disabled={isAdjustingPoints}/>
+                    {pointsForm.formState.errors.reason && <p className="text-destructive text-xs mt-1">{pointsForm.formState.errors.reason.message}</p>}
+                </div>
+                 <DialogFooter>
+                    <DialogClose asChild><Button variant="ghost" disabled={isAdjustingPoints}>Cancel</Button></DialogClose>
+                    <Button type="submit" disabled={isAdjustingPoints}>
+                        {isAdjustingPoints && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                        Confirm Change
+                    </Button>
+                </DialogFooter>
+            </form>
+        </DialogContent>
+    </Dialog>
+
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead>User</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>AE Points</TableHead>
+            <TableHead>Points</TableHead>
             <TableHead>Role</TableHead>
             <TableHead className="hidden md:table-cell">Joined</TableHead>
             <TableHead>Actions</TableHead>
@@ -217,10 +283,10 @@ export default function AdminUsersClient() {
                   </div>
                 </TableCell>
                 <TableCell><Skeleton className="h-5 w-40" /></TableCell>
-                <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                 <TableCell><Skeleton className="h-6 w-16 rounded-full" /></TableCell>
                 <TableCell className="hidden md:table-cell"><Skeleton className="h-5 w-24" /></TableCell>
-                <TableCell><Skeleton className="h-9 w-28" /></TableCell>
+                <TableCell><Skeleton className="h-9 w-36" /></TableCell>
               </TableRow>
             ))
           ) : users.length > 0 ? users.map((user) => (
@@ -243,9 +309,15 @@ export default function AdminUsersClient() {
               </TableCell>
               <TableCell>{user.email}</TableCell>
               <TableCell>
-                  <div className="flex items-center gap-1 font-semibold">
-                      <Coins className="h-4 w-4 text-yellow-500" />
-                      {user.points || 0}
+                  <div className="flex items-center gap-2 font-semibold">
+                      <div className="flex items-center gap-1" title="AE Points">
+                        <Coins className="h-4 w-4 text-yellow-500" />
+                        {user.points || 0}
+                      </div>
+                      <div className="flex items-center gap-1" title="Pro Points">
+                        <Trophy className="h-4 w-4 text-primary"/>
+                        {user.proPoints || 0}
+                      </div>
                   </div>
               </TableCell>
               <TableCell>
@@ -259,8 +331,11 @@ export default function AdminUsersClient() {
                   {formatDateFromTimestamp(user.createdAt)}
               </TableCell>
               <TableCell className="space-x-1 sm:space-x-2 whitespace-nowrap">
-                <Button variant="outline" size="icon" title="Adjust Points" onClick={() => openPointsDialog(user)} className="h-8 w-8 sm:h-9 sm:w-9">
+                <Button variant="outline" size="icon" title="Adjust AE Points" onClick={() => openPointsDialog(user, false)} className="h-8 w-8 sm:h-9 sm:w-9">
                   <Coins className="h-4 w-4" />
+                </Button>
+                 <Button variant="outline" size="icon" title="Adjust Pro Points" onClick={() => openPointsDialog(user, true)} className="h-8 w-8 sm:h-9 sm:w-9">
+                  <Trophy className="h-4 w-4" />
                 </Button>
                  {user.email !== ADMIN_EMAIL && user.uid !== currentUser?.uid && ( 
                   <>
