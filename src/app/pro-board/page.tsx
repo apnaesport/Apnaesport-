@@ -5,6 +5,8 @@ import type { Metadata } from 'next';
 import { getTopPlayersByProPoints } from "@/lib/tournamentStore";
 import { ProBoardClient } from "./ProBoardClient";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import type { UserProfile } from "@/lib/types";
+import type { Timestamp } from "firebase/firestore";
 
 export const metadata: Metadata = {
   title: "The Pro Board - Where Legends Rise | Apna Esport",
@@ -14,8 +16,32 @@ export const metadata: Metadata = {
 
 export const dynamic = 'force-dynamic';
 
+// Helper function to serialize Firestore Timestamps
+const serializeObject = (obj: any): any => {
+    if (!obj || typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(serializeObject);
+    
+    const newObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const value = obj[key];
+            if (value && typeof value.toDate === 'function') {
+                newObj[key] = value.toDate().toISOString();
+            } else if (value instanceof Date) {
+                newObj[key] = value.toISOString();
+            } else {
+                newObj[key] = serializeObject(value);
+            }
+        }
+    }
+    return newObj;
+};
+
+
 export default async function ProBoardPage() {
-    const initialTopPlayers = await getTopPlayersByProPoints(50);
+    const topPlayers = await getTopPlayersByProPoints(50);
+    const initialTopPlayers = topPlayers.map(player => serializeObject(player));
+
 
     return (
         <div className="space-y-8">
