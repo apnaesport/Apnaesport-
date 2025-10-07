@@ -5,7 +5,7 @@
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn, Megaphone, RefreshCcw } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn, Megaphone, RefreshCcw, Trophy } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -113,48 +113,24 @@ const AnnouncementForm = ({ communityId, ownerId }: { communityId: string, owner
 };
 
 
-const MemberList = ({ members, isCommunityMember }: { members: CommunityMember[]; isCommunityMember: boolean }) => {
-    const { settings } = useSiteSettings();
-    const adFrequency = settings?.adFrequencyInLists || 0;
-
-    // Conditionally show ads in member list only if the current user is NOT a member
-    const shouldShowAds = !isCommunityMember && adFrequency > 0;
-
-    const itemsWithAds = useMemo(() => {
-        if (!shouldShowAds) return members;
-        const newItems: (CommunityMember | { isAd: true })[] = [];
-        members.forEach((item, index) => {
-            newItems.push(item);
-            if ((index + 1) % adFrequency === 0) {
-                newItems.push({ isAd: true });
-            }
-        });
-        return newItems;
-    }, [members, shouldShowAds, adFrequency]);
-
-
+const MemberList = ({ members }: { members: CommunityMember[] }) => {
     if (!members || members.length === 0) {
         return <p className="text-muted-foreground text-center py-4">No members found.</p>;
     }
     return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {itemsWithAds.map((item, index) => {
-                if ('isAd' in item) {
-                    return <AdsterraBlock key={`ad-${index}`} format="square" className="h-full min-h-[100px]" />;
-                }
-                return (
-                    <Card key={item.uid} className="flex items-center p-4 gap-4">
-                        <Avatar>
-                            <AvatarImage src={item.avatarUrl} alt={item.displayName} />
-                            <AvatarFallback>{getInitials(item.displayName)}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <p className="font-semibold">{item.displayName}</p>
-                            <p className="text-sm text-muted-foreground">{item.role}</p>
-                        </div>
-                    </Card>
-                )
-            })}
+            {members.map((item) => (
+                <Card key={item.uid} className="flex items-center p-4 gap-4">
+                    <Avatar>
+                        <AvatarImage src={item.avatarUrl} alt={item.displayName} />
+                        <AvatarFallback>{getInitials(item.displayName)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="font-semibold">{item.displayName}</p>
+                        <p className="text-sm text-muted-foreground">{item.role}</p>
+                    </div>
+                </Card>
+            ))}
         </div>
     );
 };
@@ -393,7 +369,6 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIsCreator, setOwnerIsCreator] = useState(false);
-    const adFrequency = settings?.adFrequencyInLists || 0;
 
     const communityId = community.id;
 
@@ -435,19 +410,6 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
 
     const isMember = useMemo(() => user?.communityId === community.id, [user, community]);
     const isOwner = useMemo(() => user?.uid === community.ownerId, [user, community]);
-
-    const announcementsWithAds = useMemo(() => {
-        if (!adFrequency || adFrequency <= 0) return announcements;
-
-        const newItems: (Announcement | { isAd: true })[] = [];
-        announcements.forEach((item, index) => {
-            newItems.push(item);
-            if ((index + 1) % adFrequency === 0 && index < announcements.length - 1) {
-                newItems.push({ isAd: true });
-            }
-        });
-        return newItems;
-    }, [announcements, adFrequency]);
 
     const handleJoinCommunity = async () => {
         if (!user) {
@@ -606,18 +568,15 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     <TabsTrigger value="home"><Home className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
                     <TabsTrigger value="tournaments">Quick Tournaments</TabsTrigger>
                     <TabsTrigger value="members"><Users className="mr-2 h-4 w-4"/>Members ({members.length})</TabsTrigger>
-                    <TabsTrigger value="leaderboard" disabled>Leaderboard</TabsTrigger>
+                    <TabsTrigger value="leaderboard" disabled><Trophy className="mr-2 h-4 w-4"/>Leaderboard</TabsTrigger>
                 </TabsList>
                 <TabsContent value="home" className="mt-4 space-y-4">
                     <AdsterraBlock format="leaderboard" key="community-announcements-top"/>
                     {isOwner && <AnnouncementForm communityId={communityId} ownerId={community.ownerId} />}
-                     {announcementsWithAds.length > 0 ? (
-                        announcementsWithAds.map((item, index) => {
-                            if ('isAd' in item) {
-                                return <AdsterraBlock key={`announcement-ad-${index}`} format="square" />;
-                            }
-                            return <AnnouncementCard key={item.id} announcement={item} isOwner={isOwner} />;
-                        })
+                     {announcements.length > 0 ? (
+                        announcements.map((item) => (
+                            <AnnouncementCard key={item.id} announcement={item} isOwner={isOwner} />
+                        ))
                     ) : (
                         <p className="text-muted-foreground text-center py-6">No announcements yet.</p>
                     )}
@@ -645,7 +604,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     <Card>
                         <CardHeader><CardTitle>Community Members</CardTitle></CardHeader>
                         <CardContent>
-                            <MemberList members={members} isCommunityMember={isMember} />
+                            <MemberList members={members} />
                         </CardContent>
                     </Card>
                 </TabsContent>

@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo, Suspense } from "react";
@@ -54,6 +55,26 @@ function TournamentsPageContent({ allTournaments }: TournamentsPageClientProps) 
         } else {
             tournaments = tournaments.filter(tournament => tournament.status.toLowerCase() === status.toLowerCase());
         }
+    } else {
+      // Custom sort for "All" tab
+       tournaments.sort((a, b) => {
+            const statusOrder = { "Live": 1, "Ongoing": 1, "Upcoming": 2, "Completed": 3, "Cancelled": 4 };
+            const aStatus = statusOrder[a.status] || 5;
+            const bStatus = statusOrder[b.status] || 5;
+            
+            if (aStatus !== bStatus) {
+                return aStatus - bStatus;
+            }
+
+            // If statuses are the same, sort by date
+            const aDate = new Date(a.startDate as any).getTime();
+            const bDate = new Date(b.startDate as any).getTime();
+            
+            if (a.status === 'Upcoming') {
+                return aDate - bDate; // Soonest first
+            }
+            return bDate - aDate; // Most recent first for all other statuses
+        });
     }
     
     return tournaments;

@@ -63,6 +63,8 @@ const MyRankCard = () => {
         ? ((user.proPoints || 0) - tierInfo.points) / (nextTierInfo.points - tierInfo.points) * 100
         : 100;
 
+    const isMaxLevel = myProTier === 'Legend';
+
     return (
         <Card className="mb-8 border-2 border-primary/30 shadow-lg shadow-primary/10">
             <CardHeader>
@@ -83,10 +85,16 @@ const MyRankCard = () => {
                 <div className="space-y-2">
                      <div className="flex justify-between items-baseline">
                         <p className={`font-bold text-lg ${tierInfo.color}`}>{tierInfo.name}</p>
-                        {nextTierInfo && <p className="text-xs text-muted-foreground">Next: {nextTierInfo.name}</p>}
+                        {!isMaxLevel && nextTierInfo && <p className="text-xs text-muted-foreground">Next: {nextTierInfo.name}</p>}
                     </div>
-                    <Progress value={progress} className="h-3" />
-                    {nextTierInfo && (
+                    {isMaxLevel ? (
+                        <div className="flex items-center justify-center gap-2 h-3 text-center bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white font-bold text-xs shadow-lg">
+                           MAX LEVEL <Trophy className="h-3 w-3"/>
+                        </div>
+                    ) : (
+                        <Progress value={progress} className="h-3" />
+                    )}
+                    {!isMaxLevel && nextTierInfo && (
                         <p className="text-xs text-muted-foreground text-right">
                             {nextTierInfo.points - (user.proPoints || 0)} points to next tier
                         </p>
