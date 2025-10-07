@@ -1,5 +1,4 @@
 
-
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -13,6 +12,8 @@ export interface UnseenWin {
     rank: 1 | 2 | 3;
     prize: number;
 }
+
+export type ProTier = "Bronze" | "Silver" | "Gold" | "Diamond" | "Legend";
 
 export interface PremiumFeatures {
   verifiedBadge?: boolean;
@@ -43,7 +44,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   streamingChannelUrl?: string;
   communityId?: string | null;
   points: number;
-  proPoints?: number; // For the Pro Board
+  proPoints: number;
+  proTier: ProTier;
   wins?: number;
   monthlyWins?: number;
   kills?: number;

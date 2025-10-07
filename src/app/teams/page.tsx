@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, LogIn, Loader2, Users, Send, Check, X, Copy, Share2, Edit, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
-import type { Team, TeamInvite, UserProfile } from "@/lib/types";
+import type { Team, TeamInvite, UserProfile, ProTier } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { 
     createTeamInFirestore, 
@@ -30,6 +30,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+
+const proTierColors: Record<ProTier, string> = {
+    Bronze: "border-orange-700/50",
+    Silver: "border-slate-400/50",
+    Gold: "border-yellow-400/50",
+    Diamond: "border-cyan-400/50",
+    Legend: "border-purple-500/50",
+};
+
 
 export default function TeamsPage() {
     const { user, loading } = useAuth();

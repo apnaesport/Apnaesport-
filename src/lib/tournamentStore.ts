@@ -26,7 +26,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite, ProTier } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -153,6 +153,15 @@ export const deleteGameFromFirestore = async (gameId: string): Promise<void> => 
 };
 
 // --- Tournament Functions ---
+
+// Helper function to determine Pro Tier based on points
+const getProTier = (points: number): ProTier => {
+    if (points >= 1000) return "Legend";
+    if (points >= 600) return "Diamond";
+    if (points >= 300) return "Gold";
+    if (points >= 100) return "Silver";
+    return "Bronze";
+};
 
 export const addTournamentToFirestore = async (
     tournamentUiData: TournamentFormDataUI, 
@@ -564,11 +573,28 @@ export const awardTournamentWinners = async (
         
         const winnerIds = new Set([winners.first.participant.id, winners.second.participant.id, winners.third.participant.id]);
 
-        // Award participation points to non-winners
+        // Award participation points and update tiers for all participants
         for (const participant of tournamentData.participants) {
-            if (!winnerIds.has(participant.id)) {
-                const participantRef = doc(db, USERS_COLLECTION, participant.id);
-                transaction.update(participantRef, { proPoints: increment(PRO_POINTS_PARTICIPATION) });
+            const participantRef = doc(db, USERS_COLLECTION, participant.id);
+            const userDoc = await transaction.get(participantRef);
+            if(userDoc.exists()) {
+                const userData = userDoc.data() as UserProfile;
+                const currentProPoints = userData.proPoints || 0;
+                let pointsToAdd = 0;
+                if (winnerIds.has(participant.id)) {
+                    if (participant.id === winners.first.participant.id) pointsToAdd = PRO_POINTS_WIN;
+                    else if (participant.id === winners.second.participant.id || participant.id === winners.third.participant.id) pointsToAdd = PRO_POINTS_RUNNERUP;
+                } else {
+                    pointsToAdd = PRO_POINTS_PARTICIPATION;
+                }
+
+                const newTotalProPoints = currentProPoints + pointsToAdd;
+                const newTier = getProTier(newTotalProPoints);
+
+                transaction.update(participantRef, { 
+                    proPoints: increment(pointsToAdd),
+                    proTier: newTier 
+                });
             }
         }
 
@@ -596,7 +622,7 @@ export const awardTournamentWinners = async (
             }
         }
         
-        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number, proPoints: number) => {
+        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
             const teamId = winnerData.participant.teamId;
             if (isTeamEvent && teamId) {
                 const team = (await getDoc(doc(db, TEAMS_COLLECTION, teamId))).data() as Team;
@@ -605,7 +631,7 @@ export const awardTournamentWinners = async (
                 
                 for (const member of members) {
                      const winnerRef = doc(db, USERS_COLLECTION, member.uid);
-                     transaction.update(winnerRef, { points: increment(prizePerMember), proPoints: increment(proPoints) });
+                     transaction.update(winnerRef, { points: increment(prizePerMember) });
                      
                      const prizeTxRef = doc(collection(db, USERS_COLLECTION, member.uid, TRANSACTIONS_COLLECTION));
                      transaction.set(prizeTxRef, {
@@ -619,7 +645,7 @@ export const awardTournamentWinners = async (
             } else { // Solo winner
                 const { participant } = winnerData;
                 const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-                const updatePayload: any = { monthlyWins: increment(1), proPoints: increment(proPoints) };
+                const updatePayload: any = { monthlyWins: increment(1) };
                 if (totalPrize > 0) {
                     updatePayload.points = increment(totalPrize);
                     const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
@@ -633,9 +659,9 @@ export const awardTournamentWinners = async (
             }
         };
         
-        await processWinner(winners.first, 1, prizeDistribution.first, PRO_POINTS_WIN);
-        await processWinner(winners.second, 2, prizeDistribution.second, PRO_POINTS_RUNNERUP);
-        await processWinner(winners.third, 3, prizeDistribution.third, PRO_POINTS_RUNNERUP); // Runner up points for 3rd as well
+        await processWinner(winners.first, 1, prizeDistribution.first);
+        await processWinner(winners.second, 2, prizeDistribution.second);
+        await processWinner(winners.third, 3, prizeDistribution.third);
         
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
@@ -735,6 +761,7 @@ export const generateApnaId = async (): Promise<string> => {
 
 const formatUserProfile = (doc: any): UserProfile => {
     const data = doc.data();
+    const proPoints = data.proPoints || 0;
     return {
         uid: doc.id,
         displayName: data.displayName || "Unknown User",
@@ -754,7 +781,8 @@ const formatUserProfile = (doc: any): UserProfile => {
         streamingChannelUrl: data.streamingChannelUrl || "",
         communityId: data.communityId || null,
         points: data.points || 0,
-        proPoints: data.proPoints || 0,
+        proPoints: proPoints,
+        proTier: getProTier(proPoints),
         wins: data.wins || 0,
         monthlyWins: data.monthlyWins || 0,
         kills: data.kills || 0,
@@ -878,33 +906,7 @@ export const getPointTransactions = async (userId: string): Promise<PointTransac
 
 export const getAllUsersFromFirestore = async (): Promise<UserProfile[]> => {
   const usersSnapshot = await getDocs(query(collection(db, USERS_COLLECTION), orderBy("displayName", "asc")));
-  return usersSnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      uid: doc.id,
-      displayName: data.displayName || "Unknown User",
-      email: data.email || null,
-      photoURL: data.photoURL || `https://placehold.co/40x40.png?text=${(data.displayName || "U").substring(0,2)}`,
-      premiumPhotoURL: data.premiumPhotoURL || null,
-      isAdmin: data.isAdmin || false,
-      isPremium: data.isPremium || false,
-      premiumSince: data.premiumSince as Timestamp,
-      premiumFeatures: data.premiumFeatures || {},
-      createdAt: data.createdAt as Timestamp,
-      lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
-      hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
-      bio: data.bio || "",
-      favoriteGameIds: data.favoriteGameIds || [],
-      streamingChannelUrl: data.streamingChannelUrl || "",
-      communityId: data.communityId || null,
-      points: data.points || 0,
-      wins: data.wins || 0,
-      monthlyWins: data.monthlyWins || 0,
-      kills: data.kills || 0,
-      deaths: data.deaths || 0,
-      apnaId: data.apnaId,
-    };
-  });
+  return usersSnapshot.docs.map(doc => formatUserProfile(doc));
 };
 
 export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserProfile & { kda: string })[]> => {
