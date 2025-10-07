@@ -1106,6 +1106,38 @@ export const adjustUserPoints = async (userId: string, amount: number, type: 'cr
     });
 };
 
+export const adjustUserProPoints = async (userId: string, amount: number, type: 'credit' | 'debit', reason: string): Promise<void> => {
+    if (amount <= 0) throw new Error("Amount must be positive.");
+
+    return runTransaction(db, async (transaction) => {
+        const userRef = doc(db, USERS_COLLECTION, userId);
+        const transactionRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+        
+        const userDoc = await transaction.get(userRef);
+        if (!userDoc.exists()) throw new Error("User not found.");
+
+        const userData = userDoc.data() as UserProfile;
+        const currentProPoints = userData.proPoints || 0;
+        const change = type === 'credit' ? amount : -amount;
+        const newTotalProPoints = currentProPoints + change;
+
+        const newTier = getProTier(newTotalProPoints);
+        
+        transaction.update(userRef, { 
+            proPoints: increment(change),
+            proTier: newTier,
+        });
+
+        transaction.set(transactionRef, {
+            amount: amount,
+            type: type,
+            reason: `Pro Points: ${reason}`,
+            isProPoints: true,
+            createdAt: serverTimestamp()
+        });
+    });
+};
+
 // --- Premium User Functions ---
 export const updateUserPremiumStatus = async (userId: string, features: Partial<UserProfile['premiumFeatures']>, premiumPhotoURL?: string | null): Promise<void> => {
     return runTransaction(db, async (transaction) => {
