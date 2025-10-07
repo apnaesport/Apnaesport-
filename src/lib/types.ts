@@ -155,6 +155,7 @@ export type Tournament = {
   isQuickTournament?: boolean;
   communityId?: string;
   isMock?: boolean;
+  formattedStartDate?: string;
 };
 
 export type TournamentFormDataUI = {

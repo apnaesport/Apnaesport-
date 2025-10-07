@@ -24,7 +24,7 @@ import {
   increment,
   runTransaction
 } from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { db } from "./firebase";
 import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite, ProTier } from './types';
 
@@ -62,14 +62,14 @@ const PRO_POINTS_THIRD = 10;
 // Initialize Firebase Storage
 const storage = getStorage();
 
-export const uploadImageAndGetURL = async (file: File, path: string): Promise<string> => {
-  if (!file) {
-    throw new Error("No file provided for upload.");
-  }
-  const storageRef = ref(storage, path);
-  const snapshot = await uploadBytes(storageRef, file);
-  const downloadURL = await getDownloadURL(snapshot.ref);
-  return downloadURL;
+export const uploadImageAndGetURL = async (dataUrl: string, path: string): Promise<string> => {
+    if (!dataUrl) {
+        throw new Error("No data URL provided for upload.");
+    }
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadString(storageRef, dataUrl, 'data_url');
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    return downloadURL;
 };
 
 const getTournamentStatus = (tournament: Omit<Tournament, 'id'>): TournamentStatus => {
@@ -1513,6 +1513,19 @@ export const deleteAnnouncement = async (communityId: string, announcementId: st
 
 // --- Quick Tournament for Community ---
 
+export const getQuickTournamentsForCommunity = async (communityId: string): Promise<Tournament[]> => {
+    const q = query(
+        collection(db, TOURNAMENTS_COLLECTION),
+        where("communityId", "==", communityId),
+        where("isQuickTournament", "==", true),
+        orderBy("startDate", "desc"),
+        limit(10) // Limit to recent quick tournaments
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Tournament));
+};
+
+
 export const addQuickTournamentToFirestore = async (
     data: { name: string, gameId: string, mapName?: string, teamSize: TeamSize, time: string },
     community: Community,
@@ -1858,3 +1871,4 @@ export const getGameDetails = getGameByIdFromFirestore;
 export const getTournamentsForGame = (gameId: string) => getTournamentsFromFirestore({ gameId });
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
+

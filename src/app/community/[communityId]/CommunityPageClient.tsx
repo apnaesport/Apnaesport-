@@ -1,16 +1,17 @@
 
+
 "use client";
 
 import { notFound, useRouter } from 'next/navigation';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
 import { Badge } from '@/components/ui/badge';
-import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn, Megaphone } from 'lucide-react';
+import { Users, Home, Camera, PlusCircle, Loader2, Medal, BarChart3, Users2, Shield, Upload, Trash2, Star, LogIn, Megaphone, RefreshCcw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Community, CommunityMember, SiteSettings, Creator, Announcement } from '@/lib/types';
-import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore, getCreatorById, listenToAnnouncements, addAnnouncement, deleteAnnouncement, updateAnnouncement } from '@/lib/tournamentStore';
+import type { Community, CommunityMember, SiteSettings, Creator, Announcement, Tournament } from '@/lib/types';
+import { listenToCommunityById, getCommunityMembers, joinCommunity, leaveCommunity, updateCommunityDetailsInFirestore, deleteCommunityFromFirestore, getCreatorById, listenToAnnouncements, addAnnouncement, deleteAnnouncement, updateAnnouncement, uploadImageAndGetURL, getQuickTournamentsForCommunity } from '@/lib/tournamentStore';
 import { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -48,6 +49,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { QuickTournamentForm } from './QuickTournamentForm';
 import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
 import React from 'react';
+import { TournamentCard } from '@/components/tournaments/TournamentCard';
 
 interface CommunityPageClientProps {
     initialCommunity: Community;
@@ -231,12 +233,11 @@ const AnnouncementCard = ({ announcement, isOwner }: { announcement: Announcemen
 const ManageCommunityDialog = ({ community }: { community: Community }) => {
     const { toast } = useToast();
     const router = useRouter();
+    const { settings } = useSiteSettings();
     const [isUpdating, setIsUpdating] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [logoPreview, setLogoPreview] = useState<string | null>(community.logoUrl || null);
     const [bannerPreview, setBannerPreview] = useState<string | null>(community.bannerUrl || null);
-    const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [bannerFile, setBannerFile] = useState<File | null>(null);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'banner') => {
         const file = event.target.files?.[0];
@@ -246,10 +247,8 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
                 const result = reader.result as string;
                 if (type === 'logo') {
                     setLogoPreview(result);
-                    setLogoFile(file);
                 } else {
                     setBannerPreview(result);
-                    setBannerFile(file);
                 }
             };
             reader.readAsDataURL(file);
@@ -261,10 +260,12 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
         try {
             const updates: Partial<Community> = {};
             if (logoPreview && logoPreview.startsWith('data:')) {
-                updates.logoUrl = logoPreview;
+                const logoUrl = await uploadImageAndGetURL(logoPreview, `community-branding/${community.id}/logo.png`);
+                updates.logoUrl = logoUrl;
             }
             if (bannerPreview && bannerPreview.startsWith('data:')) {
-                updates.bannerUrl = bannerPreview;
+                const bannerUrl = await uploadImageAndGetURL(bannerPreview, `community-branding/${community.id}/banner.png`);
+                updates.bannerUrl = bannerUrl;
             }
 
             if (Object.keys(updates).length > 0) {
@@ -280,6 +281,24 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
             setIsUpdating(false);
         }
     };
+    
+    const handleResetToDefault = async (type: 'logo' | 'banner') => {
+        setIsUpdating(true);
+        try {
+            const updates: Partial<Community> = {};
+            if (type === 'logo') {
+                updates.logoUrl = settings?.defaultCommunityLogoUrl || null;
+            } else {
+                updates.bannerUrl = settings?.defaultCommunityBannerUrl || null;
+            }
+            await updateCommunityDetailsInFirestore(community.id, updates);
+            toast({ title: "Branding Reset", description: `Community ${type} has been reset to default.` });
+        } catch (error) {
+            toast({ title: "Error", description: "Could not reset branding.", variant: "destructive" });
+        } finally {
+            setIsUpdating(false);
+        }
+    }
 
     const handleDelete = async () => {
         setIsDeleting(true);
@@ -308,13 +327,19 @@ const ManageCommunityDialog = ({ community }: { community: Community }) => {
                 <div className="space-y-6 py-4">
                     <div className="space-y-2">
                         <Label htmlFor="logoFile">Community Logo (1:1 Ratio)</Label>
-                        <Input id="logoFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'logo')} disabled={isUpdating}/>
-                        {logoPreview && <ImageWithFallback src={logoPreview} alt="Logo Preview" width={80} height={80} className="rounded-full mt-2 border" fallbackSrc="" data-ai-hint="logo preview" unoptimized={logoPreview.startsWith('data:')} />}
+                        <div className="flex gap-2 items-center">
+                            <Input id="logoFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'logo')} disabled={isUpdating} className="flex-grow"/>
+                            <Button variant="outline" size="sm" onClick={() => handleResetToDefault('logo')} disabled={isUpdating}><RefreshCcw className="h-3 w-3"/></Button>
+                        </div>
+                        {logoPreview && <ImageWithFallback src={logoPreview} alt="Logo Preview" width={80} height={80} className="rounded-full mt-2 border" fallbackSrc="" data-ai-hint="logo preview" unoptimized />}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="bannerFile">Community Banner (16:9 Ratio)</Label>
-                        <Input id="bannerFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isUpdating}/>
-                        {bannerPreview && <ImageWithFallback src={bannerPreview} alt="Banner Preview" width={400} height={225} className="rounded-md mt-2 border aspect-video object-cover" fallbackSrc="" data-ai-hint="banner preview" unoptimized={bannerPreview.startsWith('data:')}/>}
+                         <div className="flex gap-2 items-center">
+                            <Input id="bannerFile" type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'banner')} disabled={isUpdating} className="flex-grow"/>
+                             <Button variant="outline" size="sm" onClick={() => handleResetToDefault('banner')} disabled={isUpdating}><RefreshCcw className="h-3 w-3"/></Button>
+                        </div>
+                        {bannerPreview && <ImageWithFallback src={bannerPreview} alt="Banner Preview" width={400} height={225} className="rounded-md mt-2 border aspect-video object-cover" fallbackSrc="" data-ai-hint="banner preview" unoptimized />}
                     </div>
                      <Separator />
                     <div className="space-y-2">
@@ -364,6 +389,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
     const [community, setCommunity] = useState<Community>(initialCommunity);
     const [members, setMembers] = useState<CommunityMember[]>(initialMembers);
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+    const [quickTournaments, setQuickTournaments] = useState<Tournament[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ownerIsCreator, setOwnerIsCreator] = useState(false);
@@ -398,6 +424,8 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
         });
         
         const unsubscribeAnnouncements = listenToAnnouncements(communityId, setAnnouncements);
+        
+        getQuickTournamentsForCommunity(communityId).then(setQuickTournaments);
 
         return () => {
             unsubscribeCommunity();
@@ -573,10 +601,6 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                 </div>
             </header>
             
-             <div className="flex justify-center">
-                <AdsterraBlock format="leaderboard" key="community-detail-top"/>
-            </div>
-            
             <Tabs defaultValue="home" className="w-full">
                 <TabsList>
                     <TabsTrigger value="home"><Home className="mr-2 h-4 w-4"/>Announcements</TabsTrigger>
@@ -585,6 +609,7 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     <TabsTrigger value="leaderboard" disabled>Leaderboard</TabsTrigger>
                 </TabsList>
                 <TabsContent value="home" className="mt-4 space-y-4">
+                    <AdsterraBlock format="leaderboard" key="community-announcements-top"/>
                     {isOwner && <AnnouncementForm communityId={communityId} ownerId={community.ownerId} />}
                      {announcementsWithAds.length > 0 ? (
                         announcementsWithAds.map((item, index) => {
@@ -597,12 +622,26 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                         <p className="text-muted-foreground text-center py-6">No announcements yet.</p>
                     )}
                 </TabsContent>
-                <TabsContent value="tournaments" className="mt-4">
-                    <div className="space-y-4">
-                        <QuickTournamentForm community={community} />
-                    </div>
+                <TabsContent value="tournaments" className="mt-4 space-y-6">
+                     <AdsterraBlock format="leaderboard" key="community-quick-tournaments-top"/>
+                    {isOwner && <QuickTournamentForm community={community} />}
+                     {quickTournaments.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {quickTournaments.map(t => (
+                                <TournamentCard key={t.id} tournament={t} />
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                            <h3 className="text-xl font-semibold">No Quick Tournaments</h3>
+                            <p className="text-muted-foreground mt-2">
+                               {isOwner ? "Create a quick tournament to get your community playing!" : "The community owner hasn't created any quick tournaments yet."}
+                            </p>
+                        </div>
+                    )}
                 </TabsContent>
                  <TabsContent value="members" className="mt-4">
+                     <AdsterraBlock format="leaderboard" key="community-members-top"/>
                     <Card>
                         <CardHeader><CardTitle>Community Members</CardTitle></CardHeader>
                         <CardContent>
@@ -611,9 +650,6 @@ export default function CommunityPageClient({ initialCommunity, initialMembers }
                     </Card>
                 </TabsContent>
             </Tabs>
-             <div className="flex justify-center mt-8">
-                <AdsterraBlock format="leaderboard" key="community-detail-bottom"/>
-            </div>
         </div>
     );
 }
