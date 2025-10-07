@@ -6,6 +6,8 @@ import { LeaderboardClient } from "./LeaderboardClient";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
 import type { UserProfile } from "@/lib/types";
 import type { Timestamp } from "firebase/firestore";
+import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Logo } from "@/components/shared/Logo";
 
 export const metadata: Metadata = {
   title: "Hall of Fame - Top Players | Apna Esport",
@@ -41,7 +43,23 @@ export default async function LeaderboardPage() {
 
     return (
         <div className="space-y-8">
-            <PageTitle title="Leaderboard" subtitle="See who's dominating the competition this month." />
+             <header className="mb-6">
+                <Card className="bg-card/50 backdrop-blur-sm border-border/50 overflow-hidden">
+                    <CardHeader className="flex flex-row items-center gap-4">
+                        <div className="p-1 bg-gradient-to-br from-primary to-accent rounded-xl shadow-lg shadow-primary/20">
+                            <div className="h-16 w-16 bg-background/80 rounded-lg flex items-center justify-center">
+                                 <span className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-br from-primary to-accent">AE</span>
+                            </div>
+                        </div>
+                        <div>
+                            <CardTitle className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-foreground to-foreground/80">
+                                Apna Esports
+                            </CardTitle>
+                            <CardDescription className="text-lg font-semibold">Elite Leaderboard</CardDescription>
+                        </div>
+                    </CardHeader>
+                </Card>
+            </header>
              <div className="flex justify-center">
                 <AdsterraBlock format="leaderboard" />
             </div>
