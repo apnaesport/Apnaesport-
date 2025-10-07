@@ -53,6 +53,7 @@ export interface UserProfile extends Partial<FirebaseUser> {
   deaths?: number;
   apnaId?: string;
   unseenWins?: UnseenWin[];
+  isMock?: boolean;
 }
 
 export type PointTransaction = {
@@ -63,6 +64,7 @@ export type PointTransaction = {
   type: 'credit' | 'debit';
   tournamentId?: string;
   createdAt: Timestamp;
+  isProPoints?: boolean;
 }
 
 export type Game = {
@@ -179,6 +181,7 @@ export type TournamentFormDataUI = {
   sponsorName?: string;
   sponsorLogoUrl?: string;
   isMock?: boolean;
+  isProBoardDemo?: boolean;
   mockParticipantCount?: number;
 };
 

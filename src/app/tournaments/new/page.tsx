@@ -19,7 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize, PrizeDistribution } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2, AlertTriangle } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2, AlertTriangle, Users } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
 import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
@@ -50,6 +50,7 @@ const tournamentSchema = z.object({
   sponsorName: z.string().optional(),
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
   isMock: z.boolean().optional(),
+  isProBoardDemo: z.boolean().optional(),
   mockParticipantCount: z.coerce.number().min(2).max(256).optional(),
   prizeDistribution: z.object({
     first: z.coerce.number().min(0),
@@ -101,6 +102,7 @@ export default function CreateTournamentPage() {
       sponsorName: "",
       sponsorLogoUrl: "",
       isMock: false,
+      isProBoardDemo: false,
       mockParticipantCount: 16,
       prizeDistribution: { first: 0, second: 0, third: 0 },
     },
@@ -290,22 +292,40 @@ export default function CreateTournamentPage() {
             )}
 
             {isAdmin && isMock && (
-              <div className="space-y-2">
-                <Label htmlFor="mockParticipantCount">Fake Participant Count</Label>
-                <Controller
-                  name="mockParticipantCount"
-                  control={form.control}
-                  render={({ field }) => (
-                    <Slider
-                      id="mockParticipantCount"
-                      min={8} max={100} step={1}
-                      value={[field.value || 16]}
-                      onValueChange={(value) => field.onChange(value[0])}
-                      disabled={isSubmittingForm}
+              <div className="space-y-4 rounded-md border border-amber-500/50 bg-amber-500/10 p-4">
+                 <Controller
+                    name="isProBoardDemo"
+                    control={form.control}
+                    render={({ field }) => (
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="isProBoardDemoSwitch" className="font-medium">Add Mock Players to Pro Board</Label>
+                            <Switch
+                                id="isProBoardDemoSwitch"
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={isSubmittingForm}
+                            />
+                        </div>
+                    )}
+                 />
+                 <p className="text-sm text-muted-foreground">If enabled, this will create permanent mock user profiles with random Pro Points to populate the Pro Board.</p>
+                <div>
+                    <Label htmlFor="mockParticipantCount">Fake Participant Count</Label>
+                    <Controller
+                    name="mockParticipantCount"
+                    control={form.control}
+                    render={({ field }) => (
+                        <Slider
+                        id="mockParticipantCount"
+                        min={8} max={100} step={1}
+                        value={[field.value || 16]}
+                        onValueChange={(value) => field.onChange(value[0])}
+                        disabled={isSubmittingForm}
+                        />
+                    )}
                     />
-                  )}
-                />
-                <p className="text-sm text-muted-foreground text-center">{form.watch('mockParticipantCount') || 16} mock participants will be generated.</p>
+                    <p className="text-sm text-muted-foreground text-center">{form.watch('mockParticipantCount') || 16} mock participants will be generated.</p>
+                </div>
               </div>
             )}
 

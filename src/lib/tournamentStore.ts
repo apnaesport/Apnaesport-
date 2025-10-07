@@ -52,9 +52,11 @@ const PREMIUM_POINT_BONUS = 200;
 const CAPTAIN_BONUS_PERCENTAGE = 0.10; // 10% of platform fee
 
 // --- Pro Board Point Constants ---
+const PRO_POINTS_CREATE_TOURNAMENT = 20;
+const PRO_POINTS_JOIN_TOURNAMENT = 3;
 const PRO_POINTS_WIN = 20;
-const PRO_POINTS_RUNNERUP = 10;
-const PRO_POINTS_PARTICIPATION = 3;
+const PRO_POINTS_SECOND = 15;
+const PRO_POINTS_THIRD = 10;
 
 
 // Initialize Firebase Storage
@@ -177,6 +179,23 @@ export const addTournamentToFirestore = async (
         if (!userDoc.exists() || (userDoc.data().points || 0) < TOURNAMENT_CREATION_FEE) {
             throw new Error(`You need at least ${TOURNAMENT_CREATION_FEE} AE Points to create a tournament.`);
         }
+        transaction.update(userRef, { 
+            points: increment(-TOURNAMENT_CREATION_FEE),
+            proPoints: increment(PRO_POINTS_CREATE_TOURNAMENT)
+        });
+        const feeTxRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
+        transaction.set(feeTxRef, { 
+            amount: TOURNAMENT_CREATION_FEE, type: 'debit', 
+            reason: `Fee for creating tournament: ${tournamentUiData.name}`,
+            tournamentId: "N/A", // Will be updated later
+            createdAt: serverTimestamp() 
+        });
+        const proPointsTxRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
+        transaction.set(proPointsTxRef, {
+            amount: PRO_POINTS_CREATE_TOURNAMENT, type: 'credit', reason: 'Pro Points for creating a tournament',
+            isProPoints: true, createdAt: serverTimestamp()
+        });
+
     }
 
     const game = await getGameByIdFromFirestore(tournamentUiData.gameId);
@@ -186,14 +205,46 @@ export const addTournamentToFirestore = async (
     
     let mockParticipants: Participant[] = [];
     if (isMock && tournamentUiData.mockParticipantCount && tournamentUiData.mockParticipantCount > 0) {
-        for (let i = 0; i < tournamentUiData.mockParticipantCount; i++) {
-            mockParticipants.push({
-                id: `mock_user_${i}`,
-                name: `Player ${1000 + i}`,
-                avatarUrl: `https://i.pravatar.cc/150?u=player${i}`,
-                gameUsername: `player${1000 + i}`,
-                inGameId: `123456789${i}`,
-            });
+        if(tournamentUiData.isProBoardDemo) { // NEW LOGIC
+            const batch = writeBatch(db); // Use a separate batch for user creation
+            for (let i = 0; i < tournamentUiData.mockParticipantCount; i++) {
+                const mockUserId = `mock_user_${Date.now()}_${i}`;
+                const mockUserRef = doc(db, USERS_COLLECTION, mockUserId);
+                const proPoints = Math.floor(Math.random() * 1200);
+                const newUserProfile: UserProfile = {
+                    uid: mockUserId,
+                    displayName: `Pro Player ${1000 + i}`,
+                    email: `pro_player_${1000+i}@example.com`,
+                    photoURL: `https://i.pravatar.cc/150?u=pro_player${i}`,
+                    apnaId: `AE${Math.floor(100000 + Math.random() * 900000)}`,
+                    isAdmin: false,
+                    isPremium: Math.random() > 0.8,
+                    points: Math.floor(Math.random() * 500),
+                    proPoints: proPoints,
+                    proTier: getProTier(proPoints),
+                    isMock: true,
+                    createdAt: serverTimestamp() as Timestamp,
+                };
+                batch.set(mockUserRef, newUserProfile);
+                mockParticipants.push({
+                    id: newUserProfile.uid,
+                    name: newUserProfile.displayName,
+                    avatarUrl: newUserProfile.photoURL,
+                    gameUsername: newUserProfile.displayName,
+                    inGameId: `123456789${i}`,
+                });
+            }
+            await batch.commit();
+        } else {
+             for (let i = 0; i < tournamentUiData.mockParticipantCount; i++) {
+                mockParticipants.push({
+                    id: `mock_user_temp_${i}`,
+                    name: `Player ${1000 + i}`,
+                    avatarUrl: `https://i.pravatar.cc/150?u=player${i}`,
+                    gameUsername: `player${1000 + i}`,
+                    inGameId: `123456789${i}`,
+                });
+            }
         }
     }
     
@@ -208,7 +259,6 @@ export const addTournamentToFirestore = async (
         ];
     }
 
-    // Omit undefined optional fields
     const cleanSponsorName = tournamentUiData.sponsorName || '';
     const cleanSponsorLogoUrl = tournamentUiData.sponsorLogoUrl || '';
 
@@ -223,7 +273,7 @@ export const addTournamentToFirestore = async (
       status: tournamentUiData.status,
       maxParticipants: tournamentUiData.maxParticipants,
       entryFee: isMock ? 0 : tournamentUiData.entryFee,
-      prizePool: 0, // Prize pool is calculated from entry fees, not set at creation
+      prizePool: 0,
       prizeDistribution,
       matchType: tournamentUiData.matchType,
       mapName: tournamentUiData.mapName === "any" ? "" : tournamentUiData.mapName,
@@ -232,7 +282,7 @@ export const addTournamentToFirestore = async (
       registrationInstructions: tournamentUiData.registrationInstructions,
       organizerId: user.uid,
       organizer: user.displayName || user.email || "Unknown Organizer",
-      participants: isMock ? mockParticipants : [], 
+      participants: mockParticipants, 
       matches: [], 
       featured: tournamentUiData.featured || false,
       sponsorName: cleanSponsorName,
@@ -245,18 +295,21 @@ export const addTournamentToFirestore = async (
 
     transaction.set(newTournamentDocRef, newTournamentData);
     
+    // Update the fee transaction with the new tournament ID
     if (!isMock) {
-        transaction.update(userRef, { points: increment(-TOURNAMENT_CREATION_FEE) });
-        
-        const transactionRef = doc(collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION));
-        transaction.set(transactionRef, { 
-            amount: TOURNAMENT_CREATION_FEE, 
-            type: 'debit', 
-            reason: `Fee for creating tournament: ${tournamentUiData.name}`,
-            tournamentId: newTournamentDocRef.id,
-            createdAt: serverTimestamp() 
-        });
+        const feeTxQuery = query(
+            collection(db, USERS_COLLECTION, user.uid, TRANSACTIONS_COLLECTION),
+            where("reason", "==", `Fee for creating tournament: ${tournamentUiData.name}`),
+            orderBy("createdAt", "desc"),
+            limit(1)
+        );
+        const feeTxSnapshot = await getDocs(feeTxQuery);
+        if (!feeTxSnapshot.empty) {
+            const feeTxDoc = feeTxSnapshot.docs[0];
+            transaction.update(feeTxDoc.ref, { tournamentId: newTournamentDocRef.id });
+        }
     }
+
 
     return newTournamentDocRef.id;
   });
@@ -432,7 +485,8 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
   return runTransaction(db, async (transaction) => {
     const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
     const userRef = doc(db, USERS_COLLECTION, participant.id);
-    const transactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+    const feeTransactionRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+    const proPointsTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
 
     const tournamentSnap = await transaction.get(tournamentRef);
     const userSnap = await transaction.get(userRef);
@@ -453,11 +507,24 @@ export const addParticipantToTournamentFirestore = async (tournamentId: string, 
       throw new Error("Insufficient AE Points to join.");
     }
     
+    // Pro Points for joining
+    const currentProPoints = userData.proPoints || 0;
+    const newTotalProPoints = currentProPoints + PRO_POINTS_JOIN_TOURNAMENT;
+    const newTier = getProTier(newTotalProPoints);
+    transaction.update(userRef, { 
+        proPoints: increment(PRO_POINTS_JOIN_TOURNAMENT),
+        proTier: newTier,
+    });
+    transaction.set(proPointsTxRef, {
+        amount: PRO_POINTS_JOIN_TOURNAMENT, type: 'credit', reason: 'Pro Points for joining a tournament',
+        isProPoints: true, createdAt: serverTimestamp()
+    });
+    
     if (fee > 0) {
         // Deduct points from user
         transaction.update(userRef, { points: increment(-fee) });
          // Create a transaction record
-        transaction.set(transactionRef, { 
+        transaction.set(feeTransactionRef, { 
             amount: fee, 
             type: 'debit', 
             reason: `Entry fee for: ${tournamentData.name}`,
@@ -488,15 +555,7 @@ export const addTeamToTournamentFirestore = async (tournament: Tournament, team:
         const tournamentData = tournamentDoc.data() as Tournament;
 
         const feePerPlayer = tournamentData.entryFee || 0;
-        if (feePerPlayer <= 0) { // If it's a free tournament, just add everyone.
-            const newParticipants = team.members.map(member => ({
-                id: member.uid, name: member.name, avatarUrl: member.avatarUrl,
-                gameUsername: member.name, inGameId: 'N/A', teamId: team.id, teamName: team.name
-            }));
-            transaction.update(tournamentRef, { participants: arrayUnion(...newParticipants) });
-            return;
-        }
-
+        
         const participantIds = new Set(tournamentData.participants.map(p => p.id));
         const memberRefs = team.members.map(m => doc(db, USERS_COLLECTION, m.uid));
         const memberDocs = await Promise.all(memberRefs.map(ref => transaction.get(ref)));
@@ -515,15 +574,31 @@ export const addTeamToTournamentFirestore = async (tournament: Tournament, team:
         let totalFeeCollected = 0;
         for (const memberDoc of memberDocs) {
             const memberData = memberDoc.data() as UserProfile;
-            transaction.update(memberDoc.ref, { points: increment(-feePerPlayer) });
-            
-            const feeTransactionRef = doc(collection(db, USERS_COLLECTION, memberData.uid, TRANSACTIONS_COLLECTION));
-            transaction.set(feeTransactionRef, {
-                amount: feePerPlayer, type: 'debit',
-                reason: `Team entry fee for: ${tournament.name}`,
-                tournamentId: tournament.id, createdAt: serverTimestamp()
+
+             // Pro Points for joining
+            const currentProPoints = memberData.proPoints || 0;
+            const newTotalProPoints = currentProPoints + PRO_POINTS_JOIN_TOURNAMENT;
+            const newTier = getProTier(newTotalProPoints);
+            transaction.update(memberDoc.ref, { 
+                proPoints: increment(PRO_POINTS_JOIN_TOURNAMENT),
+                proTier: newTier,
             });
-            totalFeeCollected += feePerPlayer;
+            const proPointsTxRef = doc(collection(db, USERS_COLLECTION, memberData.uid, TRANSACTIONS_COLLECTION));
+            transaction.set(proPointsTxRef, {
+                amount: PRO_POINTS_JOIN_TOURNAMENT, type: 'credit', reason: 'Pro Points for joining a tournament',
+                isProPoints: true, createdAt: serverTimestamp()
+            });
+
+            if (feePerPlayer > 0) {
+                transaction.update(memberDoc.ref, { points: increment(-feePerPlayer) });
+                const feeTransactionRef = doc(collection(db, USERS_COLLECTION, memberData.uid, TRANSACTIONS_COLLECTION));
+                transaction.set(feeTransactionRef, {
+                    amount: feePerPlayer, type: 'debit',
+                    reason: `Team entry fee for: ${tournament.name}`,
+                    tournamentId: tournament.id, createdAt: serverTimestamp()
+                });
+                totalFeeCollected += feePerPlayer;
+            }
         }
 
         const newParticipants: Participant[] = team.members.map(member => ({
@@ -575,19 +650,17 @@ export const awardTournamentWinners = async (
 
         // Award participation points and update tiers for all participants
         for (const participant of tournamentData.participants) {
+            if (participant.id.startsWith('mock_')) continue; // Skip mock users
             const participantRef = doc(db, USERS_COLLECTION, participant.id);
             const userDoc = await transaction.get(participantRef);
             if(userDoc.exists()) {
                 const userData = userDoc.data() as UserProfile;
-                const currentProPoints = userData.proPoints || 0;
-                let pointsToAdd = 0;
-                if (winnerIds.has(participant.id)) {
-                    if (participant.id === winners.first.participant.id) pointsToAdd = PRO_POINTS_WIN;
-                    else if (participant.id === winners.second.participant.id || participant.id === winners.third.participant.id) pointsToAdd = PRO_POINTS_RUNNERUP;
-                } else {
-                    pointsToAdd = PRO_POINTS_PARTICIPATION;
-                }
+                let pointsToAdd = PRO_POINTS_JOIN_TOURNAMENT; // Base participation
+                 if (participant.id === winners.first.participant.id) pointsToAdd = PRO_POINTS_WIN;
+                 else if (participant.id === winners.second.participant.id) pointsToAdd = PRO_POINTS_SECOND;
+                 else if (participant.id === winners.third.participant.id) pointsToAdd = PRO_POINTS_THIRD;
 
+                const currentProPoints = userData.proPoints || 0;
                 const newTotalProPoints = currentProPoints + pointsToAdd;
                 const newTier = getProTier(newTotalProPoints);
 
