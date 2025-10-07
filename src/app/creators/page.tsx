@@ -45,7 +45,6 @@ export default function CreatorHubPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [applicationStatus, setApplicationStatus] = useState<'none' | 'pending' | 'approved' | 'rejected'>('none');
   const [isCreator, setIsCreator] = useState(false);
-  const adFrequency = settings?.adFrequencyInLists || 0;
 
 
   useEffect(() => {
@@ -123,19 +122,6 @@ export default function CreatorHubPage() {
         setIsSubmitting(false);
     }
   }
-
-  const itemsWithAds = useMemo(() => {
-    if (!adFrequency || adFrequency <= 0) return creators;
-
-    const newItems: (Creator | { isAd: true })[] = [];
-    creators.forEach((item, index) => {
-      newItems.push(item);
-      if ((index + 1) % adFrequency === 0) {
-        newItems.push({ isAd: true });
-      }
-    });
-    return newItems;
-  }, [creators, adFrequency]);
 
   const renderJoinButton = () => {
     if (authLoading) {
@@ -254,18 +240,11 @@ export default function CreatorHubPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                             {Array.from({length: 6}).map((_, i) => <Skeleton key={i} className="h-[88px] w-full" />)}
                         </div>
-                    ) : itemsWithAds.length > 0 ? (
+                    ) : creators.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {itemsWithAds.map((creator, index) => {
-                            if ('isAd' in creator) {
-                                return (
-                                    <div key={`ad-${index}`} className="flex items-center justify-center">
-                                        <AdsterraBlock format="square" className="h-full min-h-[88px] w-full" />
-                                    </div>
-                                );
-                            }
-                            return <CreatorCard key={creator.id} creator={creator} />;
-                        })}
+                        {creators.map((creator) => (
+                            <CreatorCard key={creator.id} creator={creator} />
+                        ))}
                         </div>
                     ) : (
                         <div className="text-center py-10 border-2 border-dashed rounded-lg">
