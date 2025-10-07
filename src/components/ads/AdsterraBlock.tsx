@@ -16,6 +16,24 @@ interface AdsterraBlockProps {
   format: AdFormat;
 }
 
+// Function to trigger the interstitial ad
+export const showInterstitialAd = () => {
+    const adScriptSrc = '//pl27497499.revenuecpmgate.com/81/b8/c7/81b8c797da849cfed0ffcaa619935968.js';
+    
+    // Check if the script already exists to avoid duplicates
+    if (document.querySelector(`script[src="${adScriptSrc}"]`)) {
+        // If it exists, remove and re-add to re-trigger if needed, though most ad scripts handle this.
+        const existingScript = document.querySelector(`script[src="${adScriptSrc}"]`);
+        existingScript?.remove();
+    }
+    
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = adScriptSrc;
+    script.async = true;
+    document.body.appendChild(script);
+};
+
 export function AdsterraBlock({ className, style, format }: AdsterraBlockProps) {
   const adContainerRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();

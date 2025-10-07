@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
-import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import { AdsterraBlock, showInterstitialAd } from "@/components/ads/AdsterraBlock";
 
 const DailyBonusCard = ({ isAvailable, onClaim, isClaiming }: { isAvailable: boolean, onClaim: () => void, isClaiming: boolean }) => {
     return (
@@ -96,6 +96,9 @@ export default function RewardsPage() {
                 toast({ title: "Success!", description: `+${result.amount} AE Points have been added to your account.` });
                 await refreshUser(); // Refresh user context to show new balance
                 await fetchPageData(user.uid); // Refresh page data to update transactions and button state
+                
+                // Show the interstitial ad after a successful claim
+                showInterstitialAd();
             } else {
                 toast({ title: "Already Claimed", description: "You have already claimed your bonus for today.", variant: "destructive" });
                 setBonusAvailable(false); // Sync state just in case
