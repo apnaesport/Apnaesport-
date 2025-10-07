@@ -181,25 +181,7 @@ export const addTournamentToFirestore = async (
         }
     }
     
-    let prizeDistribution: PrizeDistribution | undefined = undefined;
-    let entryFee = 0;
-    let prizePool = 0;
-
-    if (tournamentUiData.prizeMode === 'custom' && tournamentUiData.prizeDistribution) {
-        prizeDistribution = tournamentUiData.prizeDistribution;
-        const totalCustomPrize = prizeDistribution.first + prizeDistribution.second + prizeDistribution.third;
-        // Calculate entry fee based on custom prize pool
-        entryFee = Math.ceil(totalCustomPrize / tournamentUiData.maxParticipants);
-        prizePool = totalCustomPrize;
-    } else { // Automatic mode
-        entryFee = tournamentUiData.entryFee;
-        prizePool = entryFee * tournamentUiData.maxParticipants;
-        prizeDistribution = {
-            first: Math.floor(prizePool * 0.5),
-            second: Math.floor(prizePool * 0.3),
-            third: Math.floor(prizePool * 0.2),
-        };
-    }
+    let prizeDistribution: PrizeDistribution | undefined = tournamentUiData.prizeDistribution;
     
     let winners: Winner[] = [];
     if(isMock && tournamentUiData.status === 'Completed' && mockParticipants.length >= 3 && prizeDistribution) {
@@ -220,8 +202,8 @@ export const addTournamentToFirestore = async (
       startDate: Timestamp.fromDate(tournamentUiData.startDate), 
       status: tournamentUiData.status,
       maxParticipants: tournamentUiData.maxParticipants,
-      entryFee: isMock ? 0 : entryFee,
-      prizePool: isMock ? (prizeDistribution ? prizeDistribution.first + prizeDistribution.second + prizeDistribution.third : 0) : 0,
+      entryFee: isMock ? 0 : tournamentUiData.entryFee,
+      prizePool: isMock && prizeDistribution ? (prizeDistribution.first + prizeDistribution.second + prizeDistribution.third) : 0,
       prizeDistribution,
       matchType: tournamentUiData.matchType,
       mapName: tournamentUiData.mapName === "any" ? "" : tournamentUiData.mapName,
@@ -233,8 +215,8 @@ export const addTournamentToFirestore = async (
       participants: isMock ? mockParticipants : [], 
       matches: [], 
       featured: tournamentUiData.featured || false,
-      ...(tournamentUiData.sponsorName && { sponsorName: tournamentUiData.sponsorName }),
-      ...(tournamentUiData.sponsorLogoUrl && { sponsorLogoUrl: tournamentUiData.sponsorLogoUrl }),
+      sponsorName: tournamentUiData.sponsorName || '',
+      sponsorLogoUrl: tournamentUiData.sponsorLogoUrl || '',
       isMock: tournamentUiData.isMock,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
@@ -561,16 +543,37 @@ export const awardTournamentWinners = async (
             throw new Error("Winners have already been declared for this tournament.");
         }
 
-        const totalPrizePool = tournamentData.prizePool || ((tournamentData.entryFee || 0) * tournamentData.participants.length);
+        // Calculate total prize pool and fees
+        const totalEntryFees = (tournamentData.entryFee || 0) * tournamentData.participants.length;
+        const platformFee = totalEntryFees * PLATFORM_FEE_PERCENTAGE;
+        const organizerPayout = platformFee; // 50/50 split of the fee
+        const prizePool = totalEntryFees - platformFee;
 
-        const prizeDistribution = tournamentData.prizeDistribution || {
-            first: Math.floor(totalPrizePool * 0.5),
-            second: Math.floor(totalPrizePool * 0.3),
-            third: Math.floor(totalPrizePool * 0.2)
-        };
+        // Use custom prize distribution if set, otherwise calculate automatically
+        const prizeDistribution = tournamentData.prizeDistribution && (tournamentData.prizeDistribution.first + tournamentData.prizeDistribution.second + tournamentData.prizeDistribution.third > 0)
+            ? tournamentData.prizeDistribution
+            : {
+                first: Math.floor(prizePool * 0.5),
+                second: Math.floor(prizePool * 0.3),
+                third: Math.floor(prizePool * 0.2)
+            };
 
         const finalWinners: Winner[] = [];
 
+        // Payout Organizer
+        if (organizerPayout > 0 && tournamentData.organizerId) {
+            const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
+            transaction.update(organizerRef, { points: increment(organizerPayout) });
+            const organizerTxRef = doc(collection(db, USERS_COLLECTION, tournamentData.organizerId, TRANSACTIONS_COLLECTION));
+            transaction.set(organizerTxRef, {
+                amount: organizerPayout,
+                type: 'credit',
+                reason: `Organizer payout for: ${tournamentData.name}`,
+                tournamentId: tournamentId,
+                createdAt: serverTimestamp()
+            });
+        }
+        
         const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, prize: number) => {
             const { participant, kills = 0, deaths = 0 } = winnerData;
             
@@ -1633,7 +1636,7 @@ export const respondToTeamInvite = async (inviteId: string, response: 'accepted'
             const newMember: TeamMember = {
                 uid: user.uid,
                 name: user.displayName || 'New Member',
-                avatarUrl: user.photoURL || '',
+                avatarUrl: user.photoURL || `https://placehold.co/40x40.png?text=${(user.displayName || "P").substring(0,2)}`,
                 role: 'Member'
             };
 
@@ -1681,5 +1684,7 @@ export const getTournamentsForGame = (gameId: string) => getTournamentsFromFires
 export const getTournamentDetails = getTournamentByIdFromFirestore;
 export const getCommunityDetails = getCommunityByIdFromFirestore;
 
+
+    
 
     

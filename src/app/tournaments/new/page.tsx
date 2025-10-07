@@ -51,28 +51,19 @@ const tournamentSchema = z.object({
   sponsorLogoUrl: z.string().url("Must be a valid URL for sponsor logo.").or(z.literal('')).optional(),
   isMock: z.boolean().optional(),
   mockParticipantCount: z.coerce.number().min(2).max(256).optional(),
-  prizeMode: z.enum(["automatic", "custom"]),
   prizeDistribution: z.object({
     first: z.coerce.number().min(0),
     second: z.coerce.number().min(0),
     third: z.coerce.number().min(0),
   }).optional(),
 }).refine(data => {
-    if (data.prizeMode === 'custom' && data.prizeDistribution) {
-        const total = data.prizeDistribution.first + data.prizeDistribution.second + data.prizeDistribution.third;
+    if (data.prizeDistribution) {
+        const total = (data.prizeDistribution.first || 0) + (data.prizeDistribution.second || 0) + (data.prizeDistribution.third || 0);
         return total <= 200;
     }
     return true;
 }, {
-    message: "Total prize pool cannot exceed 200 AE Coins.",
-    path: ["prizeDistribution.first"],
-}).refine(data => {
-    if (data.prizeMode === 'custom') {
-        return data.prizeDistribution && data.prizeDistribution.first > 0;
-    }
-    return true;
-}, {
-    message: "1st place prize must be set for custom prize mode.",
+    message: "Total custom prize pool cannot exceed 200 AE Coins.",
     path: ["prizeDistribution.first"],
 });
 
@@ -110,7 +101,6 @@ export default function CreateTournamentPage() {
       sponsorLogoUrl: "",
       isMock: false,
       mockParticipantCount: 16,
-      prizeMode: "automatic",
       prizeDistribution: { first: 0, second: 0, third: 0 },
     },
   });
@@ -118,31 +108,11 @@ export default function CreateTournamentPage() {
   const selectedGameId = form.watch("gameId");
   const isMock = form.watch("isMock");
   const selectedGame = availableGames.find(g => g.id === selectedGameId);
-  const entryFee = form.watch("entryFee");
-  const maxParticipants = form.watch("maxParticipants");
-  const prizeMode = form.watch("prizeMode");
   const customPrizes = form.watch("prizeDistribution");
-
-  const totalPrizePool = useMemo(() => {
-    if (isMock) {
-        return (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0) || (entryFee * maxParticipants);
-    }
-    if (prizeMode === 'custom') {
-        return (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0);
-    }
-    return entryFee * maxParticipants;
-  }, [entryFee, maxParticipants, prizeMode, customPrizes, isMock]);
-
-  const firstPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.5) : (customPrizes?.first || 0), [prizeMode, totalPrizePool, customPrizes]);
-  const secondPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.3) : (customPrizes?.second || 0), [prizeMode, totalPrizePool, customPrizes]);
-  const thirdPrize = useMemo(() => prizeMode === 'automatic' ? Math.floor(totalPrizePool * 0.2) : (customPrizes?.third || 0), [prizeMode, totalPrizePool, customPrizes]);
   
-  useEffect(() => {
-    if (prizeMode === 'custom' && totalPrizePool > 0) {
-      const calculatedFee = Math.ceil(totalPrizePool / maxParticipants);
-      form.setValue('entryFee', calculatedFee);
-    }
-  }, [totalPrizePool, maxParticipants, prizeMode, form]);
+  const totalPrizePool = useMemo(() => {
+    return (customPrizes?.first || 0) + (customPrizes?.second || 0) + (customPrizes?.third || 0);
+  }, [customPrizes]);
 
 
   const fetchGames = useCallback(async () => {
@@ -482,102 +452,62 @@ export default function CreateTournamentPage() {
                         <Trophy className="h-5 w-5 text-primary" /> Entry Fee & Prize Pool
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                     <Tabs value={prizeMode} onValueChange={(value) => form.setValue('prizeMode', value as "automatic" | "custom")} className="w-full">
-                        <TabsList className="grid w-full grid-cols-2">
-                            <TabsTrigger value="automatic">Automatic Prize</TabsTrigger>
-                            <TabsTrigger value="custom" disabled={!isPremium || !premiumFeatures?.customPrizes}>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <span className="flex items-center gap-1">
-                                                {(!isPremium || !premiumFeatures?.customPrizes) && <Lock className="h-3 w-3"/>}
-                                                Custom Prize
-                                            </span>
-                                        </TooltipTrigger>
-                                        {(!isPremium || !premiumFeatures?.customPrizes) && (
-                                            <TooltipContent>
-                                                <p>This is a premium feature. <Link href="/premium" className="text-primary underline">Learn more</Link>.</p>
-                                            </TooltipContent>
-                                        )}
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </TabsTrigger>
-                        </TabsList>
-                        <TabsContent value="automatic" className="pt-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <Label htmlFor="entryFee">Entry Fee</Label>
-                                    <Controller
-                                        name="entryFee"
-                                        control={form.control}
-                                        render={({ field }) => (
-                                            <div className="space-y-3">
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm font-medium">{field.value === 0 ? "Free Entry" : `${field.value} AE Coins`}</span>
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => field.onChange(0)}>Set as Free</Button>
-                                                </div>
-                                                <Slider
-                                                    id="entryFee"
-                                                    min={0} max={100} step={5}
-                                                    value={[field.value]}
-                                                    onValueChange={(value) => field.onChange(value[0])}
-                                                    disabled={isSubmittingForm || isMock || prizeMode === 'custom'}
-                                                />
-                                                <div className="flex justify-between text-xs text-muted-foreground">
-                                                    <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    />
-                                </div>
-                                <Alert variant="default" className="border-primary/30">
-                                    <Trophy className="h-4 w-4" />
-                                    <AlertTitle>Estimated Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
-                                    <AlertDescription>
-                                        <ul className="text-xs list-disc pl-4">
-                                            <li>1st Place: {firstPrize} AE Coins</li>
-                                            <li>2nd Place: {secondPrize} AE Coins</li>
-                                            <li>3rd Place: {thirdPrize} AE Coins</li>
-                                        </ul>
-                                    </AlertDescription>
-                                </Alert>
-                            </div>
-                        </TabsContent>
-                        <TabsContent value="custom" className="pt-6">
-                             <div className="space-y-4">
-                                <Alert variant="default" className="border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                    <AlertTriangle className="h-4 w-4" />
-                                    <AlertTitle>You're in Control</AlertTitle>
-                                    <AlertDescription>
-                                        Set your custom prize pool (max 200 AE Coins total). The entry fee will be calculated automatically.
-                                    </AlertDescription>
-                                </Alert>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                     <div>
-                                        <Label htmlFor="prizeFirst">1st Place Prize</Label>
-                                        <Input id="prizeFirst" type="number" {...form.register("prizeDistribution.first")} disabled={isSubmittingForm || isMock}/>
-                                     </div>
-                                      <div>
-                                        <Label htmlFor="prizeSecond">2nd Place Prize</Label>
-                                        <Input id="prizeSecond" type="number" {...form.register("prizeDistribution.second")} disabled={isSubmittingForm || isMock}/>
-                                     </div>
-                                      <div>
-                                        <Label htmlFor="prizeThird">3rd Place Prize</Label>
-                                        <Input id="prizeThird" type="number" {...form.register("prizeDistribution.third")} disabled={isSubmittingForm || isMock}/>
-                                     </div>
-                                </div>
-                                {form.formState.errors.prizeDistribution?.first && <p className="text-destructive text-xs mt-1">{form.formState.errors.prizeDistribution.first.message}</p>}
-                                <Alert variant="default" className="border-primary/30">
-                                    <Trophy className="h-4 w-4" />
-                                    <AlertTitle>Total Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
-                                    <AlertDescription>
-                                        Calculated Entry Fee: {maxParticipants > 0 ? Math.ceil(totalPrizePool / maxParticipants) : 0} AE Coins per player.
-                                    </AlertDescription>
-                                </Alert>
-                            </div>
-                        </TabsContent>
-                    </Tabs>
+                <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                        <div>
+                            <Label htmlFor="entryFee">Entry Fee</Label>
+                            <Controller
+                                name="entryFee"
+                                control={form.control}
+                                render={({ field }) => (
+                                    <div className="space-y-3">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-medium">{field.value === 0 ? "Free Entry" : `${field.value} AE Coins`}</span>
+                                            <Button type="button" variant="outline" size="sm" onClick={() => field.onChange(0)}>Set as Free</Button>
+                                        </div>
+                                        <Slider
+                                            id="entryFee"
+                                            min={0} max={100} step={5}
+                                            value={[field.value]}
+                                            onValueChange={(value) => field.onChange(value[0])}
+                                            disabled={isSubmittingForm || isMock}
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>0</span><span>25</span><span>50</span><span>75</span><span>100</span>
+                                        </div>
+                                    </div>
+                                )}
+                            />
+                        </div>
+                    </div>
+                     <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                             <Label>Custom Prize Pool</Label>
+                             {(!isPremium || !premiumFeatures?.customPrizes) && <Lock className="h-4 w-4 text-primary"/>}
+                        </div>
+                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                             <div>
+                                <Label htmlFor="prizeFirst">1st Place Prize</Label>
+                                <Input id="prizeFirst" type="number" {...form.register("prizeDistribution.first")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
+                             </div>
+                              <div>
+                                <Label htmlFor="prizeSecond">2nd Place Prize</Label>
+                                <Input id="prizeSecond" type="number" {...form.register("prizeDistribution.second")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
+                             </div>
+                              <div>
+                                <Label htmlFor="prizeThird">3rd Place Prize</Label>
+                                <Input id="prizeThird" type="number" {...form.register("prizeDistribution.third")} disabled={isSubmittingForm || isMock || !isPremium || !premiumFeatures?.customPrizes}/>
+                             </div>
+                        </div>
+                        {form.formState.errors.prizeDistribution?.first && <p className="text-destructive text-xs mt-1">{form.formState.errors.prizeDistribution.first.message}</p>}
+                        <Alert variant="default" className="border-primary/30">
+                            <Trophy className="h-4 w-4" />
+                            <AlertTitle>Total Custom Prize Pool: {totalPrizePool} AE Coins</AlertTitle>
+                            <AlertDescription>
+                                Total custom prize cannot exceed 200 AE Coins.
+                            </AlertDescription>
+                        </Alert>
+                    </div>
                 </CardContent>
             </Card>
 
@@ -661,6 +591,4 @@ export default function CreateTournamentPage() {
   );
 }
 
-
-
-
+    

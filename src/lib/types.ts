@@ -1,5 +1,4 @@
 
-
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -162,7 +161,6 @@ export type TournamentFormDataUI = {
       second: number;
       third: number;
   };
-  prizeMode: "automatic" | "custom";
   matchType: string;
   mapName?: string;
   teamSize: TeamSize;
@@ -396,5 +394,7 @@ export interface PremiumRequest {
   status: PremiumRequestStatus;
   createdAt: Timestamp;
 }
+
+    
 
     
