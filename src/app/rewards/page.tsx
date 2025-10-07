@@ -4,7 +4,7 @@
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { Coins, LogIn, Loader2, ArrowUp, ArrowDown, Gift, CheckCircle, Clock } from "lucide-react";
+import { Coins, LogIn, Loader2, ArrowUp, ArrowDown, Gift, CheckCircle, Clock, Annoyed } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
@@ -17,7 +17,18 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
-import { AdsterraBlock, showInterstitialAd } from "@/components/ads/AdsterraBlock";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const DailyBonusCard = ({ isAvailable, onClaim, isClaiming }: { isAvailable: boolean, onClaim: () => void, isClaiming: boolean }) => {
     return (
@@ -61,6 +72,28 @@ export default function RewardsPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [bonusAvailable, setBonusAvailable] = useState(false);
     const [isClaiming, setIsClaiming] = useState(false);
+    const [showAdDialog, setShowAdDialog] = useState(false);
+
+    const showInterstitialAd = useCallback(() => {
+        const adScriptSrc = '//pl27497499.revenuecpmgate.com/81/b8/c7/81b8c797da849cfed0ffcaa619935968.js';
+        
+        // Remove any existing script to ensure it can be re-triggered
+        const existingScript = document.querySelector(`script[src="${adScriptSrc}"]`);
+        existingScript?.remove();
+        
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = adScriptSrc;
+        script.async = true;
+        document.body.appendChild(script);
+        
+        // Clean up the script tag after it has likely run
+        setTimeout(() => {
+            const scriptToRemove = document.querySelector(`script[src="${adScriptSrc}"]`);
+            scriptToRemove?.remove();
+        }, 10000);
+
+    }, []);
 
     const fetchPageData = useCallback(async (userId: string) => {
         setIsLoading(true);
@@ -97,8 +130,9 @@ export default function RewardsPage() {
                 await refreshUser(); // Refresh user context to show new balance
                 await fetchPageData(user.uid); // Refresh page data to update transactions and button state
                 
-                // Show the interstitial ad after a successful claim
-                showInterstitialAd();
+                // Show the ad confirmation dialog
+                setShowAdDialog(true);
+
             } else {
                 toast({ title: "Already Claimed", description: "You have already claimed your bonus for today.", variant: "destructive" });
                 setBonusAvailable(false); // Sync state just in case
@@ -135,6 +169,29 @@ export default function RewardsPage() {
 
     return (
         <div className="space-y-8">
+             <AlertDialog open={showAdDialog} onOpenChange={setShowAdDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                        <Annoyed className="h-5 w-5 text-primary" /> Advertisement
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                        To support our platform, a brief advertisement will be shown. You can choose to view it or close this message.
+                    </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                    <AlertDialogCancel>Close</AlertDialogCancel>
+                    <AlertDialogAction
+                        onClick={() => {
+                        showInterstitialAd();
+                        }}
+                    >
+                        Show Ad
+                    </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             <PageTitle title="My Rewards" subtitle="Track your AE Points and see your transaction history." />
 
             <div className="flex justify-center">
