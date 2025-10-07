@@ -20,6 +20,7 @@ import {
   Coins,
   Users2,
   Trophy,
+  ListOrdered,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -39,6 +40,7 @@ import type { NavIndicator } from "@/lib/types";
 export const mainNavItemsForAdmin = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/tournaments", label: "Tournaments", icon: Swords },
+  { href: "/my-tournaments", label: "My Tournaments", icon: ListOrdered },
   { href: "/teams", label: "Teams", icon: Users2 },
   { href: "/pro-board", label: "Pro Board", icon: Trophy },
   { href: "/leaderboard", label: "Hall of Fame", icon: TrendingUp },

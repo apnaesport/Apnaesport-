@@ -10,6 +10,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import Script from "next/script";
 import { SiteSettingsProvider } from "@/contexts/SiteSettingsContext";
 import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import { Suspense } from "react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -134,7 +135,11 @@ export default function RootLayout({
         </noscript>
         {/* End Google Tag Manager (noscript) */}
         <SiteSettingsProvider>
-            <AppProviders>{children}</AppProviders>
+            <AppProviders>
+              <Suspense>
+                {children}
+              </Suspense>
+            </AppProviders>
             <AdsterraBlock format="social_bar" />
         </SiteSettingsProvider>
         <Analytics />

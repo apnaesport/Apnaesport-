@@ -19,10 +19,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Game, Tournament, TournamentFormDataUI, TeamSize, PrizeDistribution } from "@/lib/types";
-import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2, AlertTriangle, Users } from "lucide-react";
+import { CalendarIcon, PlusCircle, Loader2, LogIn, Coins, ShieldCheck, Lock, Image as ImageIcon, Handshake, Trophy, TestTube2, AlertTriangle, Users, Trophy as TrophyIcon } from "lucide-react";
 import { format } from "date-fns";
 import Link from "next/link";
-import { addTournamentToFirestore, getGamesFromFirestore } from "@/lib/tournamentStore"; 
+import { addTournamentToFirestore, getGamesFromFirestore, PRO_POINTS_CREATE_TOURNAMENT } from "@/lib/tournamentStore"; 
 import Image from "next/image";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Slider } from "@/components/ui/slider";
@@ -192,13 +192,26 @@ export default function CreateTournamentPage() {
           sponsorName: data.sponsorName || '',
           sponsorLogoUrl: data.sponsorLogoUrl || '',
       }, user);
-      if (!data.isMock) {
-        await refreshUser();
-      }
+      
+      await refreshUser();
+      
       toast({
         title: "Tournament Created!",
         description: `"${data.name}" is live. ${!data.isMock ? `${TOURNAMENT_CREATION_FEE} AE Points were deducted.` : ''}`,
       });
+
+      if (!isMock) {
+          toast({
+              title: "Pro Points Earned!",
+              description: `You earned ${PRO_POINTS_CREATE_TOURNAMENT} Pro Points for creating a tournament.`,
+              action: (
+                <div className="p-2 bg-primary/20 rounded-md">
+                    <TrophyIcon className="h-5 w-5 text-yellow-400"/>
+                </div>
+              )
+          });
+      }
+
       router.push(`/tournaments/${createdTournamentId}`); 
     } catch (error: any) {
       console.error("Error creating tournament:", error);
