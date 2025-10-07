@@ -1,14 +1,18 @@
 
+
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import type { UserProfile } from '@/lib/types';
-import { listenToTopPlayersByProPoints } from '@/lib/tournamentStore';
-import { Trophy, Crown, Loader2, Info } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { UserProfile, ProTier } from '@/lib/types';
+import { listenToTopPlayersByProPoints, getAllUsersFromFirestore } from '@/lib/tournamentStore';
+import { Trophy, Crown, Loader2, Info, UserCheck, BarChart2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ImageWithFallback } from '@/components/shared/ImageWithFallback';
+import { useAuth } from '@/contexts/AuthContext';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 
 interface ProBoardClientProps {
     initialPlayers: (UserProfile & { kda: string })[];
@@ -18,6 +22,80 @@ const getInitials = (name?: string | null) => {
     if (!name) return "??";
     return name.split(" ").map((n) => n[0]).join("").toUpperCase();
 };
+
+const tierConfig: Record<ProTier, { name: string, points: number, color: string, nextTierPoints?: number }> = {
+    "Bronze": { name: "Bronze Player", points: 0, color: "text-orange-400", nextTierPoints: 100 },
+    "Silver": { name: "Silver Striker", points: 100, color: "text-slate-400", nextTierPoints: 300 },
+    "Gold": { name: "Gold Warrior", points: 300, color: "text-yellow-400", nextTierPoints: 600 },
+    "Diamond": { name: "Diamond Slayer", points: 600, color: "text-cyan-400", nextTierPoints: 1000 },
+    "Legend": { name: "The Untouchable", points: 1000, color: "text-purple-400" },
+};
+
+const tierOrder: ProTier[] = ["Bronze", "Silver", "Gold", "Diamond", "Legend"];
+
+const MyRankCard = () => {
+    const { user, loading } = useAuth();
+    const [allPlayers, setAllPlayers] = useState<UserProfile[]>([]);
+    const [isLoadingRank, setIsLoadingRank] = useState(true);
+
+    useEffect(() => {
+        const fetchAll = async () => {
+            setIsLoadingRank(true);
+            const players = await getAllUsersFromFirestore();
+            players.sort((a, b) => (b.proPoints || 0) - (a.proPoints || 0));
+            setAllPlayers(players);
+            setIsLoadingRank(false);
+        }
+        fetchAll();
+    }, []);
+
+    if (loading || isLoadingRank || !user) {
+        return <Skeleton className="h-40 w-full mb-8" />;
+    }
+
+    const myRank = allPlayers.findIndex(p => p.uid === user.uid) + 1;
+    const myProTier = user.proTier || 'Bronze';
+    const tierInfo = tierConfig[myProTier];
+    const nextTier = tierOrder[tierOrder.indexOf(myProTier) + 1];
+    const nextTierInfo = nextTier ? tierConfig[nextTier] : null;
+
+    const progress = nextTierInfo
+        ? ((user.proPoints || 0) - tierInfo.points) / (nextTierInfo.points - tierInfo.points) * 100
+        : 100;
+
+    return (
+        <Card className="mb-8 border-2 border-primary/30 shadow-lg shadow-primary/10">
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <UserCheck className="h-6 w-6 text-primary" /> My Pro Status
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                <div className="flex flex-col items-center text-center">
+                    <p className="text-sm text-muted-foreground">Your Rank</p>
+                    <p className="text-5xl font-bold text-primary">{myRank > 0 ? `#${myRank}` : 'Unranked'}</p>
+                </div>
+                <div className="flex flex-col items-center text-center">
+                    <p className="text-sm text-muted-foreground">Your Points</p>
+                    <p className="text-5xl font-bold">{user.proPoints || 0}</p>
+                    <p className="text-sm text-muted-foreground">Pro Points</p>
+                </div>
+                <div className="space-y-2">
+                     <div className="flex justify-between items-baseline">
+                        <p className={`font-bold text-lg ${tierInfo.color}`}>{tierInfo.name}</p>
+                        {nextTierInfo && <p className="text-xs text-muted-foreground">Next: {nextTierInfo.name}</p>}
+                    </div>
+                    <Progress value={progress} className="h-3" />
+                    {nextTierInfo && (
+                        <p className="text-xs text-muted-foreground text-right">
+                            {nextTierInfo.points - (user.proPoints || 0)} points to next tier
+                        </p>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
 
 export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
     const [players, setPlayers] = useState(initialPlayers);
@@ -45,7 +123,7 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
     };
 
     return (
-        <div className="container mx-auto max-w-2xl relative" role="region" aria-label="Apna Esport Pro Board">
+        <div className="container mx-auto max-w-4xl relative" role="region" aria-label="Apna Esport Pro Board">
             <style jsx>{`
                 .pro-board-bg {
                     background: 
@@ -64,12 +142,27 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
                     border-color: hsl(var(--primary));
                 }
             `}</style>
+            
+            <MyRankCard />
+
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                {tierOrder.map(tier => (
+                    <Card key={tier} className="text-center bg-card/30">
+                        <CardContent className="p-3">
+                            <p className={`font-bold ${tierConfig[tier].color}`}>{tierConfig[tier].name}</p>
+                            <p className="text-xs text-muted-foreground">{tierConfig[tier].points}+ Points</p>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+
             <div className="pro-board space-y-3 pro-board-bg p-4 rounded-xl border border-border" id="pro-board">
                 {loading ? (
                     Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-2xl" />)
                 ) : players.length > 0 ? (
                     players.map((player, index) => {
                         const rank = index + 1;
+                        const tier = player.proTier || 'Bronze';
                         return (
                             <div
                                 key={player.uid}
@@ -79,7 +172,7 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
                                 <div className={cn("rank-badge w-12 h-12 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0", getRankClass(rank))}>
                                     #${rank}
                                 </div>
-                                <Avatar className={cn("w-14 h-14 rounded-xl border-2 flex-shrink-0", player.isPremium ? "border-amber-400" : "border-border")}>
+                                <Avatar className={cn("w-14 h-14 rounded-xl border-2 flex-shrink-0", player.isPremium ? "border-amber-400" : tierConfig[tier].color.replace('text-', 'border-'))}>
                                      <ImageWithFallback 
                                         as={AvatarImage}
                                         user={player}
@@ -95,12 +188,11 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
                                         <h3 className="text-base font-semibold text-foreground truncate">{player.displayName}</h3>
                                         {player.isPremium && <Crown className="h-4 w-4 text-amber-400" />}
                                     </div>
-                                    <div className="player-stats text-xs text-muted-foreground flex items-center gap-3 mt-1">
-                                        <span className="stat flex items-center gap-1">🏆 {player.wins || 0} Wins</span>
-                                        <span className="stat flex items-center gap-1">⚔️ {player.kda} K/D</span>
+                                    <div className={`player-stats text-xs font-bold flex items-center gap-3 mt-1 ${tierConfig[tier].color}`}>
+                                        {tierConfig[tier].name}
                                     </div>
                                 </div>
-                                <div className="player-score text-right font-bold text-lg text-primary min-w-[60px]">
+                                <div className="player-score text-right font-bold text-lg text-primary min-w-[80px]">
                                     {(player.proPoints || 0).toLocaleString()}
                                     <p className="text-xs font-normal text-muted-foreground">Pro Points</p>
                                 </div>

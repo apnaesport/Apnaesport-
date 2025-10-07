@@ -1,4 +1,5 @@
 
+
 import type { User as FirebaseUser } from "firebase/auth";
 import type { Timestamp } from "firebase/firestore";
 import type { icons } from "lucide-react";
@@ -44,8 +45,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   streamingChannelUrl?: string;
   communityId?: string | null;
   points: number;
-  proPoints: number;
-  proTier: ProTier;
+  proPoints?: number;
+  proTier?: ProTier;
   wins?: number;
   monthlyWins?: number;
   kills?: number;
@@ -271,6 +272,7 @@ export interface CommunityMember {
     role: CommunityRole;
     points: number;
     joinedAt: Timestamp;
+    proTier?: ProTier;
 }
 
 export interface Community {
@@ -331,6 +333,7 @@ export interface TeamMember {
   name: string;
   avatarUrl: string;
   role: 'Owner' | 'Member';
+  proTier?: ProTier;
 }
 
 export interface Team {

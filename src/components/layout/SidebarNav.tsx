@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import {
@@ -18,7 +19,7 @@ import {
   Home,
   Coins,
   Users2,
-  Trophy, // Added
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

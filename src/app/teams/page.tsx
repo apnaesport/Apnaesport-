@@ -336,7 +336,7 @@ export default function TeamsPage() {
                                 <h4 className="font-semibold mb-2">Members ({team.members.length} / 4)</h4>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {team.members.map(member => (
-                                        <div key={member.uid} className="flex items-center justify-between p-3 border rounded-lg bg-secondary/30">
+                                        <div key={member.uid} className={cn("flex items-center justify-between p-3 border rounded-lg bg-secondary/30", member.proTier && proTierColors[member.proTier])}>
                                             <div className="flex items-center gap-3">
                                                 <Avatar>
                                                     <AvatarImage src={member.avatarUrl} alt={member.name}/>
@@ -379,4 +379,3 @@ export default function TeamsPage() {
         </div>
     );
 }
-
