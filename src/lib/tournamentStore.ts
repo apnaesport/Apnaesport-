@@ -182,16 +182,20 @@ export const addTournamentToFirestore = async (
         }
     }
     
-    let prizeDistribution: PrizeDistribution | undefined = tournamentUiData.prizeDistribution;
+    const prizeDistribution = tournamentUiData.prizeDistribution || { first: 0, second: 0, third: 0 };
     
     let winners: Winner[] = [];
-    if(isMock && tournamentUiData.status === 'Completed' && mockParticipants.length >= 3 && prizeDistribution) {
+    if(isMock && tournamentUiData.status === 'Completed' && mockParticipants.length >= 3) {
         winners = [
             { rank: 1, participant: mockParticipants[0], prize: prizeDistribution.first },
             { rank: 2, participant: mockParticipants[1], prize: prizeDistribution.second },
             { rank: 3, participant: mockParticipants[2], prize: prizeDistribution.third },
         ];
     }
+
+    // Omit undefined optional fields
+    const cleanSponsorName = tournamentUiData.sponsorName || '';
+    const cleanSponsorLogoUrl = tournamentUiData.sponsorLogoUrl || '';
 
     const newTournamentData: Omit<Tournament, 'id'> = {
       name: tournamentUiData.name,
@@ -204,7 +208,7 @@ export const addTournamentToFirestore = async (
       status: tournamentUiData.status,
       maxParticipants: tournamentUiData.maxParticipants,
       entryFee: isMock ? 0 : tournamentUiData.entryFee,
-      prizePool: isMock && prizeDistribution ? (prizeDistribution.first + prizeDistribution.second + prizeDistribution.third) : 0,
+      prizePool: 0, // Prize pool is calculated from entry fees, not set at creation
       prizeDistribution,
       matchType: tournamentUiData.matchType,
       mapName: tournamentUiData.mapName === "any" ? "" : tournamentUiData.mapName,
@@ -216,8 +220,8 @@ export const addTournamentToFirestore = async (
       participants: isMock ? mockParticipants : [], 
       matches: [], 
       featured: tournamentUiData.featured || false,
-      sponsorName: tournamentUiData.sponsorName || '',
-      sponsorLogoUrl: tournamentUiData.sponsorLogoUrl || '',
+      sponsorName: cleanSponsorName,
+      sponsorLogoUrl: cleanSponsorLogoUrl,
       isMock: tournamentUiData.isMock,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
