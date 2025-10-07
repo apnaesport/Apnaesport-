@@ -233,8 +233,8 @@ export const addTournamentToFirestore = async (
       participants: isMock ? mockParticipants : [], 
       matches: [], 
       featured: tournamentUiData.featured || false,
-      sponsorName: tournamentUiData.sponsorName || undefined,
-      sponsorLogoUrl: tournamentUiData.sponsorLogoUrl || undefined,
+      ...(tournamentUiData.sponsorName && { sponsorName: tournamentUiData.sponsorName }),
+      ...(tournamentUiData.sponsorLogoUrl && { sponsorLogoUrl: tournamentUiData.sponsorLogoUrl }),
       isMock: tournamentUiData.isMock,
       createdAt: serverTimestamp() as Timestamp,
       updatedAt: serverTimestamp() as Timestamp,
@@ -898,7 +898,6 @@ export const getTopPlayersByMonthlyWins = async (count: number): Promise<(UserPr
 export const listenToTopPlayersByMonthlyWins = (count: number, callback: (players: (UserProfile & { kda: string })[]) => void): (() => void) => {
     const q = query(
         collection(db, USERS_COLLECTION),
-        where("monthlyWins", ">", 0),
         orderBy("monthlyWins", "desc"),
         limit(count)
     );
