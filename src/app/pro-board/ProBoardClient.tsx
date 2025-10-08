@@ -33,6 +33,15 @@ const tierConfig: Record<ProTier, { name: string, points: number, color: string,
 
 const tierOrder: ProTier[] = ["Bronze", "Silver", "Gold", "Diamond", "Legend"];
 
+// Helper function to determine Pro Tier based on points
+const getProTier = (points: number): ProTier => {
+    if (points >= 1000) return "Legend";
+    if (points >= 600) return "Diamond";
+    if (points >= 300) return "Gold";
+    if (points >= 100) return "Silver";
+    return "Bronze";
+};
+
 const MyRankCard = () => {
     const { user, loading } = useAuth();
     const [allPlayers, setAllPlayers] = useState<UserProfile[]>([]);
