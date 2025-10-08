@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { UserProfile, ProTier } from '@/lib/types';
 import { listenToTopPlayersByProPoints, getAllUsersFromFirestore } from '@/lib/tournamentStore';
-import { Trophy, Crown, Loader2, Info, UserCheck, BarChart2 } from "lucide-react";
+import { Trophy, Crown, Loader2, Info, UserCheck, BarChart2, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -54,15 +54,17 @@ const MyRankCard = () => {
     }
 
     const myRank = allPlayers.findIndex(p => p.uid === user.uid) + 1;
-    const myProTier = user.proTier || 'Bronze';
+    const myProPoints = user.proPoints || 0;
+    const myProTier = getProTier(myProPoints);
     const tierInfo = tierConfig[myProTier];
     const nextTier = tierOrder[tierOrder.indexOf(myProTier) + 1];
     const nextTierInfo = nextTier ? tierConfig[nextTier] : null;
 
     const progress = nextTierInfo
-        ? ((user.proPoints || 0) - tierInfo.points) / (nextTierInfo.points - tierInfo.points) * 100
+        ? ((myProPoints - tierInfo.points) / (nextTierInfo.points - tierInfo.points)) * 100
         : 100;
-
+        
+    const isTierComplete = nextTierInfo && myProPoints >= nextTierInfo.points;
     const isMaxLevel = myProTier === 'Legend';
 
     return (
@@ -79,7 +81,7 @@ const MyRankCard = () => {
                 </div>
                 <div className="flex flex-col items-center text-center">
                     <p className="text-sm text-muted-foreground">Your Points</p>
-                    <p className="text-5xl font-bold">{user.proPoints || 0}</p>
+                    <p className="text-5xl font-bold">{myProPoints}</p>
                     <p className="text-sm text-muted-foreground">Pro Points</p>
                 </div>
                 <div className="space-y-2">
@@ -91,12 +93,16 @@ const MyRankCard = () => {
                         <div className="flex items-center justify-center gap-2 h-3 text-center bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white font-bold text-xs shadow-lg">
                            MAX LEVEL <Trophy className="h-3 w-3"/>
                         </div>
+                    ) : isTierComplete ? (
+                        <div className="flex items-center justify-center gap-2 h-3 text-center bg-gradient-to-r from-green-500 to-emerald-500 rounded-full text-white font-bold text-xs shadow-lg">
+                           TIER UNLOCKED! <CheckCircle className="h-3 w-3"/>
+                        </div>
                     ) : (
                         <Progress value={progress} className="h-3" />
                     )}
-                    {!isMaxLevel && nextTierInfo && (
+                    {!isMaxLevel && !isTierComplete && nextTierInfo && (
                         <p className="text-xs text-muted-foreground text-right">
-                            {nextTierInfo.points - (user.proPoints || 0)} points to next tier
+                            {nextTierInfo.points - myProPoints} points to next tier
                         </p>
                     )}
                 </div>
@@ -218,3 +224,5 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
         </div>
     );
 }
+
+    
