@@ -1,10 +1,11 @@
 
+
 "use client";
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Youtube, Twitter, Instagram, Download, Users, Star } from "lucide-react"; 
+import { Youtube, Twitter, Instagram, Download, Users, Star, PhoneCall } from "lucide-react"; 
 import { useAuth } from "@/contexts/AuthContext";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import type { Community } from "@/lib/types";
@@ -187,12 +188,15 @@ export function MainLayout({ children }: MainLayoutProps) {
                         </ul>
                     </div>
                     <div>
-                        <h4 className="font-semibold text-foreground mb-4">Legal</h4>
+                        <h4 className="font-semibold text-foreground mb-4">Legal & Support</h4>
                         <ul className="space-y-2 text-sm">
                             <li><Link href="/privacy" className="text-muted-foreground hover:text-primary transition-colors">Privacy Policy</Link></li>
                             <li><Link href="/terms" className="text-muted-foreground hover:text-primary transition-colors">Terms of Service</Link></li>
                             <li><Link href="/contact" className="text-muted-foreground hover:text-primary transition-colors">Contact</Link></li>
-                            <li><Link href="/premium" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"><Star className="h-4 w-4 text-yellow-400"/>Premium</Link></li>
+                             <li><Link href="/premium" className="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center sm:justify-start gap-1"><Star className="h-4 w-4 text-yellow-400"/>Premium</Link></li>
+                             {settings?.externalContactUrl && (
+                                <li><a href={settings.externalContactUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-primary transition-colors flex items-center justify-center sm:justify-start gap-1"><PhoneCall className="h-4 w-4 text-primary"/>Live Support</a></li>
+                            )}
                         </ul>
                     </div>
                     <div className="space-y-6 col-span-2 sm:col-span-1">

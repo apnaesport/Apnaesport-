@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins, Tags, Crown } from "lucide-react";
+import { Globe, Palette, Shield, UsersRound, Save, Loader2, Sun, Moon, Laptop, Megaphone, Receipt, DollarSign, Download, Image as ImageIcon, Coins, Tags, Crown, Phone } from "lucide-react";
 import { useForm, type SubmitHandler, Controller, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -39,6 +39,7 @@ const settingsSchema = z.object({
   allowRegistrations: z.boolean(),
   faviconUrl: z.string().url("Must be a valid URL for favicon.").or(z.literal('')).optional(),
   downloadAppLink: z.string().url("Must be a valid URL for the app download.").or(z.literal('')).optional(),
+  externalContactUrl: z.string().url("Must be a valid URL for external contact.").or(z.literal('')).optional(),
   defaultTheme: z.string().optional(),
   basePlayerCount: z.coerce.number().min(0, "Base player count cannot be negative.").optional(),
   defaultCommunityLogoUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
@@ -58,6 +59,7 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   allowRegistrations: true,
   faviconUrl: "",
   downloadAppLink: "",
+  externalContactUrl: "",
   defaultTheme: "system",
   basePlayerCount: 0,
   defaultCommunityLogoUrl: "",
@@ -177,10 +179,16 @@ function AdminSettingsPageContent() {
             <Textarea id="siteDescription" {...form.register("siteDescription")} disabled={isSaving}/>
             {form.formState.errors.siteDescription && <p className="text-destructive text-xs mt-1">{form.formState.errors.siteDescription.message as string}</p>}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="downloadAppLink">App Download Link</Label>
+           <div className="space-y-2">
+            <Label htmlFor="downloadAppLink" className="flex items-center gap-2"><Download className="h-4 w-4"/>App Download Link</Label>
             <Input id="downloadAppLink" {...form.register("downloadAppLink")} placeholder="https://play.google.com/store/apps/..." disabled={isSaving}/>
             {form.formState.errors.downloadAppLink && <p className="text-destructive text-xs mt-1">{form.formState.errors.downloadAppLink.message as string}</p>}
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="externalContactUrl" className="flex items-center gap-2"><Phone className="h-4 w-4"/>External Contact URL</Label>
+            <Input id="externalContactUrl" {...form.register("externalContactUrl")} placeholder="https://wa.me/..." disabled={isSaving}/>
+            {form.formState.errors.externalContactUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.externalContactUrl.message as string}</p>}
+            <p className="text-xs text-muted-foreground">Add a direct contact link (e.g., WhatsApp, Telegram) for support and partnerships.</p>
           </div>
           <Separator />
           <Controller

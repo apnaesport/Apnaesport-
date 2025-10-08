@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -74,15 +75,14 @@ export default function RewardsPage() {
     const [showAdDialog, setShowAdDialog] = useState(false);
 
     const showInterstitialAd = useCallback(() => {
-        const adKey = "81b8c797da849cfed0ffcaa619935968";
-        const adScriptSrc = `//pl27497499.revenuecpmgate.com/${adKey}/invoke.js`;
-        
-        // Remove any existing script to ensure it can be re-triggered
-        const existingScript = document.querySelector(`script[src*="${adKey}"]`);
-        existingScript?.remove();
-        
-        const script = document.createElement('script');
-        script.type = 'text/javascript';
+        const adKey = settings?.adKeySquare || "81b8c797da849cfed0ffcaa619935968"; // Fallback key
+        if (!settings?.adsEnabled) return;
+
+        const containerId = `ad-container-${Date.now()}`;
+        const container = document.createElement('div');
+        container.id = containerId;
+        document.body.appendChild(container);
+
         const adOptions = `
             atOptions = {
                 'key' : '${adKey}',
@@ -92,23 +92,22 @@ export default function RewardsPage() {
                 'params' : {}
             };
         `;
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
         script.innerHTML = adOptions;
-
-        const invokeScript = document.createElement('script');
-        invokeScript.async = true;
-        invokeScript.type = 'text/javascript';
-        invokeScript.src = adScriptSrc;
-
-        document.body.appendChild(script);
-        document.body.appendChild(invokeScript);
         
-        // Clean up the script tag after it has likely run
-        setTimeout(() => {
-            script.remove();
-            invokeScript.remove();
-        }, 10000);
+        const invokeScript = document.createElement('script');
+        invokeScript.type = 'text/javascript';
+        invokeScript.src = `//www.profitabledisplaynetwork.com/${adKey}/invoke.js`;
 
-    }, []);
+        container.appendChild(script);
+        container.appendChild(invokeScript);
+        
+        setTimeout(() => {
+            container.remove();
+        }, 15000); // Clean up after 15s
+
+    }, [settings]);
 
     const fetchPageData = useCallback(async (userId: string) => {
         setIsLoading(true);
@@ -145,9 +144,9 @@ export default function RewardsPage() {
                 await refreshUser(); // Refresh user context to show new balance
                 await fetchPageData(user.uid); // Refresh page data to update transactions and button state
                 
-                // Show the ad confirmation dialog
-                setShowAdDialog(true);
-
+                if (settings?.adsEnabled) {
+                  setShowAdDialog(true);
+                }
             } else {
                 toast({ title: "Already Claimed", description: "You have already claimed your bonus for today.", variant: "destructive" });
                 setBonusAvailable(false); // Sync state just in case
@@ -198,7 +197,7 @@ export default function RewardsPage() {
                     <AlertDialogCancel>Close</AlertDialogCancel>
                     <AlertDialogAction
                         onClick={() => {
-                        showInterstitialAd();
+                            showInterstitialAd();
                         }}
                     >
                         Show Ad
@@ -269,7 +268,7 @@ export default function RewardsPage() {
                                             </div>
                                             <div>
                                                 <p className="font-semibold text-foreground">{tx.reason}</p>
-                                                <p className="text-xs text-muted-foreground">{formatDistanceToNow(tx.createdAt.toDate(), { addSuffix: true })}</p>
+                                                <p className="text-xs text-muted-foreground">{tx.createdAt ? formatDistanceToNow(tx.createdAt.toDate(), { addSuffix: true }) : 'Just now'}</p>
                                             </div>
                                         </div>
                                         <div className={cn(

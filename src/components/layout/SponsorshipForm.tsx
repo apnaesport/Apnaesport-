@@ -1,14 +1,16 @@
 
+
 "use client";
 
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Send, LogIn } from "lucide-react";
+import { Loader2, Send, LogIn, PhoneCall } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
 import { addSponsorshipRequestToFirestore } from "@/lib/tournamentStore";
@@ -16,6 +18,7 @@ import type { SponsorshipRequest } from "@/lib/types";
 
 export function SponsorshipForm() {
   const { user, loading } = useAuth();
+  const { settings } = useSiteSettings();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -77,6 +80,13 @@ export function SponsorshipForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+        {settings?.externalContactUrl && (
+            <a href={settings.externalContactUrl} target="_blank" rel="noopener noreferrer" className="block">
+                <div className="p-3 rounded-md bg-primary/10 border border-primary/20 hover:bg-primary/20 transition-colors">
+                    <p className="text-sm font-semibold flex items-center gap-2"><PhoneCall className="h-4 w-4"/>For a faster response, contact us directly on our live support channel.</p>
+                </div>
+            </a>
+        )}
       <div>
         <Label htmlFor="brandName">Brand / Company Name *</Label>
         <Input id="brandName" name="brandName" required disabled={isSubmitting} />

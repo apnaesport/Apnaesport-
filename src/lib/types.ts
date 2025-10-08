@@ -54,6 +54,8 @@ export interface UserProfile extends Partial<FirebaseUser> {
   apnaId?: string;
   unseenWins?: UnseenWin[];
   isMock?: boolean;
+  referredBy?: string; // UID of the user who referred this user
+  referralBonusClaimed?: boolean; // Whether the sign-up bonus was claimed
 }
 
 export type PointTransaction = {
@@ -209,6 +211,7 @@ export interface SiteSettings {
   logoUrl?: string;
   faviconUrl?: string;
   downloadAppLink?: string;
+  externalContactUrl?: string;
   defaultTheme?: string;
   basePlayerCount?: number;
   defaultCommunityLogoUrl?: string;
