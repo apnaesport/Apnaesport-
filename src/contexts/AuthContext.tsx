@@ -17,6 +17,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isPremium: boolean;
   premiumFeatures: PremiumFeatures | null;
+  hasUnreadNotifications: boolean;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -26,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -48,6 +50,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (userDocSnap.exists()) {
         const userProfile = userDocSnap.data() as UserProfile;
         setUser(userProfile);
+        if (userProfile.lastNotificationCheck && userProfile.createdAt) {
+          // Placeholder for real notification check logic
+        }
       } else {
         // This is a new, verified user. Create their profile.
         const newApnaId = await generateApnaId();
@@ -104,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const premiumFeatures = user?.premiumFeatures || null;
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, isPremium, premiumFeatures, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, isPremium, premiumFeatures, hasUnreadNotifications, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

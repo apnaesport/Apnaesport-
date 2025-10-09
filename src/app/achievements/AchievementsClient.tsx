@@ -3,9 +3,8 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect, useCallback }from "react";
-import { getUserAchievements } from "@/lib/tournamentStore";
 import type { Achievement } from "@/lib/types";
-import { Loader2, LogIn, Award } from "lucide-react";
+import { LogIn, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PageTitle } from "@/components/shared/PageTitle";
@@ -13,38 +12,14 @@ import { AchievementCard } from "@/components/achievements/AchievementCard";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { useUserAchievements } from "@/lib/hooks";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function AchievementsClient() {
     const { user, loading: authLoading } = useAuth();
-    const [achievements, setAchievements] = useState<Achievement[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const { data: achievements = [], isLoading } = useUserAchievements(user?.uid || '');
     const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
-
-    const fetchAchievements = useCallback(async (uid: string) => {
-        setIsLoading(true);
-        try {
-            const userAchievements = await getUserAchievements(uid);
-            setAchievements(userAchievements);
-        } catch (error) {
-            console.error("Failed to fetch achievements", error);
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    useEffect(() => {
-        if(user && !authLoading) {
-            fetchAchievements(user.uid);
-        } else if (!authLoading && !user) {
-            setIsLoading(false);
-        }
-    }, [user, authLoading, fetchAchievements]);
-
 
     if(isLoading || authLoading) {
         return (
