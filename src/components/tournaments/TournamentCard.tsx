@@ -13,7 +13,7 @@ import { useState, useEffect } from "react";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface TournamentCardProps {
-  tournament: Tournament & { formattedStartDate: string };
+  tournament: Tournament;
 }
 
 export function TournamentCard({ tournament }: TournamentCardProps) {

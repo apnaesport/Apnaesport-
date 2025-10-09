@@ -8,7 +8,6 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/componen
 import type { Tournament } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, Users, Trophy } from "lucide-react";
-import { format } from "date-fns";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
 
 interface FeaturedTournamentCardProps {
@@ -43,7 +42,7 @@ export function FeaturedTournamentCard({ tournament }: FeaturedTournamentCardPro
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div className="flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-primary" />
-            <span>{format(new Date(tournament.startDate), "MMM dd, yyyy")}</span>
+            <span>{tournament.formattedStartDate}</span>
           </div>
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-primary" />
