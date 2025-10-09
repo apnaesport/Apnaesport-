@@ -5,6 +5,7 @@ import React, { useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { ImageWithFallback } from "../shared/ImageWithFallback";
 // Note: html2canvas is a large library, ensure it's used only where needed.
 
 interface AchievementCardProps {
@@ -111,7 +112,15 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
         >
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex items-center gap-4">
-              <img src={player.avatar} className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border-2 border-white/10" alt={player.name} crossOrigin="anonymous" />
+              <ImageWithFallback 
+                src={player.avatar} 
+                fallbackSrc={`https://placehold.co/80x80.png?text=${player.name.substring(0, 2)}`}
+                alt={player.name} 
+                width={80} 
+                height={80}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover border-2 border-white/10" 
+                unoptimized
+              />
               <div>
                 <div className="text-xl sm:text-3xl font-extrabold text-white">{player.name}</div>
                 <div className="text-xs sm:text-sm text-gray-400">{player.tag}</div>
@@ -136,7 +145,15 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
                 Outstanding performance and fearless gameplay. You made history in Apna Esport.
               </p>
               <div className="mt-4 flex items-center gap-3">
-                <img src={team.logo} alt={team.name} className="w-10 h-10 rounded-full border border-white/10" crossOrigin="anonymous" />
+                <ImageWithFallback 
+                  src={team.logo} 
+                  fallbackSrc={`https://placehold.co/40x40.png?text=${team.name.substring(0, 2)}`}
+                  alt={team.name}
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full border border-white/10"
+                  unoptimized
+                />
                 <div>
                   <div className="text-sm text-white font-semibold">{team.name}</div>
                   <div className="text-xs text-gray-400">Official Esport Team</div>
