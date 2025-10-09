@@ -283,16 +283,14 @@ service cloud.firestore {
 
     // --- Achievements (`achievements`) ---
     match /achievements/{achievementId} {
-      // Allow any authenticated user to read an achievement (e.g., for public profiles).
-      allow get: if isSignedIn();
-      // Only allow a user to list their own achievements.
-      allow list: if isVerified() && request.auth.uid == request.query.where.userId;
-      // Only admins can create achievements, ensuring they are legitimate.
-      allow create: if isAdmin();
-      // Achievements are records of the past and should not be changed.
-      allow update: if false;
-      // Only admins can delete achievements, e.g., for cleanup.
-      allow delete: if isAdmin();
+      // Admins can get any achievement. Users can only get their own.
+      allow get: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      
+      // Admins can list all. Users can only list their own via a query.
+      allow list: if isVerified() && (isAdmin() || request.query.where.userId == request.auth.uid);
+      
+      // Only admins can create, update, or delete achievements.
+      allow write: if isAdmin();
     }
   }
 }
