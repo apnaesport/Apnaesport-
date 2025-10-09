@@ -2,27 +2,297 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if a user is an admin
+
+    // --- Helper Functions ---
+
+    // Checks if a user is signed in.
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks if the requesting user's email is verified.
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // A secure check to ensure the user is updating their own document.
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Safely checks if a document exists before trying to get data from it.
+    function docExists(path) {
+      return exists(path);
+    }
+
+    // Safely gets document data.
+    function getDoc(path) {
+      return get(path);
+    }
+    
+    // Safely gets an invitation document.
+    function getInvite(inviteId) {
+      return get(/databases/$(database)/documents/invites/$(inviteId));
+    }
+
+    // Checks if the current user is an admin.
     function isAdmin() {
-      // Check if the requesting user's profile has the 'isAdmin' flag set to true
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      // Ensure the user is verified, their document exists, and the isAdmin flag is true.
+      return isVerified() && docExists(userPath) && getDoc(userPath).data.isAdmin == true;
     }
 
-    // Rules for the 'users' collection
-    match /users/{userId} {
-      // Allow anyone to read user profiles (for displaying names, avatars, etc.)
-      allow read;
-      
-      // Allow a user to create or update their own profile, OR allow an admin to create/update any profile.
-      // This is necessary for the mock user creation feature.
-      allow write: if request.auth.uid == userId || isAdmin();
+    // Checks if the current user is the organizer of a specific tournament.
+    function isTournamentOrganizer(tournamentId) {
+      let tournamentPath = /databases/$(database)/documents/tournaments/$(tournamentId);
+      // Ensure the tournament doc exists and the organizerId matches.
+      return docExists(tournamentPath) && getDoc(tournamentPath).data.organizerId == request.auth.uid;
     }
 
-    // Rules for all other collections (e.g., tournaments, games, etc.)
-    // These rules allow any authenticated user to read and write, which is suitable for this prototype.
-    // For a production app, you would add more granular security here.
+    // Checks if the current user is the owner of a specific community.
+    function isCommunityOwner(communityId) {
+      let communityPath = /databases/$(database)/documents/communities/$(communityId);
+      // Ensure the community doc exists and the ownerId matches.
+      return docExists(communityPath) && getDoc(communityPath).data.ownerId == request.auth.uid;
+    }
+
+    function isTeamOwner(teamId) {
+      let teamPath = /databases/$(database)/documents/teams/$(teamId);
+      return docExists(teamPath) && getDoc(teamPath).data.ownerId == request.auth.uid;
+    }
+
+
+    // --- Default Security: Deny all access unless explicitly allowed ---
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
+    }
+
+    // --- User Profiles (`users`) ---
+    match /users/{userId} {
+      // Anyone can get a single user's public profile.
+      allow get: if true;
+      // Anyone can list users, necessary for the public leaderboard.
+      allow list: if true;
+
+      allow create: if isSelf(userId)
+                    && request.resource.data.isAdmin == false
+                    && request.resource.data.points == 10
+                    && !('communityId' in request.resource.data)
+                    && request.resource.data.uid == userId;
+      
+      allow update: if isVerified() && (
+        (isAdmin() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'apnaId', 'createdAt', 'uid'])) ||
+        (isSelf(userId) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['isAdmin', 'isPremium', 'premiumSince', 'hasReceivedPremiumBonus', 'points', 'apnaId', 'createdAt', 'uid'])
+        ) ||
+        (isSelf(userId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastBonusClaimedAt', 'points', 'updatedAt']) &&
+          request.resource.data.points == resource.data.points + 5
+        ) ||
+        // Allow point deduction ONLY for tournament entry fee.
+        (
+          isSelf(userId) &&
+          request.resource.data.points < resource.data.points &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['points', 'updatedAt'])
+        )
+      );
+      
+      allow delete: if isAdmin();
+
+      // --- Rewards Transaction History (Subcollection) ---
+      match /transactions/{transactionId} {
+        allow read: if isSelf(userId) || isAdmin();
+        allow create: if isSelf(userId) || isAdmin();
+        allow update, delete: if false;
+      }
+    }
+
+    // --- Games (`games`) ---
+    match /games/{gameId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // --- Tournaments (`tournaments`) ---
+    match /tournaments/{tournamentId} {
+      allow read: if true;
+
+      allow create: if isVerified() && (
+        (
+          request.resource.data.get('isQuickTournament', false) == false &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.points >= 40 &&
+          request.resource.data.organizerId == request.auth.uid
+        ) ||
+        (
+          request.resource.data.isQuickTournament == true &&
+          isCommunityOwner(request.resource.data.communityId) &&
+          request.resource.data.organizerId == request.auth.uid
+        )
+      );
+
+      allow update: if isVerified() && (
+        isAdmin() ||
+
+        // Organizer can end a tournament and declare winners.
+        (
+          isTournamentOrganizer(tournamentId) &&
+          (resource.data.status == 'Live' || resource.data.status == 'Ongoing') &&
+          request.resource.data.status == 'Completed' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'winners', 'updatedAt'])
+        ) ||
+
+        // Any verified user can join an "Upcoming" or "Live" tournament.
+        (
+          (resource.data.status == 'Upcoming' || resource.data.status == 'Live') &&
+          // Check that only the participants list, prize pool, and timestamp are being changed.
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants', 'prizePool', 'updatedAt']) &&
+          
+          // Verify prize pool is incremented correctly. `get` provides a default value if the field is missing.
+          request.resource.data.prizePool == (resource.data.get('prizePool', 0)) + (resource.data.get('entryFee', 0)) &&
+
+          // --- Participant list update logic ---
+          (
+            // Case 1: The 'participants' field does not exist yet.
+            // The new list must have exactly one member: the current user.
+            !('participants' in resource.data) &&
+            request.resource.data.participants.size() == 1 &&
+            request.resource.data.participants[0].id == request.auth.uid
+          ) ||
+          (
+            // Case 2: The 'participants' list already exists.
+            // The new list size must be exactly one greater than the old list.
+            'participants' in resource.data &&
+            request.resource.data.participants.size() == resource.data.participants.size() + 1 &&
+            // The new participant (at the end of the list) must be the current user.
+            // This relies on the client transaction to add the user to the end of the array.
+            request.resource.data.participants[request.resource.data.participants.size() - 1].id == request.auth.uid
+          )
+        )
+      );
+
+      // Organizer can delete a tournament only if it hasn't started. Admin can always delete.
+      allow delete: if isVerified() && (isAdmin() || (isTournamentOrganizer(tournamentId) && resource.data.status == 'Upcoming'));
+    }
+    
+    // --- Notifications (`notifications`) ---
+    match /notifications/{notificationId} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+    
+    // --- Site Settings (`settings`) ---
+    match /settings/{setting} {
+        allow read: if true;
+        allow write: if isAdmin();
+    }
+    
+    // --- Sponsorships (`sponsorships`) ---
+    match /sponsorships/{sponsorshipId} {
+      allow create: if isVerified();
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // --- Communities (`communities`) ---
+    match /communities/{communityId} {
+      allow read: if true;
+
+      allow create: if isVerified() && request.resource.data.ownerId == request.auth.uid;
+      
+      allow update: if isVerified() && (
+        (isAdmin() || isCommunityOwner(communityId)) ||
+        (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberCount', 'updatedAt']) && 
+          request.resource.data.memberCount == resource.data.memberCount + 1
+        )
+      );
+      
+      allow delete: if isVerified() && (isAdmin() || isCommunityOwner(communityId));
+      
+      match /members/{userId} {
+        allow read: if true;
+        allow create: if isSelf(userId);
+        allow delete: if isSelf(userId) || isCommunityOwner(communityId);
+        allow update: if isAdmin() || isCommunityOwner(communityId);
+      }
+
+      match /announcements/{announcementId} {
+        allow read: if true;
+        allow write: if isCommunityOwner(communityId);
+      }
+    }
+    
+    // --- Creator Hub (`creatorApplications` and `creators`) ---
+    match /creatorApplications/{applicationId} {
+      allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
+      allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+    
+    match /creators/{creatorId} {
+      allow read: if true;
+      allow create, delete: if isAdmin();
+      allow update: if isVerified() && (
+        isAdmin() ||
+        (
+          request.resource.data.votes == resource.data.votes + 1 &&
+          !resource.data.votedBy.hasAny([request.auth.uid]) && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'votedBy', 'updatedAt'])
+        )
+      );
+    }
+
+    // --- Premium Requests (`premiumRequests`) ---
+    match /premiumRequests/{requestId} {
+      allow create: if isVerified() && request.resource.data.userId == request.auth.uid;
+      allow read: if isVerified() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // --- Teams (`teams` and `invites`) ---
+    match /teams/{teamId} {
+      allow read: if isVerified();
+      allow create: if isVerified() 
+                    && request.resource.data.ownerId == request.auth.uid;
+      
+      allow update: if isVerified() && (
+        // Allow owner to update name or remove members
+        (isTeamOwner(teamId) && (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']) ||
+          request.resource.data.members.size() == resource.data.members.size() - 1
+        )) ||
+        // Allow an invited user to add themselves to the members list
+        (
+          // Check that only members are being changed
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members']) &&
+          // Verify the user is adding themselves
+          request.resource.data.members.size() == resource.data.members.size() + 1 &&
+          request.resource.data.members[request.resource.data.members.size() - 1].uid == request.auth.uid &&
+          // Verify the team isn't full
+          resource.data.members.size() < 4
+        )
+      );
+
+      allow delete: if isVerified() && isTeamOwner(teamId);
+    }
+
+    match /invites/{inviteId} {
+      allow create: if isVerified() && isTeamOwner(request.resource.data.teamId);
+      allow read: if isVerified() && request.auth.uid == resource.data.toId;
+      allow delete: if isVerified() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+    }
+
+    // --- Achievements (`achievements`) ---
+    match /achievements/{achievementId} {
+      // Allow any authenticated user to read an achievement (e.g., for public profiles).
+      allow get: if isSignedIn();
+      // Only allow a user to list their own achievements.
+      allow list: if isVerified() && request.auth.uid == request.query.where.userId;
+      // Only admins can create achievements, ensuring they are legitimate.
+      allow create: if isAdmin();
+      // Achievements are records of the past and should not be changed.
+      allow update: if false;
+      // Only admins can delete achievements, e.g., for cleanup.
+      allow delete: if isAdmin();
     }
   }
 }
