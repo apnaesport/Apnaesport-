@@ -621,12 +621,9 @@ export const awardTournamentWinners = async (
     winners: { first: Winner, second: Winner, third: Winner }
 ): Promise<void> => {
     return runTransaction(db, async (transaction) => {
-        // --- 1. READ PHASE ---
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
         const tournamentDoc = await transaction.get(tournamentRef);
-        if (!tournamentDoc.exists()) {
-            throw new Error("Tournament not found.");
-        }
+        if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
         const tournamentData = tournamentDoc.data() as Tournament;
 
         if (tournamentData.winners && tournamentData.winners.length > 0) {
@@ -638,15 +635,13 @@ export const awardTournamentWinners = async (
         const winnerDocs = await Promise.all(uniqueWinnerRefs.map(ref => transaction.get(ref)));
         const winnerDataMap = new Map<string, UserProfile>();
         winnerDocs.forEach(doc => {
-            if (doc.exists()) {
-                winnerDataMap.set(doc.id, doc.data() as UserProfile);
-            }
+            if (doc.exists()) winnerDataMap.set(doc.id, doc.data() as UserProfile);
+            else throw new Error(`Winner profile with ID ${doc.id} not found.`);
         });
-
+        
         const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId as string);
         const organizerDoc = await transaction.get(organizerRef);
 
-        // --- 2. LOGIC PHASE (NO WRITES) ---
         const isTeamEvent = tournamentData.teamSize !== 'Solo';
         const totalEntryFees = tournamentData.prizePool;
         const platformFee = totalEntryFees * PLATFORM_FEE_PERCENTAGE;
@@ -663,9 +658,6 @@ export const awardTournamentWinners = async (
         
         const finalWinners: Winner[] = [];
 
-        // --- 3. WRITE PHASE ---
-
-        // Payout organizer
         if (organizerPayout > 0 && tournamentData.organizerId && organizerDoc.exists()) {
             transaction.update(organizerRef, { points: increment(organizerPayout) });
             const organizerTxRef = doc(collection(db, USERS_COLLECTION, tournamentData.organizerId, TRANSACTIONS_COLLECTION));
@@ -687,61 +679,60 @@ export const awardTournamentWinners = async (
             }
         }
         
-        const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
+        const processWinner = (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
             const { participant } = winnerData;
             const winnerRef = doc(db, USERS_COLLECTION, participant.id);
             const winnerProfile = winnerDataMap.get(participant.id);
+            
+            if (!winnerProfile) return;
 
-            if (winnerProfile) {
-                const unseenWin: UnseenWin = { id: `${tournamentId}-${rank}`, tournamentId, tournamentName: tournamentData.name, rank, prize: totalPrize };
-                const achievement: Omit<Achievement, 'id' | 'createdAt'> = {
-                    userId: participant.id,
-                    tournamentId,
-                    tournamentName: tournamentData.name,
-                    tournamentDate: (tournamentData.startDate as Timestamp).toDate().toISOString(),
-                    rank,
-                    rarity: rank === 1 ? 'mythic' : rank === 2 ? 'master' : 'elite',
-                    playerName: participant.name,
-                    playerTag: winnerProfile.apnaId || '',
-                    playerAvatar: winnerProfile.photoURL || '',
-                    teamName: participant.teamName || 'Solo Player',
-                    teamLogo: '' // Placeholder, maybe fetch team logo if it's a team tournament
-                };
-
-                const achievementRef = doc(collection(db, ACHIEVEMENTS_COLLECTION));
-                transaction.set(achievementRef, { ...achievement, createdAt: serverTimestamp() });
-                
-                const updatePayload: any = { 
-                    monthlyWins: increment(1),
-                    unseenWins: arrayUnion(unseenWin)
-                };
-                
-                let proPointsToAdd = 0;
-                if (rank === 1) proPointsToAdd = PRO_POINTS_WIN;
-                else if (rank === 2) proPointsToAdd = PRO_POINTS_SECOND;
-                else if (rank === 3) proPointsToAdd = PRO_POINTS_THIRD;
-                
-                const newTotalProPoints = (winnerProfile.proPoints || 0) + proPointsToAdd;
-                updatePayload.proPoints = increment(proPointsToAdd);
-                updatePayload.proTier = getProTier(newTotalProPoints);
-                
-                if (totalPrize > 0) {
-                    updatePayload.points = increment(totalPrize);
-                    const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
-                    transaction.set(prizeTxRef, {
-                        amount: totalPrize, type: 'credit', reason: `Prize for ${rank} place in ${tournamentData.name}`,
-                        tournamentId, createdAt: serverTimestamp()
-                    });
-                }
-
-                transaction.update(winnerRef, updatePayload);
-                finalWinners.push({ ...winnerData, prize: totalPrize, rank });
+            const unseenWin: UnseenWin = { id: `${tournamentId}-${rank}`, tournamentId, tournamentName: tournamentData.name, rank, prize: totalPrize };
+            const achievement: Omit<Achievement, 'id' | 'createdAt'> = {
+                userId: participant.id,
+                tournamentId,
+                tournamentName: tournamentData.name,
+                tournamentDate: (tournamentData.startDate as Timestamp).toDate().toISOString(),
+                rank,
+                rarity: rank === 1 ? 'mythic' : rank === 2 ? 'master' : 'elite',
+                playerName: participant.name,
+                playerTag: winnerProfile.apnaId || '',
+                playerAvatar: winnerProfile.photoURL || '',
+                teamName: participant.teamName || 'Solo Player',
+                teamLogo: '' 
+            };
+            const achievementRef = doc(collection(db, ACHIEVEMENTS_COLLECTION));
+            transaction.set(achievementRef, { ...achievement, createdAt: serverTimestamp() });
+            
+            const updatePayload: any = { 
+                monthlyWins: increment(1),
+                unseenWins: arrayUnion(unseenWin)
+            };
+            
+            let proPointsToAdd = 0;
+            if (rank === 1) proPointsToAdd = PRO_POINTS_WIN;
+            else if (rank === 2) proPointsToAdd = PRO_POINTS_SECOND;
+            else if (rank === 3) proPointsToAdd = PRO_POINTS_THIRD;
+            
+            const newTotalProPoints = (winnerProfile.proPoints || 0) + proPointsToAdd;
+            updatePayload.proPoints = increment(proPointsToAdd);
+            updatePayload.proTier = getProTier(newTotalProPoints);
+            
+            if (totalPrize > 0) {
+                updatePayload.points = increment(totalPrize);
+                const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
+                transaction.set(prizeTxRef, {
+                    amount: totalPrize, type: 'credit', reason: `Prize for ${rank} place in ${tournamentData.name}`,
+                    tournamentId, createdAt: serverTimestamp()
+                });
             }
+
+            transaction.update(winnerRef, updatePayload);
+            finalWinners.push({ ...winnerData, prize: totalPrize, rank });
         };
 
-        await processWinner(winners.first, 1, prizeDistribution.first);
-        await processWinner(winners.second, 2, prizeDistribution.second);
-        await processWinner(winners.third, 3, prizeDistribution.third);
+        processWinner(winners.first, 1, prizeDistribution.first);
+        processWinner(winners.second, 2, prizeDistribution.second);
+        processWinner(winners.third, 3, prizeDistribution.third);
         
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
@@ -1515,7 +1506,7 @@ export const updateAnnouncement = async (communityId: string, announcementId: st
 };
 
 export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
-    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
+    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
     await deleteDoc(announcementRef);
 };
 
@@ -1884,6 +1875,80 @@ export const getUserAchievements = async (userId: string): Promise<Achievement[]
         ...doc.data(),
     } as Achievement));
 };
+
+export const createManualAchievement = async (
+    tournamentId: string,
+    userId: string,
+    rank: 1 | 2 | 3,
+    prize: number
+): Promise<void> => {
+    return runTransaction(db, async (transaction) => {
+        const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
+        const userRef = doc(db, USERS_COLLECTION, userId);
+
+        const tournamentDoc = await transaction.get(tournamentRef);
+        const userDoc = await transaction.get(userRef);
+
+        if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
+        if (!userDoc.exists()) throw new Error("User not found.");
+
+        const tournamentData = tournamentDoc.data() as Tournament;
+        const userData = userDoc.data() as UserProfile;
+        const participant = tournamentData.participants.find(p => p.id === userId);
+
+        if (!participant) throw new Error("User was not a participant in this tournament.");
+
+        const existingAchievementQuery = query(
+            collection(db, ACHIEVEMENTS_COLLECTION),
+            where("userId", "==", userId),
+            where("tournamentId", "==", tournamentId)
+        );
+        const existingAchievementSnap = await getDocs(existingAchievementQuery);
+        if (!existingAchievementSnap.empty) {
+            throw new Error("This user already has an achievement for this tournament.");
+        }
+
+        const achievement: Omit<Achievement, 'id' | 'createdAt'> = {
+            userId,
+            tournamentId,
+            tournamentName: tournamentData.name,
+            tournamentDate: (tournamentData.startDate as Timestamp).toDate().toISOString(),
+            rank,
+            rarity: rank === 1 ? 'mythic' : rank === 2 ? 'master' : 'elite',
+            playerName: userData.displayName || 'Player',
+            playerTag: userData.apnaId || '',
+            playerAvatar: userData.photoURL || '',
+            teamName: participant.teamName || 'Solo Player',
+            teamLogo: '' // Placeholder
+        };
+        const achievementRef = doc(collection(db, ACHIEVEMENTS_COLLECTION));
+        transaction.set(achievementRef, { ...achievement, createdAt: serverTimestamp() });
+
+        let proPointsToAdd = 0;
+        if (rank === 1) proPointsToAdd = PRO_POINTS_WIN;
+        else if (rank === 2) proPointsToAdd = PRO_POINTS_SECOND;
+        else if (rank === 3) proPointsToAdd = PRO_POINTS_THIRD;
+
+        const newTotalProPoints = (userData.proPoints || 0) + proPointsToAdd;
+        const updatePayload: any = {
+            monthlyWins: increment(1),
+            proPoints: increment(proPointsToAdd),
+            proTier: getProTier(newTotalProPoints),
+        };
+        
+        if (prize > 0) {
+            updatePayload.points = increment(prize);
+            const prizeTxRef = doc(collection(db, USERS_COLLECTION, userId, TRANSACTIONS_COLLECTION));
+            transaction.set(prizeTxRef, {
+                amount: prize, type: 'credit', reason: `Prize for ${rank} place in ${tournamentData.name} (Manual Award)`,
+                tournamentId, createdAt: serverTimestamp()
+            });
+        }
+        
+        transaction.update(userRef, updatePayload);
+    });
+};
+
 
 
 // Aliases for easier use

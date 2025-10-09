@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
@@ -17,7 +18,8 @@ import {
   getTopPlayersByMonthlyWins,
   getCommunityMembers,
   getGameDetails,
-  getPremiumRequestsFromFirestore
+  getPremiumRequestsFromFirestore,
+  getUserAchievements,
 } from "./tournamentStore";
 
 // --- React Query Hooks for Firestore ---
@@ -140,4 +142,12 @@ export function useLeaderboard(count: number) {
         queryKey: ['leaderboard', count],
         queryFn: () => getTopPlayersByMonthlyWins(count),
     });
+}
+
+export function useUserAchievements(userId: string) {
+    return useQuery({
+        queryKey: ['achievements', userId],
+        queryFn: () => getUserAchievements(userId),
+        enabled: !!userId,
+    })
 }

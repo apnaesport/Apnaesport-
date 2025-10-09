@@ -18,6 +18,7 @@ import {
   Crown,
   KeyRound,
   Gift,
+  Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -38,6 +39,7 @@ const adminNavItems = [
   { href: "/admin/creators", label: "Creators", icon: Star },
   { href: "/admin/premium", label: "Premium", icon: Crown },
   { href: "/admin/premium-requests", label: "Premium Requests", icon: Gift },
+  { href: "/admin/achievements", label: "Award Achievements", icon: Trophy },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/sponsorships", label: "Sponsorships", icon: Handshake },
   { href: "/admin/monetization", label: "Monetization", icon: DollarSign },
