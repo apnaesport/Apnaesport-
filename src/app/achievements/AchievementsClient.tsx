@@ -12,6 +12,8 @@ import { AchievementCard } from "@/components/achievements/AchievementCard";
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { useUserAchievements } from "@/lib/hooks";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,13 +78,18 @@ export default function AchievementsClient() {
             <Dialog open={!!selectedAchievement} onOpenChange={(open) => !open && setSelectedAchievement(null)}>
                 <DialogContent className="max-w-4xl w-full p-0 bg-transparent border-none shadow-none">
                      {selectedAchievement && (
-                        <AchievementCard 
-                            player={{ name: selectedAchievement.playerName, tag: selectedAchievement.playerTag, avatar: selectedAchievement.playerAvatar }}
-                            team={{ name: selectedAchievement.teamName, logo: selectedAchievement.teamLogo }}
-                            tournament={{ name: selectedAchievement.tournamentName, date: new Date(selectedAchievement.tournamentDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'}) }}
-                            rank={selectedAchievement.rank}
-                            rarity={selectedAchievement.rarity}
-                        />
+                         <>
+                            <DialogHeader className="sr-only">
+                                <DialogTitle>Achievement Card: {selectedAchievement.tournamentName}</DialogTitle>
+                            </DialogHeader>
+                            <AchievementCard 
+                                player={{ name: selectedAchievement.playerName, tag: selectedAchievement.playerTag, avatar: selectedAchievement.playerAvatar }}
+                                team={{ name: selectedAchievement.teamName, logo: selectedAchievement.teamLogo }}
+                                tournament={{ name: selectedAchievement.tournamentName, date: new Date(selectedAchievement.tournamentDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'}) }}
+                                rank={selectedAchievement.rank}
+                                rarity={selectedAchievement.rarity}
+                            />
+                        </>
                      )}
                 </DialogContent>
             </Dialog>
