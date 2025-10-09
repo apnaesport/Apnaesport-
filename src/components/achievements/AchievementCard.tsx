@@ -4,9 +4,8 @@
 import React, { useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
 import { ImageWithFallback } from "../shared/ImageWithFallback";
-// Note: html2canvas is a large library, ensure it's used only where needed.
+import { downloadAchievementImage, shareAchievementCard } from "@/lib/image-export";
 
 interface AchievementCardProps {
   player: { name: string; tag: string; avatar: string; };
@@ -14,93 +13,51 @@ interface AchievementCardProps {
   tournament: { name: string; date: string; };
   rank: number;
   rarity: "elite" | "master" | "mythic" | "supreme";
-  isStatic?: boolean; // New prop to disable interactive elements
+  isStatic?: boolean;
 }
 
-export function AchievementCard({ player, team, tournament, rank, rarity, isStatic = false }: AchievementCardProps) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
+const TrophyIcon = () => (
+  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white/80">
+    <path d="M8 3h8v2a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V3z" fill="currentColor" />
+    <path d="M4 8a2 2 0 0 1 2-2v2a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V6a2 2 0 0 1 2 2v1a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V8z" fill="currentColor" />
+  </svg>
+);
 
-  const rarityStyles = {
-    elite: {
-      label: "ELITE CHAMPION",
-      glow: "from-indigo-500/20 to-transparent",
-      border: "border-indigo-400/60",
-      text: "text-indigo-400"
-    },
-    master: {
-      label: "MASTER PLAYER",
-      glow: "from-cyan-500/25 to-transparent",
-      border: "border-cyan-400/60",
-      text: "text-cyan-400"
-    },
-    mythic: {
-      label: "MYTHIC WARRIOR",
-      glow: "from-pink-500/25 to-transparent",
-      border: "border-pink-400/60",
-      text: "text-pink-400"
-    },
-    supreme: {
-      label: "SUPREME LEGEND",
-      glow: "from-purple-500/25 to-transparent",
-      border: "border-purple-400/60",
-      text: "text-purple-400"
-    },
-  };
+const rarityStyles = {
+  elite: { label: "ELITE CHAMPION", glow: "from-indigo-500/20 to-transparent", border: "border-indigo-400/60", text: "text-indigo-400" },
+  master: { label: "MASTER PLAYER", glow: "from-cyan-500/25 to-transparent", border: "border-cyan-400/60", text: "text-cyan-400" },
+  mythic: { label: "MYTHIC WARRIOR", glow: "from-pink-500/25 to-transparent", border: "border-pink-400/60", text: "text-pink-400" },
+  supreme: { label: "SUPREME LEGEND", glow: "from-purple-500/25 to-transparent", border: "border-purple-400/60", text: "text-purple-400" },
+};
 
-  const styles = rarityStyles[rarity] || rarityStyles.elite;
+export const AchievementCard = React.forwardRef<HTMLDivElement, AchievementCardProps>(
+  ({ player, team, tournament, rank, rarity, isStatic = false }, ref) => {
+    const internalCardRef = useRef<HTMLDivElement>(null);
+    // Use the forwarded ref if provided, otherwise use the internal ref
+    const cardRef = (ref || internalCardRef) as React.RefObject<HTMLDivElement>;
 
-  async function downloadImage() {
-    try {
-        const html2canvas = (await import("html2canvas")).default;
-        const node = cardRef.current;
-        if (!node) return;
-        const canvas = await html2canvas(node, { useCORS: true, scale: 2, backgroundColor: null });
-        const dataUrl = canvas.toDataURL("image/png");
-        const a = document.createElement("a");
-        a.href = dataUrl;
-        a.download = `${player.name.replace(/\s+/g, "_")}_${tournament.name.replace(/\s+/g, "_")}_achievement.png`;
-        a.click();
-    } catch (e) {
-        console.error(e);
-        toast({ title: "Error", description: "Could not download image.", variant: "destructive" });
-    }
-  }
+    const styles = rarityStyles[rarity] || rarityStyles.elite;
+    
+    const handleDownload = () => {
+        const fileName = `${player.name.replace(/\s+/g, "_")}_${tournament.name.replace(/\s+/g, "_")}_achievement.png`;
+        downloadAchievementImage(cardRef, fileName);
+    };
 
-  async function shareCard() {
-    try {
-      const html2canvas = (await import("html2canvas")).default;
-      const node = cardRef.current;
-      if (!node) return;
-      const canvas = await html2canvas(node, { useCORS: true, scale: 2, backgroundColor: null });
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, "image/png"));
-      if (!blob) throw new Error("Could not create blob from canvas.");
-      
-      const file = new File([blob], "apna-achievement.png", { type: "image/png" });
-      const shareText = `${player.name} just conquered ${tournament.name} in Apna Esport!🔥\n#ApnaEsport #GamingChampion`;
+    const handleShare = () => {
+        shareAchievementCard(cardRef, {
+            title: "Apna Esport Achievement",
+            text: `${player.name} just conquered ${tournament.name} in Apna Esport!🔥\n#ApnaEsport #GamingChampion`,
+            fileName: "apna-esport-achievement.png",
+        });
+    };
 
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: "Apna Esport Achievement", text: shareText });
-      } else {
-        downloadImage();
-      }
-    } catch (e) {
-      console.error(e);
-      toast({ title: "Sharing Not Supported", description: "Sharing is not supported on this browser. Downloading image instead.", variant: "default" });
-      downloadImage();
-    }
-  }
-
-  const TrophyIcon = () => (
-    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={cn("text-white/80", styles.text)}>
-      <path d="M8 3h8v2a3 3 0 0 1-3 3H11a3 3 0 0 1-3-3V3z" fill="currentColor" />
-      <path d="M4 8a2 2 0 0 1 2-2v2a4 4 0 0 0 4 4h4a4 4 0 0 0 4-4V6a2 2 0 0 1 2 2v1a6 6 0 0 1-6 6H10a6 6 0 0 1-6-6V8z" fill="currentColor" />
-    </svg>
-  );
-
-  const cardContent = (
-      <>
-        {/* outer aura */}
+    return (
+      <motion.div
+        initial={{ scale: isStatic ? 1 : 0.9, opacity: isStatic ? 1 : 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="relative max-w-[900px] w-full"
+      >
         <div className={cn("absolute -inset-3 blur-3xl opacity-30 bg-gradient-to-r pointer-events-none", styles.glow)} />
 
         <div
@@ -113,7 +70,7 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <div className="flex items-center gap-4">
               <ImageWithFallback 
-                src={player.avatar} 
+                src={player.avatar || ''} 
                 fallbackSrc={`https://placehold.co/80x80.png?text=${player.name.substring(0, 2)}`}
                 alt={player.name} 
                 width={80} 
@@ -146,7 +103,7 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
               </p>
               <div className="mt-4 flex items-center gap-3">
                 <ImageWithFallback 
-                  src={team.logo} 
+                  src={team.logo || ''} 
                   fallbackSrc={`https://placehold.co/40x40.png?text=${team.name.substring(0, 2)}`}
                   alt={team.name}
                   width={40}
@@ -181,10 +138,10 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
                 </div>
 
                 <div className="flex gap-3">
-                <button onClick={shareCard} className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:scale-105 transition">
+                <button onClick={handleShare} className="px-4 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold hover:scale-105 transition">
                     Share
                 </button>
-                <button onClick={downloadImage} className="px-4 py-2 rounded-lg border border-white/10 text-white/90 hover:bg-white/5 transition">
+                <button onClick={handleDownload} className="px-4 py-2 rounded-lg border border-white/10 text-white/90 hover:bg-white/5 transition">
                     Download
                 </button>
                 </div>
@@ -193,17 +150,9 @@ export function AchievementCard({ player, team, tournament, rank, rarity, isStat
 
           <div className="absolute bottom-3 right-3 text-[10px] text-gray-500">© Apna Esport</div>
         </div>
-      </>
-  );
+      </motion.div>
+    );
+  }
+);
 
-  return (
-    <motion.div
-        initial={{ scale: isStatic ? 1 : 0.9, opacity: isStatic ? 1 : 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.8, ease: "easeOut" }}
-        className="relative max-w-[900px] w-full"
-    >
-        {cardContent}
-    </motion.div>
-  );
-}
+AchievementCard.displayName = "AchievementCard";
