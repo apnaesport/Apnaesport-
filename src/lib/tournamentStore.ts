@@ -26,7 +26,7 @@ import {
 } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL, deleteObject } from "firebase/storage";
 import { db } from "./firebase";
-import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite, ProTier } from './types';
+import type { Tournament, Game, Participant, Match, NotificationMessage, NotificationFormData, NotificationTarget, SiteSettings, UserProfile, TournamentStatus, SponsorshipRequest, Community, CommunityMember, Creator, CreatorApplication, Winner, Announcement, TeamSize, PointTransaction, UnseenWin, PremiumRequest, PrizeDistribution, TournamentFormDataUI, Team, TeamMember, TeamInvite, ProTier, Achievement } from './types';
 
 const GAMES_COLLECTION = "games";
 const TOURNAMENTS_COLLECTION = "tournaments";
@@ -43,6 +43,8 @@ const UNSEEN_WINS_COLLECTION = "unseenWins";
 const PREMIUM_REQUESTS_COLLECTION = "premiumRequests";
 const TEAMS_COLLECTION = "teams";
 const INVITES_COLLECTION = "invites";
+const ACHIEVEMENTS_COLLECTION = "achievements";
+
 
 const TOURNAMENT_CREATION_FEE = 40;
 const TOURNAMENT_DELETION_PENALTY = 5;
@@ -622,25 +624,27 @@ export const awardTournamentWinners = async (
         // --- 1. READ PHASE ---
         const tournamentRef = doc(db, TOURNAMENTS_COLLECTION, tournamentId);
         const tournamentDoc = await transaction.get(tournamentRef);
-        if (!tournamentDoc.exists()) throw new Error("Tournament not found.");
-
+        if (!tournamentDoc.exists()) {
+            throw new Error("Tournament not found.");
+        }
         const tournamentData = tournamentDoc.data() as Tournament;
+
         if (tournamentData.winners && tournamentData.winners.length > 0) {
             throw new Error("Winners have already been declared for this tournament.");
         }
-
-        const allParticipantRefs = tournamentData.participants
-            .filter(p => !p.id.startsWith('mock_'))
-            .map(p => doc(db, USERS_COLLECTION, p.id));
         
-        const allParticipantDocs = await Promise.all(allParticipantRefs.map(ref => transaction.get(ref)));
-        
-        const participantDataMap = new Map<string, UserProfile>();
-        allParticipantDocs.forEach(doc => {
+        const allWinnerParticipantIds = [winners.first.participant.id, winners.second.participant.id, winners.third.participant.id];
+        const uniqueWinnerRefs = [...new Set(allWinnerParticipantIds)].map(id => doc(db, USERS_COLLECTION, id));
+        const winnerDocs = await Promise.all(uniqueWinnerRefs.map(ref => transaction.get(ref)));
+        const winnerDataMap = new Map<string, UserProfile>();
+        winnerDocs.forEach(doc => {
             if (doc.exists()) {
-                participantDataMap.set(doc.id, doc.data() as UserProfile);
+                winnerDataMap.set(doc.id, doc.data() as UserProfile);
             }
         });
+
+        const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId as string);
+        const organizerDoc = await transaction.get(organizerRef);
 
         // --- 2. LOGIC PHASE (NO WRITES) ---
         const isTeamEvent = tournamentData.teamSize !== 'Solo';
@@ -658,14 +662,12 @@ export const awardTournamentWinners = async (
             };
         
         const finalWinners: Winner[] = [];
-        
+
         // --- 3. WRITE PHASE ---
 
         // Payout organizer
-        if (organizerPayout > 0 && tournamentData.organizerId) {
-            const organizerRef = doc(db, USERS_COLLECTION, tournamentData.organizerId);
+        if (organizerPayout > 0 && tournamentData.organizerId && organizerDoc.exists()) {
             transaction.update(organizerRef, { points: increment(organizerPayout) });
-
             const organizerTxRef = doc(collection(db, USERS_COLLECTION, tournamentData.organizerId, TRANSACTIONS_COLLECTION));
             transaction.set(organizerTxRef, {
                 amount: organizerPayout, type: 'credit', reason: `Organizer payout for: ${tournamentData.name}`,
@@ -684,34 +686,54 @@ export const awardTournamentWinners = async (
                 }
             }
         }
-
-        // Payout winners and award pro points
+        
         const processWinner = async (winnerData: Winner, rank: 1 | 2 | 3, totalPrize: number) => {
-            const teamId = winnerData.participant.teamId;
-            if (isTeamEvent && teamId) {
-                const teamDoc = await getDoc(doc(db, TEAMS_COLLECTION, teamId)); // Read outside transaction or accept team data
-                const team = teamDoc.data() as Team;
-                const prizePerMember = Math.floor(totalPrize / team.members.length);
+            const { participant } = winnerData;
+            const winnerRef = doc(db, USERS_COLLECTION, participant.id);
+            const winnerProfile = winnerDataMap.get(participant.id);
 
-                for (const member of team.members) {
-                    const winnerRef = doc(db, USERS_COLLECTION, member.uid);
-                    if (totalPrize > 0) transaction.update(winnerRef, { points: increment(prizePerMember) });
-                    // Pro points are handled in the all-participants loop
-                }
-                finalWinners.push({ ...winnerData, prize: totalPrize, rank, teamId: team.id, teamName: team.name });
+            if (winnerProfile) {
+                const unseenWin: UnseenWin = { id: `${tournamentId}-${rank}`, tournamentId, tournamentName: tournamentData.name, rank, prize: totalPrize };
+                const achievement: Omit<Achievement, 'id' | 'createdAt'> = {
+                    userId: participant.id,
+                    tournamentId,
+                    tournamentName: tournamentData.name,
+                    tournamentDate: (tournamentData.startDate as Timestamp).toDate().toISOString(),
+                    rank,
+                    rarity: rank === 1 ? 'mythic' : rank === 2 ? 'master' : 'elite',
+                    playerName: participant.name,
+                    playerTag: winnerProfile.apnaId || '',
+                    playerAvatar: winnerProfile.photoURL || '',
+                    teamName: participant.teamName || 'Solo Player',
+                    teamLogo: '' // Placeholder, maybe fetch team logo if it's a team tournament
+                };
 
-            } else { // Solo winner
-                const { participant } = winnerData;
-                const winnerRef = doc(db, USERS_COLLECTION, participant.id);
-                const updatePayload: any = { monthlyWins: increment(1) };
+                const achievementRef = doc(collection(db, ACHIEVEMENTS_COLLECTION));
+                transaction.set(achievementRef, { ...achievement, createdAt: serverTimestamp() });
+                
+                const updatePayload: any = { 
+                    monthlyWins: increment(1),
+                    unseenWins: arrayUnion(unseenWin)
+                };
+                
+                let proPointsToAdd = 0;
+                if (rank === 1) proPointsToAdd = PRO_POINTS_WIN;
+                else if (rank === 2) proPointsToAdd = PRO_POINTS_SECOND;
+                else if (rank === 3) proPointsToAdd = PRO_POINTS_THIRD;
+                
+                const newTotalProPoints = (winnerProfile.proPoints || 0) + proPointsToAdd;
+                updatePayload.proPoints = increment(proPointsToAdd);
+                updatePayload.proTier = getProTier(newTotalProPoints);
+                
                 if (totalPrize > 0) {
                     updatePayload.points = increment(totalPrize);
                     const prizeTxRef = doc(collection(db, USERS_COLLECTION, participant.id, TRANSACTIONS_COLLECTION));
                     transaction.set(prizeTxRef, {
-                        amount: totalPrize, type: 'credit', reason: `Prize for ${rank === 1 ? '1st' : rank === 2 ? '2nd' : '3rd'} place in ${tournamentData.name}`,
+                        amount: totalPrize, type: 'credit', reason: `Prize for ${rank} place in ${tournamentData.name}`,
                         tournamentId, createdAt: serverTimestamp()
                     });
                 }
+
                 transaction.update(winnerRef, updatePayload);
                 finalWinners.push({ ...winnerData, prize: totalPrize, rank });
             }
@@ -720,27 +742,7 @@ export const awardTournamentWinners = async (
         await processWinner(winners.first, 1, prizeDistribution.first);
         await processWinner(winners.second, 2, prizeDistribution.second);
         await processWinner(winners.third, 3, prizeDistribution.third);
-
-        // Update pro points for all participants
-        for (const doc of allParticipantDocs) {
-            const userData = participantDataMap.get(doc.id);
-            if (!userData) continue;
-
-            let pointsToAdd = PRO_POINTS_JOIN_TOURNAMENT;
-            if (doc.id === winners.first.participant.id) pointsToAdd = PRO_POINTS_WIN;
-            else if (doc.id === winners.second.participant.id) pointsToAdd = PRO_POINTS_SECOND;
-            else if (doc.id === winners.third.participant.id) pointsToAdd = PRO_POINTS_THIRD;
-            
-            const newTotalProPoints = (userData.proPoints || 0) + pointsToAdd;
-            const newTier = getProTier(newTotalProPoints);
-            
-            transaction.update(doc.ref, {
-                proPoints: increment(pointsToAdd),
-                proTier: newTier
-            });
-        }
         
-        // Finalize tournament
         transaction.update(tournamentRef, { status: "Completed", winners: finalWinners, updatedAt: serverTimestamp() });
     });
 };
@@ -1869,6 +1871,18 @@ export const deleteTeamFromFirestore = async (teamId: string): Promise<void> => 
     const teamRef = doc(db, TEAMS_COLLECTION, teamId);
     await deleteDoc(teamRef);
     // Optional: also delete all pending invites for this team
+};
+
+// --- Achievement Functions ---
+export const getUserAchievements = async (userId: string): Promise<Achievement[]> => {
+    if (!userId) return [];
+    const achievementsRef = collection(db, ACHIEVEMENTS_COLLECTION);
+    const q = query(achievementsRef, where("userId", "==", userId), orderBy("createdAt", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+    } as Achievement));
 };
 
 
