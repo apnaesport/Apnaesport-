@@ -1,14 +1,5 @@
 
 import type { Metadata } from "next";
-import { PageTitle } from "@/components/shared/PageTitle";
-import { Card } from "@/components/ui/card";
-import { ArrowRight, Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone } from "lucide-react";
-import { LandingHeader } from "@/components/layout/LandingHeader";
-import { LandingPageVideoAnimation } from "@/components/layout/LandingPageVideoAnimation";
-import { useAuth } from "@/contexts/AuthContext";
-import { LandingCTAButtons } from "@/components/layout/LandingCTAButtons";
-import { useSiteSettings } from "@/contexts/SiteSettingsContext";
-import { MainLayout } from "@/components/layout/MainLayout";
 import LandingPageClient from "./LandingPageClient";
 
 export const metadata: Metadata = {

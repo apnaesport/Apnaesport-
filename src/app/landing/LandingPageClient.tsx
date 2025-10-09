@@ -3,6 +3,7 @@
 
 import { FeatureCard, FloatingShape, StatItem } from "./LandingPageComponents";
 import { LandingHeader } from "@/components/layout/LandingHeader";
+import { LandingPageVideoAnimation } from "@/components/layout/LandingPageVideoAnimation";
 import { LandingCTAButtons } from "@/components/layout/LandingCTAButtons";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { Trophy, Users, ShieldCheck, Gamepad2, Star, Megaphone } from "lucide-react";
@@ -42,16 +43,7 @@ export default function LandingPageClient() {
       {!loadingSettings && settings?.showVideoSectionOnLanding && settings.landingPageVideoUrl && (
         <section id="video" className="py-20 px-4 relative z-10">
           <div className="container mx-auto">
-            <h2 className="text-3xl md:text-4xl font-bold text-center mb-8 text-white">See What's Happening</h2>
-            <div className="aspect-video max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-primary/20 border-2 border-primary/30">
-              <iframe
-                className="w-full h-full"
-                src={settings.landingPageVideoUrl}
-                title="Apna Esport Promotion"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              ></iframe>
-            </div>
+             <LandingPageVideoAnimation />
           </div>
         </section>
       )}

@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import React from 'react';
-import Confetti from 'react-use-confetti';
+import Confetti from 'react-confetti';
 import { useWindowSize } from 'react-use';
 import {
   AlertDialog,
