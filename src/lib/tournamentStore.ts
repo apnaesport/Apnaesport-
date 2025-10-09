@@ -54,7 +54,7 @@ const PREMIUM_POINT_BONUS = 200;
 const CAPTAIN_BONUS_PERCENTAGE = 0.10; // 10% of platform fee
 
 // --- Pro Board Point Constants ---
-const PRO_POINTS_CREATE_TOURNAMENT = 20;
+export const PRO_POINTS_CREATE_TOURNAMENT = 20;
 const PRO_POINTS_JOIN_TOURNAMENT = 3;
 const PRO_POINTS_WIN = 20;
 const PRO_POINTS_SECOND = 15;
@@ -1044,7 +1044,7 @@ export const getTopPlayersByProPoints = async (count: number): Promise<(UserProf
 
 export const listenToTopPlayersByProPoints = (count: number, callback: (players: (UserProfile & { kda: string })[]) => void): (() => void) => {
     const q = query(
-        collection(db, USERS_COLLECTION),
+        collection(db, USERS_COLlection),
         orderBy("proPoints", "desc"),
         limit(count)
     );
@@ -1506,7 +1506,7 @@ export const updateAnnouncement = async (communityId: string, announcementId: st
 };
 
 export const deleteAnnouncement = async (communityId: string, announcementId: string) => {
-    const announcementRef = doc(db, COMMUNITIONS_COLLECTION, communityId, 'announcements', announcementId);
+    const announcementRef = doc(db, COMMUNITIES_COLLECTION, communityId, 'announcements', announcementId);
     await deleteDoc(announcementRef);
 };
 
