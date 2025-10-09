@@ -7,7 +7,7 @@ import { FeaturedTournamentCard } from "@/components/dashboard/FeaturedTournamen
 import { LiveTournamentCard } from "@/components/dashboard/LiveTournamentCard";
 import { StatsCard } from "@/components/dashboard/StatsCard";
 import { GamesListHorizontal } from "@/components/games/GamesListHorizontal";
-import type { Tournament, Game, StatItem, UserProfile, UnseenWin } from "@/lib/types";
+import type { Tournament, Game, StatItem, UserProfile, UnseenWin, Achievement } from "@/lib/types";
 import { Heart, Megaphone, Coins, Gift, Trophy, Crown, Swords } from "lucide-react";
 import { TournamentCard } from "@/components/tournaments/TournamentCard";
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -16,13 +16,13 @@ import { ImageWithFallback } from "@/components/shared/ImageWithFallback";
 import { cn } from "@/lib/utils";
 import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { AdsterraBlock } from '@/components/ads/AdsterraBlock';
-import { isDailyBonusAvailable, getUnseenWinsFromFirestore, clearUnseenWinsFromFirestore, updateUserProfileInFirestore } from "@/lib/tournamentStore";
+import { AdsterraBlock } from "@/components/ads/AdsterraBlock";
+import { isDailyBonusAvailable, getUnseenWinsFromFirestore, clearUnseenWinsFromFirestore, updateUserProfileInFirestore, getUserAchievements } from "@/lib/tournamentStore";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import React from 'react';
-import Confetti from 'react-confetti';
+import Confetti from 'react-use-confetti';
 import { useWindowSize } from 'react-use';
 import {
   AlertDialog,
@@ -33,8 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogClose } from "@/components/ui/dialog";
+import { DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { AchievementCard } from "@/components/achievements/AchievementCard";
 
 
 interface DashboardPageClientProps {
@@ -73,72 +76,90 @@ const WelcomePremiumDialog = ({ open, onOpenChange }: { open: boolean, onOpenCha
     const { width, height } = useWindowSize();
     
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 100 }}>
-            <Confetti width={width} height={height} recycle={false} numberOfPieces={open ? 400 : 0} />
-            <AlertDialog open={open} onOpenChange={onOpenChange}>
-                <AlertDialogContent className="text-center">
-                    <AlertDialogHeader>
-                        <Crown className="h-16 w-16 mx-auto text-amber-400" />
-                        <AlertDialogTitle className="text-3xl font-bold">Welcome to Premium!</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg">
-                           You've unlocked exclusive benefits, including a <strong className="text-primary">200 AE Point bonus!</strong>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                     <div className="py-4">
-                        <p className="text-muted-foreground">Thank you for being a valued member of our community.</p>
-                    </div>
-                    <AlertDialogFooter className="sm:justify-center">
-                        <AlertDialogAction onClick={() => onOpenChange(false)}>Awesome!</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            {open && <Confetti width={width} height={height} recycle={false} numberOfPieces={400} />}
+            <DialogContent className="text-center">
+                 <DialogHeader>
+                    <Crown className="h-16 w-16 mx-auto text-amber-400" />
+                    <DialogTitle className="text-3xl font-bold">Welcome to Premium!</DialogTitle>
+                    <DialogDescription className="text-lg">
+                       You've unlocked exclusive benefits, including a <strong className="text-primary">200 AE Point bonus!</strong>
+                    </DialogDescription>
+                </DialogHeader>
+                 <div className="py-4">
+                    <p className="text-muted-foreground">Thank you for being a valued member of our community.</p>
+                </div>
+                <DialogClose asChild>
+                    <Button>Awesome!</Button>
+                </DialogClose>
+            </DialogContent>
+        </Dialog>
     );
 };
 
 
-const WinnerShowcaseDialog = ({ win, open, onOpenChange }: { win: UnseenWin; open: boolean; onOpenChange: (open: boolean) => void; }) => {
+const WinnerShowcaseDialog = ({ win, onOpenChange, onAchievementOpen }: { win: UnseenWin; onOpenChange: (open: boolean) => void; onAchievementOpen: () => void; }) => {
     const { width, height } = useWindowSize();
     
     if (!win) return null;
 
     const rankText = win.rank === 1 ? '1st' : win.rank === 2 ? '2nd' : '3rd';
+    const open = !!win;
 
     return (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', zIndex: 100 }}>
-            <Confetti width={width} height={height} recycle={false} numberOfPieces={open ? 400 : 0} />
-            <AlertDialog open={open} onOpenChange={onOpenChange}>
-                <AlertDialogContent className="text-center">
-                    <AlertDialogHeader>
-                        <Trophy className="h-16 w-16 mx-auto text-yellow-400" />
-                        <AlertDialogTitle className="text-3xl font-bold">Congratulations!</AlertDialogTitle>
-                        <AlertDialogDescription className="text-lg">
-                            You placed <strong className="text-primary">{rankText}</strong> in the <strong className="text-foreground">{win.tournamentName}</strong> tournament!
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    {win.prize > 0 && (
-                        <div className="py-4">
-                            <p className="text-muted-foreground">You have been awarded:</p>
-                            <p className="text-4xl font-bold text-yellow-500 flex items-center justify-center gap-2">
-                                {win.prize} <Coins className="h-8 w-8" />
-                            </p>
-                        </div>
-                    )}
-                    <AlertDialogFooter className="sm:justify-center">
-                        <AlertDialogAction onClick={() => onOpenChange(false)}>Awesome!</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
-        </div>
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            {open && <Confetti width={width} height={height} recycle={false} numberOfPieces={400} />}
+             <DialogContent className="text-center">
+                <DialogHeader>
+                    <Trophy className="h-16 w-16 mx-auto text-yellow-400" />
+                    <DialogTitle className="text-3xl font-bold">Congratulations!</DialogTitle>
+                    <DialogDescription className="text-lg">
+                        You placed <strong className="text-primary">{rankText}</strong> in the <strong className="text-foreground">{win.tournamentName}</strong> tournament!
+                    </DialogDescription>
+                </DialogHeader>
+                {win.prize > 0 && (
+                    <div className="py-4">
+                        <p className="text-muted-foreground">You have been awarded:</p>
+                        <p className="text-4xl font-bold text-yellow-500 flex items-center justify-center gap-2">
+                            {win.prize} <Coins className="h-8 w-8" />
+                        </p>
+                    </div>
+                )}
+                 <DialogClose asChild>
+                    <Button onClick={onAchievementOpen}>View My Achievement</Button>
+                </DialogClose>
+            </DialogContent>
+        </Dialog>
     );
 };
+
+const AchievementDialog = ({ achievement, onOpenChange }: { achievement: Achievement | null; onOpenChange: (open: boolean) => void }) => {
+    const open = !!achievement;
+
+    if (!achievement) return null;
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-4xl w-full p-0 bg-transparent border-none shadow-none">
+                 <AchievementCard 
+                    player={{ name: achievement.playerName, tag: achievement.playerTag, avatar: achievement.playerAvatar }}
+                    team={{ name: achievement.teamName, logo: achievement.teamLogo }}
+                    tournament={{ name: achievement.tournamentName, date: new Date(achievement.tournamentDate).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric'}) }}
+                    rank={achievement.rank}
+                    rarity={achievement.rarity}
+                />
+            </DialogContent>
+        </Dialog>
+    )
+}
 
 export default function DashboardPageClient({ stats: initialStats, featuredTournament, liveTournaments, allGames, allTournaments, recentWinners }: DashboardPageClientProps) {
     const { user, refreshUser } = useAuth();
     const { settings, loadingSettings } = useSiteSettings();
     const [bonusAvailable, setBonusAvailable] = useState(false);
     const [unseenWin, setUnseenWin] = useState<UnseenWin | null>(null);
-    const [showWinnerShowcase, setShowWinnerShowcase] = useState(false);
+    const [latestAchievement, setLatestAchievement] = useState<Achievement | null>(null);
+    const [showAchievementCard, setShowAchievementCard] = useState(false);
     const [showPremiumWelcome, setShowPremiumWelcome] = useState(false);
 
 
@@ -153,7 +174,6 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
                 const wins = await getUnseenWinsFromFirestore(user.uid);
                 if (wins.length > 0) {
                     setUnseenWin(wins[0]); // Show the first one
-                    setShowWinnerShowcase(true);
                 }
 
                 if(user.isPremium && user.hasSeenPremiumPopup === false) {
@@ -164,11 +184,23 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
         checkFeatures();
     }, [user]);
     
-    const handleWinnerShowcaseClose = async (open: boolean) => {
-        if (!open && user && unseenWin) {
+    const handleWinnerShowcaseClose = async () => {
+        if (user && unseenWin) {
             await clearUnseenWinsFromFirestore(user.uid, unseenWin.id);
+            setUnseenWin(null); // Clear the win from state
         }
-        setShowWinnerShowcase(open);
+    }
+    
+    const handleViewAchievement = async () => {
+        if(user && unseenWin) {
+            const achievements = await getUserAchievements(user.uid);
+            const matchingAchievement = achievements.find(ach => ach.tournamentId === unseenWin.tournamentId);
+            if(matchingAchievement) {
+                setLatestAchievement(matchingAchievement);
+            }
+            await handleWinnerShowcaseClose(); // Close the first dialog
+            setShowAchievementCard(true); // Open the second dialog
+        }
     }
     
     const handlePremiumWelcomeClose = async (open: boolean) => {
@@ -210,8 +242,9 @@ export default function DashboardPageClient({ stats: initialStats, featuredTourn
 
     return (
         <div className="space-y-8">
-            {unseenWin && <WinnerShowcaseDialog win={unseenWin} open={showWinnerShowcase} onOpenChange={handleWinnerShowcaseClose} />}
-            {showPremiumWelcome && <WelcomePremiumDialog open={showPremiumWelcome} onOpenChange={handlePremiumWelcomeClose} />}
+            {unseenWin && <WinnerShowcaseDialog win={unseenWin} onOpenChange={() => setUnseenWin(null)} onAchievementOpen={handleViewAchievement} />}
+            {latestAchievement && <AchievementDialog achievement={latestAchievement} onOpenChange={setShowAchievementCard} />}
+            <WelcomePremiumDialog open={showPremiumWelcome} onOpenChange={handlePremiumWelcomeClose} />
 
 
             <PageTitle title="Dashboard" subtitle="Welcome back to Apna Esport!" />

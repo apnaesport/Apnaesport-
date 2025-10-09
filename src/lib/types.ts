@@ -410,3 +410,22 @@ export interface PremiumRequest {
   status: PremiumRequestStatus;
   createdAt: Timestamp;
 }
+
+// --- Achievement Types ---
+export type AchievementRarity = "elite" | "master" | "mythic" | "supreme";
+
+export interface Achievement {
+    id: string;
+    userId: string;
+    tournamentId: string;
+    tournamentName: string;
+    tournamentDate: string; // ISO string
+    rank: 1 | 2 | 3;
+    rarity: AchievementRarity;
+    playerName: string;
+    playerTag: string;
+    playerAvatar: string;
+    teamName: string;
+    teamLogo: string;
+    createdAt: Timestamp;
+}

@@ -42,6 +42,7 @@ const getProTier = (points: number): ProTier => {
     return "Bronze";
 };
 
+
 const MyRankCard = () => {
     const { user, loading } = useAuth();
     const [allPlayers, setAllPlayers] = useState<UserProfile[]>([]);
@@ -95,7 +96,7 @@ const MyRankCard = () => {
                 </div>
                 <div className="space-y-2">
                      <div className="flex justify-between items-baseline">
-                        <p className={`font-bold text-lg ${tierInfo.color}`}>{tierInfo.name}</p>
+                        <p className={cn("font-bold text-lg", tierInfo.color)}>{tierInfo.name}</p>
                         {!isMaxLevel && nextTierInfo && <p className="text-xs text-muted-foreground">Next: {nextTierInfo.name}</p>}
                     </div>
                     {isMaxLevel ? (
@@ -172,7 +173,7 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
                 {tierOrder.map(tier => (
                     <Card key={tier} className="text-center bg-card/30">
                         <CardContent className="p-3">
-                            <p className={`font-bold ${tierConfig[tier].color}`}>{tierConfig[tier].name}</p>
+                            <p className={cn("font-bold", tierConfig[tier].color)}>{tierConfig[tier].name}</p>
                             <p className="text-xs text-muted-foreground">{tierConfig[tier].points}+ Points</p>
                         </CardContent>
                     </Card>
@@ -211,7 +212,7 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
                                         <h3 className="text-base font-semibold text-foreground truncate">{player.displayName}</h3>
                                         {player.isPremium && <Crown className="h-4 w-4 text-amber-400" />}
                                     </div>
-                                    <div className={`player-stats text-xs font-bold flex items-center gap-3 mt-1 ${tierConfig[tier].color}`}>
+                                    <div className={cn("player-stats text-xs font-bold flex items-center gap-3 mt-1", tierConfig[tier].color)}>
                                         {tierConfig[tier].name}
                                     </div>
                                 </div>
@@ -233,5 +234,3 @@ export function ProBoardClient({ initialPlayers }: ProBoardClientProps) {
         </div>
     );
 }
-
-    
