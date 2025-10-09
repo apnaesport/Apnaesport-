@@ -1,6 +1,8 @@
 
 import type {NextConfig} from 'next';
 
+const isDev = process.env.NODE_ENV === 'development';
+
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
@@ -12,10 +14,12 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     // This allows the Next.js dev server to accept requests from the
-    // Firebase Studio environment.
-    allowedDevOrigins: [
-      '*.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
-    ],
+    // Firebase Studio environment. This is only needed in development.
+    ...(isDev && {
+      allowedDevOrigins: [
+        '*.cluster-nzwlpk54dvagsxetkvxzbvslyi.cloudworkstations.dev',
+      ],
+    }),
   },
    async redirects() {
     return [
@@ -52,6 +56,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'i.pravatar.cc',
+        port: '',
+        pathname: '/**',
+      }
     ],
   },
 };
