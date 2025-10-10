@@ -844,10 +844,11 @@ const formatUserProfile = (doc: any): UserProfile => {
         isPremium: data.isPremium || false,
         premiumSince: data.premiumSince as Timestamp,
         premiumFeatures: data.premiumFeatures || {},
-        createdAt: data.createdAt as Timestamp,
-        lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
         hasReceivedPremiumBonus: data.hasReceivedPremiumBonus || false,
         hasSeenPremiumPopup: data.hasSeenPremiumPopup,
+        createdAt: data.createdAt as Timestamp,
+        lastBonusClaimedAt: data.lastBonusClaimedAt as Timestamp,
+        lastNotificationCheck: data.lastNotificationCheck as Timestamp, // For unread notifications
         bio: data.bio || "",
         favoriteGameIds: data.favoriteGameIds || [],
         streamingChannelUrl: data.streamingChannelUrl || "",
@@ -1044,7 +1045,7 @@ export const getTopPlayersByProPoints = async (count: number): Promise<(UserProf
 
 export const listenToTopPlayersByProPoints = (count: number, callback: (players: (UserProfile & { kda: string })[]) => void): (() => void) => {
     const q = query(
-        collection(db, USERS_COLlection),
+        collection(db, USERS_COLLECTION),
         orderBy("proPoints", "desc"),
         limit(count)
     );
@@ -1960,3 +1961,4 @@ export const getCommunityDetails = getCommunityByIdFromFirestore;
 
 
     
+
