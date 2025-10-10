@@ -45,6 +45,7 @@ const settingsSchema = z.object({
   defaultCommunityLogoUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   defaultCommunityBannerUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
   defaultPremiumAvatarUrl: z.string().url("Must be a valid URL.").or(z.literal('')).optional(),
+  achievementCardLogoUrl: z.string().url("Must be a valid URL for the achievement logo.").or(z.literal('')).optional(),
   adsEnabled: z.boolean().optional(),
   adsterraNativeAdKey: z.string().optional(),
   aeCoinLogoUrl: z.string().url("Must be a valid URL for the coin logo.").or(z.literal('')).optional(),
@@ -65,6 +66,7 @@ const defaultSettingsValues: Partial<SiteSettings> = {
   defaultCommunityLogoUrl: "",
   defaultCommunityBannerUrl: "",
   defaultPremiumAvatarUrl: "",
+  achievementCardLogoUrl: "",
   adsEnabled: false,
   adsterraNativeAdKey: "",
   aeCoinLogoUrl: "",
@@ -259,6 +261,12 @@ function AdminSettingsPageContent() {
             <Label htmlFor="defaultPremiumAvatarUrl" className="flex items-center gap-2"><Crown className="h-4 w-4 text-amber-500"/>Default Premium Avatar URL</Label>
             <Input id="defaultPremiumAvatarUrl" {...form.register("defaultPremiumAvatarUrl")} placeholder="https://example.com/premium-avatar.png" disabled={isSaving}/>
             {form.formState.errors.defaultPremiumAvatarUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.defaultPremiumAvatarUrl.message as string}</p>}
+          </div>
+           <div className="space-y-2">
+            <Label htmlFor="achievementCardLogoUrl" className="flex items-center gap-2"><ImageIcon className="h-4 w-4"/>Achievement Card Logo URL</Label>
+            <Input id="achievementCardLogoUrl" {...form.register("achievementCardLogoUrl")} placeholder="https://example.com/achievement-logo.png" disabled={isSaving}/>
+            {form.formState.errors.achievementCardLogoUrl && <p className="text-destructive text-xs mt-1">{form.formState.errors.achievementCardLogoUrl.message as string}</p>}
+            <p className="text-xs text-muted-foreground">This logo will be displayed on all achievement cards.</p>
           </div>
           <Separator />
            <div className="space-y-2">

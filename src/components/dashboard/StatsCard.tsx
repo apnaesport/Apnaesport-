@@ -31,7 +31,7 @@ export function StatsCard({ item, className }: StatsCardProps) {
         {IconComponent && <IconComponent className="h-5 w-5 text-primary" />}
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold text-foreground">{item.value}</div>
+        <div className="text-2xl sm:text-3xl font-bold text-foreground">{item.value}</div>
         {item.change && (
           <p className={cn(
             "text-xs text-muted-foreground mt-1",

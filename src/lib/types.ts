@@ -217,6 +217,7 @@ export interface SiteSettings {
   defaultCommunityLogoUrl?: string;
   defaultCommunityBannerUrl?: string;
   defaultPremiumAvatarUrl?: string;
+  achievementCardLogoUrl?: string;
   showVideoSectionOnLanding?: boolean;
   landingPageVideoUrl?: string;
   updatedAt?: Timestamp;
