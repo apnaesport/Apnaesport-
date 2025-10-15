@@ -21,7 +21,8 @@ import {
   Users2,
   Trophy,
   ListOrdered,
-  Award, // Added Award icon
+  Award,
+  BookOpen, // Added blog icon
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -44,6 +45,7 @@ export const mainNavItemsForAdmin = [
   { href: "/my-tournaments", label: "My Tournaments", icon: ListOrdered },
   { href: "/achievements", label: "Achievements", icon: Award },
   { href: "/teams", label: "Teams", icon: Users2 },
+  { href: "/blog", label: "Blog", icon: BookOpen },
   { href: "/pro-board", label: "Pro Board", icon: Trophy },
   { href: "/leaderboard", label: "Hall of Fame", icon: TrendingUp },
   { href: "/community", label: "Communities", icon: Users },
