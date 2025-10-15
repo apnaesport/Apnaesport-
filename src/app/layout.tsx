@@ -24,8 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const settings = await getSiteSettingsFromFirestore();
 
   const siteName = settings?.siteName || 'Apna Esport';
-  const defaultTitle = "Apna Esport | India's Premier Gaming Tournament Platform";
-  const defaultDescription = "Join Apna Esport (or apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games like BGMI and Free Fire, play online matches, earn AE Points, and connect with the esports community.";
+  const defaultTitle = `${siteName} | India's Premier Gaming Tournament Platform`;
+  const defaultDescription = `Join ${siteName} (or apnasport) – the ultimate platform for gamers in India. Create and join tournaments for top games like BGMI and Free Fire, play online matches, earn AE Points, and connect with the esports community.`;
   const keywords = ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", "play and win esports", "gaming competition site", "Free Fire", "BGMI", "Apna Esport tournaments", "Apna Esport gaming", "live gaming tournament", "mobile gaming tournaments", "apna esport login", "apna esport registration", "AE Points", "Apna ID"];
 
   return {
@@ -54,7 +54,7 @@ export async function generateMetadata(): Promise<Metadata> {
                 url: `${BASE_URL}/og-image.png`, // Assuming you have a default OG image
                 width: 1200,
                 height: 630,
-                alt: 'Apna Esport Banner',
+                alt: `${siteName} Banner`,
             }
         ]
     }

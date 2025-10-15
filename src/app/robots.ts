@@ -15,6 +15,7 @@ export default function robots(): MetadataRoute.Robots {
           '/landing',
           '/tournaments',
           '/games',
+          '/blog',
           '/community',
           '/creators',
           '/about',
@@ -24,8 +25,11 @@ export default function robots(): MetadataRoute.Robots {
           '/auth/login',
           '/auth/register',
           '/games/',
+          '/blog/',
           '/tournaments/',
           '/community/',
+          '/pro-board',
+          '/leaderboard',
         ],
         // Disallow crawling of private user-specific pages and the admin area
         disallow: [
@@ -35,6 +39,8 @@ export default function robots(): MetadataRoute.Robots {
           '/notifications',
           '/stats', 
           '/rewards',
+          '/my-tournaments',
+          '/achievements',
         ],
       },
     ],

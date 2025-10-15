@@ -1,5 +1,4 @@
 
-
 import type { Metadata, ResolvingMetadata } from "next";
 import { PageTitle } from "@/components/shared/PageTitle";
 import { Badge } from "@/components/ui/badge";
@@ -48,14 +47,14 @@ export async function generateMetadata({ params }: TournamentPageProps, parent: 
   
   // Correctly format the date first, then construct the description string.
   const formattedDate = new Date(startDate).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
-  const prizeText = prizePool > 0 ? `Prize Pool: ${prizePool} AE Points.` : '';
-  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Starts on ${formattedDate}. ${prizeText} Sign up now!`;
+  const prizeText = prizePool > 0 ? `Compete for a prize pool of ${prizePool} AE Points.` : 'Compete for glory.';
+  const description = `Join the ${tournament.name} ${tournament.gameName} tournament on Apna Esport. Event starts on ${formattedDate} ${prizeText} Register now and prove your skills!`;
 
 
   return {
     title,
     description,
-    keywords: ["Apna Esport", "apnasport", tournament.name, `${tournament.gameName} tournament`, "online tournament", "gaming competition"],
+    keywords: ["Apna Esport", "apnasport", tournament.name, `${tournament.gameName} tournament`, "online tournament", "gaming competition", "register tournament"],
     openGraph: {
       title: title,
       description: description,

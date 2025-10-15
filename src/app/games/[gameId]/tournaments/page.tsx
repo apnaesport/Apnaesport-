@@ -31,15 +31,15 @@ export async function generateMetadata({ params }: GameTournamentsPageProps, par
   }
 
   const title = `${game.name} Tournaments | Apna Esport`;
-  const description = `Find, join, and compete in ${game.name} tournaments on Apna Esport (apnasport). See upcoming, live, and completed events for ${game.name}.`;
+  const description = `Find, join, and compete in the latest ${game.name} tournaments on Apna Esport (apnasport). See upcoming, live, and completed events, and register to play against India's best gamers.`;
 
   return {
     title,
     description,
     keywords: ["Apna Esport", "apnasport", "esports tournaments India", "online gaming platform", `${game.name} tournaments`, "gaming competition site", game.name, `${game.name} tournament registration`],
     openGraph: {
-      title: `${game.name} Tournaments on Apna Esport`,
-      description: `Browse all available tournaments for ${game.name}.`,
+      title: `All ${game.name} Tournaments on Apna Esport`,
+      description: `Browse all available tournaments for ${game.name}, check prize pools, and register to compete.`,
       images: [game.bannerUrl || game.iconUrl, ...previousImages],
       url: `${BASE_URL}/games/${gameId}/tournaments`,
     },
